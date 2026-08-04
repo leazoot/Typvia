@@ -3,8 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "license": "MPL-2.0",
+  "type": "module",
   "packageManager": "pnpm@10.30.3",
   "engines": {
     "node": ">=22"
+  },
+  "scripts": {
+    "lint": "pnpm lint:rust && pnpm lint:js",
+    "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
+    "lint:js": "eslint .",
+    "format": "pnpm format:rust && pnpm format:js",
+    "format:rust": "cargo fmt --all --check",
+    "format:js": "prettier --check .",
+    "format:write": "cargo fmt --all && prettier --write .",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm test:rust && pnpm test:js",
+    "test:rust": "cargo test --workspace",
+    "test:js": "vitest run",
+    "build": "pnpm build:rust && pnpm build:js",
+    "build:rust": "cargo build --workspace",
+    "build:js": "pnpm -r --if-present run build"
+  },
+  "devDependencies": {
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
   }
 }

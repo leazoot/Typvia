@@ -1,0 +1,4 @@
+# unwrap/expect are denied in reachable runtime paths but allowed in tests
+# (see .claude/rules/backend.md).
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

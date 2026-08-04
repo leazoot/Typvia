@@ -13,3 +13,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 license = "MPL-2.0"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"

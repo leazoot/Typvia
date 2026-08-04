@@ -1,0 +1,10 @@
+node_modules/
+dist/
+target/
+espanso/
+design/
+docs/
+pnpm-lock.yaml
+Cargo.lock
+CLAUDE.md
+.claude/

@@ -1,0 +1,12 @@
+# SPIKE (TASK-007): throwaway desktop text-injection validation. Not part of
+# the root workspace; must not be promoted into formal modules.
+[package]
+name = "typvia-injection-spike"
+version = "0.0.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[dependencies]
+arboard = "3"
+core-graphics = "0.25"
+serde_json = "1"

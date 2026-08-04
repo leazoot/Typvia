@@ -6,3 +6,13 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# Benchmark-only for now (TASK-006 baseline); promoted to a runtime dependency
+# when the search module is implemented (TASK-019, per DEC-005).
+rusqlite = { version = "0.38", features = ["bundled"] }
+criterion = "0.7"
+
+[[bench]]
+name = "fts5_search"
+harness = false

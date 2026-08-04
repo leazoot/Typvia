@@ -1,0 +1,25 @@
+# Rust
+/target/
+**/target/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment and local overrides
+.env
+.env.*
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+*.swp
+
+# Local reference clone of Espanso (GPL-3.0). It must never be committed:
+# Typvia is MPL-2.0 and keeps Espanso at arm's length (docs/11_DECISIONS.md DEC-001).
+/espanso/

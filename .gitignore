@@ -23,3 +23,6 @@ Thumbs.db
 # Local reference clone of Espanso (GPL-3.0). It must never be committed:
 # Typvia is MPL-2.0 and keeps Espanso at arm's length (docs/11_DECISIONS.md DEC-001).
 /espanso/
+
+# Tauri generated artifacts
+**/src-tauri/gen/

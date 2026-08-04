@@ -1,0 +1,16 @@
+# SPIKE (TASK-005): throwaway shell validation crate. Not part of the root
+# workspace; must not be promoted into formal modules (see docs/spikes/).
+[package]
+name = "typvia-desktop-shell-spike"
+version = "0.0.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

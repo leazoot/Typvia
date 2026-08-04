@@ -1,5 +1,8 @@
 [workspace]
 resolver = "2"
+# Throwaway spike crates live outside the workspace so root-level quality
+# commands stay scoped to formal modules (spike code is exempt from lint).
+exclude = ["apps/desktop/src-tauri"]
 members = [
     "crates/core",
     "crates/crypto",

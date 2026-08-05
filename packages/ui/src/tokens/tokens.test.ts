@@ -63,6 +63,8 @@ describe('cssVariables', () => {
     expect(light['--type-editor-body-size']).toBe('14.5px');
     expect(light['--type-editor-body-leading']).toBe('2.05');
     expect(light['--scrim-modal']).toBe('rgba(27,28,29,.28)');
+    expect(light['--color-accent-on-ink']).toBe('#7FA3C4');
+    expect(dark['--color-accent-on-ink']).toBe('#7FA3C4');
     expect(light['--focus-ring']).toBe(
       '0 0 0 2px var(--focus-ring-surface, var(--color-paper)), 0 0 0 3.5px var(--color-accent)',
     );

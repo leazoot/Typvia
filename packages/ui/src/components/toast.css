@@ -1,0 +1,38 @@
+.tv-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-9);
+  height: 34px;
+  padding: 0 15px;
+  background: var(--color-ink);
+  border-radius: var(--radius-row);
+  box-shadow: var(--elevation-e2);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  animation: tv-toast-enter var(--duration-overlay-enter) var(--curve-standard);
+}
+
+/* The toast is an ink surface in both themes, so its caret always uses the
+ * graphite accent (generated from tokens as --color-accent-on-ink). */
+.tv-toast .tv-caret {
+  background: var(--color-accent-on-ink);
+}
+
+@keyframes tv-toast-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-toast {
+    animation: none;
+  }
+}

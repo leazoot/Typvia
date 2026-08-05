@@ -1,0 +1,20 @@
+.tv-type-mark {
+  display: inline-block;
+  flex: none;
+  padding: 3px 4px;
+  background: var(--color-sunken);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mark);
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--type-type-mark-size);
+  font-weight: var(--type-type-mark-weight);
+  line-height: var(--type-type-mark-leading);
+  letter-spacing: var(--type-type-mark-tracking);
+}
+
+.tv-type-mark.is-secret {
+  background: var(--color-accent-tint-bg);
+  border-color: var(--color-accent-tint-border);
+  color: var(--color-accent);
+}

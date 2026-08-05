@@ -1,0 +1,36 @@
+.tv-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-9);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tv-status-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.tv-status-success .tv-status-dot {
+  background: var(--color-success);
+}
+
+.tv-status-warning .tv-status-dot {
+  background: var(--color-warning);
+}
+
+.tv-status-error .tv-status-dot {
+  background: var(--color-error);
+}
+
+/* Security is a square outline, never a filled circle. */
+.tv-status-secure .tv-status-dot {
+  border-radius: 2px;
+  border: 1.5px solid var(--color-accent);
+  background: none;
+  box-sizing: border-box;
+}

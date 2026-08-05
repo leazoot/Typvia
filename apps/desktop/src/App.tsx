@@ -1,30 +1,31 @@
 import { APP_ROUTES } from '@typvia/shared';
-import { PlaceholderPage } from '@typvia/ui';
-import { NavLink, Route, Routes } from 'react-router';
+import { Page, PlaceholderPage, TopNav } from '@typvia/ui';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 
-// Skeleton shell: an unstyled text navigation over placeholder pages.
-// Visual design lands with the token system (TASK-026) and the real
-// navigation component (TASK-027); nothing here may hardcode design values.
+const NAV_ITEMS = APP_ROUTES.map((route) => ({ key: route.path, label: route.labelEn }));
+
+// App shell: top text navigation (TopNav) over the routed pages. Page bodies
+// are placeholders until their screens land (STAGE-08 on).
 export function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   return (
     <>
-      <nav aria-label="Main">
-        <ul>
-          {APP_ROUTES.map((route) => (
-            <li key={route.path}>
-              <NavLink to={route.path} end>
-                {route.labelEn}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <TopNav
+        items={NAV_ITEMS}
+        activeKey={location.pathname}
+        onNavigate={(path) => void navigate(path)}
+      />
       <Routes>
         {APP_ROUTES.map((route) => (
           <Route
             key={route.path}
             path={route.path}
-            element={<PlaceholderPage labelEn={route.labelEn} labelCn={route.labelCn} />}
+            element={
+              <Page>
+                <PlaceholderPage labelEn={route.labelEn} labelCn={route.labelCn} />
+              </Page>
+            }
           />
         ))}
       </Routes>

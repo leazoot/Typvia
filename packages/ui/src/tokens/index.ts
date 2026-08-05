@@ -111,6 +111,10 @@ export function cssVariables(theme: ThemeName): Record<string, string> {
   }
 
   vars['--scrim-modal'] = raw.scrim.modal;
+  // Ink surfaces (toast, primary button) exist in both themes; on them the
+  // caret always uses the graphite accent ("carries the caret in light
+  // accent", Phase 6 Toast). Generated, not hand-copied.
+  vars['--color-accent-on-ink'] = raw.color.dark.accent;
   vars['--focus-ring'] = raw.focus.ring
     .replace('<surface>', 'var(--focus-ring-surface, var(--color-paper))')
     .replace('<accent>', 'var(--color-accent)');

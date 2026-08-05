@@ -10,10 +10,10 @@ interface PlaceholderPageProps {
  */
 export function PlaceholderPage({ labelEn, labelCn }: PlaceholderPageProps) {
   return (
-    <main>
+    <section>
       <h1>{labelEn}</h1>
       <p lang="zh-Hans">{labelCn}</p>
       <p>This screen is not implemented yet.</p>
-    </main>
+    </section>
   );
 }

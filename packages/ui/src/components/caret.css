@@ -1,0 +1,28 @@
+.tv-caret {
+  display: inline-block;
+  flex: none;
+  width: 2px;
+  background: var(--color-accent);
+}
+
+/* The design's caret blink: hard on/off steps, no fade. */
+@keyframes tv-caret-blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.tv-caret-blink {
+  animation: tv-caret-blink 1.15s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-caret-blink {
+    animation: none;
+  }
+}

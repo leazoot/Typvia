@@ -43,10 +43,82 @@
   flex: none;
 }
 
-/* Recent list, results, preview and injection land in TASK-039. */
+.tv-panel-dest {
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
 .tv-panel-body {
   flex: 1;
   min-height: 0;
+  margin-top: var(--space-14);
+  overflow-y: auto;
+}
+
+.tv-panel-empty {
+  margin: 0;
+  padding: var(--space-14) 0;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.tv-panel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-13);
+  height: 52px;
+  padding: 0 var(--space-11);
+  border-radius: var(--radius-row);
+}
+
+/* Selection is a lift, never a solid fill (design): shadow on paper in light,
+ * a two-step lightness lift in dark. */
+.tv-panel-row[data-selected] {
+  background: var(--color-lifted, var(--color-paper));
+  box-shadow: var(--elevation-e1-row);
+}
+
+.tv-panel-row-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tv-panel-row-title {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-panel-row-preview {
+  overflow: hidden;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Trigger words are one of only two things allowed accent colour (design). */
+.tv-panel-row-trigger {
+  flex: none;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tv-panel-row-enter {
+  flex: none;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
 }
 
 .tv-panel-footer {

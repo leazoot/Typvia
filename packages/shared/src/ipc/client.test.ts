@@ -9,6 +9,7 @@ import {
   injectSnippet,
   libraryCounts,
   listSnippetPage,
+  panelInsert,
   panelReady,
   searchSnippets,
 } from './client';
@@ -127,6 +128,18 @@ describe('typed IPC client', () => {
     await hidePanel();
     await panelReady();
     expect(seen).toEqual(['panel_hide', 'panel_ready']);
+  });
+
+  it('sends the panel insert request with the wire contract', async () => {
+    const seen: Array<{ cmd: string; args: unknown }> = [];
+    mockIPC((cmd, args) => {
+      seen.push({ cmd, args });
+      return null;
+    });
+
+    await panelInsert('s-1');
+    expect(seen[0]?.cmd).toBe('panel_insert');
+    expect(seen[0]?.args).toEqual({ id: 's-1', method: null });
   });
 
   it('surfaces a permission_denied rejection as a typed IpcError', async () => {

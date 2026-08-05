@@ -65,22 +65,38 @@ pub fn toggle(app: &AppHandle) {
     }
 }
 
+/// Payload of the `panel:show` event: the app the insert will land in, named
+/// in the panel header (design "Destination app named in the header").
+#[derive(Clone, serde::Serialize)]
+struct PanelShow {
+    destination: Option<String>,
+}
+
 /// Summons the panel. Records the frontmost app first (before we steal focus),
-/// then shows, focuses, and tells the WebView to reset and focus the search
-/// field at frame 0.
+/// then shows, focuses, and tells the WebView to reset, focus the search field
+/// at frame 0, and name the destination app.
 pub fn show(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
+    let (pid, name) = match frontmost::frontmost_app() {
+        Some((pid, name)) => (Some(pid), Some(name)),
+        None => (None, None),
+    };
     let state = app.state::<PanelState>();
-    state.remember(frontmost::frontmost_pid());
+    state.remember(pid);
     state.mark_shown();
     let _ = window.show();
     let _ = window.set_focus();
     // Frame-0 focus: the WebView is resident, so a fresh show must re-focus the
     // input and clear any prior query. The panel front-end listens for this.
-    let _ = window.emit_to(PANEL_LABEL, "panel:show", ());
+    let destination = name.filter(|n| !n.is_empty());
+    let _ = window.emit_to(PANEL_LABEL, "panel:show", PanelShow { destination });
 }
+
+/// Delay after restoring the previous app before the insert paints, so the
+/// window server has brought it frontmost (TASK-039 injects into it).
+pub const FOCUS_SETTLE_MS: u64 = 100;
 
 /// Hides the panel and returns focus to the app that was frontmost when it was
 /// summoned.
@@ -123,13 +139,18 @@ mod frontmost {
     use objc2::MainThreadMarker;
     use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication, NSWorkspace};
 
-    /// PID of the frontmost application, or `None` if unreadable / off the main
-    /// thread (AppKit is main-thread-affine; callers run on the event loop).
-    pub fn frontmost_pid() -> Option<i32> {
+    /// PID and localized name of the frontmost application, or `None` if
+    /// unreadable / off the main thread (AppKit is main-thread-affine; callers
+    /// run on the event loop).
+    pub fn frontmost_app() -> Option<(i32, String)> {
         let _mtm = MainThreadMarker::new()?;
         let workspace = NSWorkspace::sharedWorkspace();
         let app = workspace.frontmostApplication()?;
-        Some(app.processIdentifier())
+        let name = app
+            .localizedName()
+            .map(|n| n.to_string())
+            .unwrap_or_default();
+        Some((app.processIdentifier(), name))
     }
 
     /// Re-activates the app with the given PID so it regains focus on hide.
@@ -149,7 +170,7 @@ mod frontmost {
 
 #[cfg(not(target_os = "macos"))]
 mod frontmost {
-    pub fn frontmost_pid() -> Option<i32> {
+    pub fn frontmost_app() -> Option<(i32, String)> {
         None
     }
 

@@ -176,6 +176,16 @@ export function hidePanel(): Promise<void> {
   return call('panel_hide');
 }
 
+/**
+ * Panel insert: hides the panel, restores the summoning app, and injects the
+ * snippet into it (usage recorded). Ordering is owned by the host so the paste
+ * never races the focus change. Rejects with `permission_denied` when the OS
+ * has not granted injection — the panel falls back to {@link copySnippet}.
+ */
+export function panelInsert(id: string, method?: InjectionMethod): Promise<void> {
+  return call('panel_insert', { id, method: method ?? null });
+}
+
 /** Signals the panel's first frame has painted (drives the debug latency probe). */
 export function panelReady(): Promise<void> {
   return call('panel_ready');

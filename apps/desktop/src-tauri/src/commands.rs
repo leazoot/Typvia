@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 use crate::dto::{
     FolderCreateInput, FolderDto, FolderUpdateInput, LibraryCountsDto, SearchHitDto,
@@ -13,7 +13,7 @@ use crate::dto::{
 };
 use crate::error::IpcError;
 use crate::injector::{InjectionMethod, Injector};
-use crate::service;
+use crate::{panel, service};
 
 /// Single-writer SQLite connection (WAL, database rules): one mutex, no pool.
 /// The injector is stateful (owns a clipboard handle) and reused across calls.
@@ -267,6 +267,32 @@ pub fn snippet_copy(state: State<'_, AppState>, id: String) -> Result<(), IpcErr
     let conn = state.lock()?;
     let mut injector = state.lock_injector()?;
     service::snippet_copy(&conn, injector.as_mut(), &id, now)
+}
+
+/// Panel insert (⌵): hide the panel and restore the previous app on the main
+/// thread, let the window server bring it frontmost, then inject into it. The
+/// ordering is owned here (not the WebView) so the paste never races the focus
+/// change. A `permission_denied` result lets the panel fall back to copy.
+#[tauri::command]
+pub async fn panel_insert(
+    app: AppHandle,
+    id: String,
+    method: Option<String>,
+) -> Result<(), IpcError> {
+    let method = parse_method(method.as_deref())?;
+    let restore = app.clone();
+    app.run_on_main_thread(move || panel::hide(&restore))
+        .map_err(|_| IpcError::system())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(std::time::Duration::from_millis(panel::FOCUS_SETTLE_MS));
+        let now = now_ms()?;
+        let state = app.state::<AppState>();
+        let conn = state.lock()?;
+        let mut injector = state.lock_injector()?;
+        service::snippet_inject(&conn, injector.as_mut(), &id, method, now)
+    })
+    .await
+    .map_err(|_| IpcError::system())?
 }
 
 #[tauri::command]

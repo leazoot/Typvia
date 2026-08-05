@@ -78,6 +78,7 @@ pub fn run() {
             commands::search_library,
             commands::snippet_inject,
             commands::snippet_copy,
+            commands::panel_insert,
             commands::detect_sensitive,
             panel::panel_hide,
             panel::panel_ready,

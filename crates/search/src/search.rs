@@ -8,6 +8,7 @@
 //! recency tiebreak and will extend the sort key here, not the FTS query.
 
 use rusqlite::{Connection, params};
+use typvia_core::model::SecurityLevel;
 
 use crate::error::SearchError;
 use crate::query::{parse_match_expr, query_terms_lower};
@@ -36,6 +37,9 @@ pub struct SearchHit {
     pub snippet_id: String,
     pub title: String,
     pub tier: MatchTier,
+    /// Security marker (PRD §12.2): the UI must present sensitive hits with
+    /// their safety treatment and never assume a body is available.
+    pub is_sensitive: bool,
 }
 
 /// Read-side companion of `SearchIndex`: parses queries and ranks hits.
@@ -55,7 +59,7 @@ const CANDIDATE_SQL: &str = "SELECT snippet_fts.snippet_id, s.title, s.\"trigger
         (SELECT group_concat(t.name, ' ')
            FROM snippet_tag st JOIN tag t ON t.id = st.tag_id
           WHERE st.snippet_id = s.id),
-        s.last_used_at, s.usage_count
+        s.last_used_at, s.usage_count, s.security_level
    FROM snippet_fts
    JOIN snippet s ON s.id = snippet_fts.snippet_id
   WHERE snippet_fts MATCH ?1 AND s.deleted_at IS NULL
@@ -69,6 +73,7 @@ struct Candidate {
     tags: Option<String>,
     last_used_at: Option<i64>,
     usage_count: i64,
+    is_sensitive: bool,
 }
 
 impl<'c> Searcher<'c> {
@@ -92,6 +97,7 @@ impl<'c> Searcher<'c> {
 
         let mut stmt = self.conn.prepare_cached(CANDIDATE_SQL)?;
         let rows = stmt.query_map(params![expr, CANDIDATE_LIMIT as i64], |row| {
+            let security_level: String = row.get(6)?;
             Ok(Candidate {
                 snippet_id: row.get(0)?,
                 title: row.get(1)?,
@@ -99,6 +105,7 @@ impl<'c> Searcher<'c> {
                 tags: row.get(3)?,
                 last_used_at: row.get(4)?,
                 usage_count: row.get(5)?,
+                is_sensitive: security_level == SecurityLevel::Sensitive.as_str(),
             })
         })?;
 
@@ -126,6 +133,7 @@ impl<'c> Searcher<'c> {
                 snippet_id: c.snippet_id,
                 title: c.title,
                 tier,
+                is_sensitive: c.is_sensitive,
             })
             .collect())
     }

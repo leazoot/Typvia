@@ -70,6 +70,19 @@ impl<'c> SearchIndex<'c> {
         Ok(())
     }
 
+    /// Merges all FTS5 index segments, physically discarding entries of
+    /// deleted or replaced rows. `sync_snippet` makes stale tokens
+    /// unmatchable immediately, but their bytes can linger in old segments
+    /// until a merge — call this after a snippet transitions from normal to
+    /// sensitive so its former plaintext leaves index storage (red line).
+    pub fn optimize(&self) -> Result<(), SearchError> {
+        self.conn.execute(
+            "INSERT INTO snippet_fts(snippet_fts) VALUES('optimize')",
+            [],
+        )?;
+        Ok(())
+    }
+
     /// Drops the whole index and re-populates it from every live snippet.
     /// Returns the number of rows indexed. Runs in one transaction, so a
     /// failure leaves the previous index intact.

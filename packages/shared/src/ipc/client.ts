@@ -129,6 +129,11 @@ export function searchSnippets(query: string, limit: number, offset: number): Pr
   return call('search_snippets', { query, limit, offset });
 }
 
+/** Ranked search returning full snippet rows for the Library list. */
+export function searchLibrary(query: string, limit: number): Promise<Snippet[]> {
+  return call('search_library', { query, limit });
+}
+
 /**
  * Offline sensitive-content scan. Returns advisory pattern codes (never the
  * matched text); an empty array means nothing suspicious.

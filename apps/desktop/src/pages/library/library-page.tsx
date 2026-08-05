@@ -1,4 +1,4 @@
-import { libraryCounts, listFolderChildren, listTags } from '@typvia/shared';
+import { libraryCounts, listFolderChildren, listTags, searchLibrary } from '@typvia/shared';
 import type { LibraryCounts, Snippet, Tag } from '@typvia/shared';
 import {
   Caret,
@@ -11,6 +11,7 @@ import {
   useVirtualRows,
 } from '@typvia/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { markFor, LibraryPreview } from './preview';
 import { LibraryRail, type FolderEntry } from './rail';
 import { useSnippetPages, type LibraryScope } from './use-snippet-pages';
@@ -55,6 +56,7 @@ async function fetchFolderTree(): Promise<FolderEntry[]> {
  * selection and batch-selection state.
  */
 export function LibraryPage() {
+  const navigate = useNavigate();
   const [scope, setScope] = useState<LibraryScope>({ view: 'all', folderId: null });
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -63,18 +65,57 @@ export function LibraryPage() {
   const [counts, setCounts] = useState<LibraryCounts | null>(null);
   const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  // null = browsing the scope; an array = live search results for `query`.
+  const [results, setResults] = useState<Snippet[] | null>(null);
+  const [searchMs, setSearchMs] = useState<number | null>(null);
+  const searchGeneration = useRef(0);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const { total, rowAt, ensureRange, failed, retry } = useSnippetPages(scope, typeFilter);
+
+  // Every keystroke replaces the results instantly — no debounce, no
+  // transition (design 1b). A generation stamp drops stale responses.
+  useEffect(() => {
+    searchGeneration.current += 1;
+    const generation = searchGeneration.current;
+    if (query.trim() === '') {
+      setResults(null);
+      setSearchMs(null);
+      return;
+    }
+    const started = performance.now();
+    searchLibrary(query, 500)
+      .then((rows) => {
+        if (searchGeneration.current !== generation) return;
+        setResults(rows);
+        setSearchMs(performance.now() - started);
+        setSelectedIndex(rows.length > 0 ? 0 : null);
+      })
+      .catch(() => {
+        if (searchGeneration.current === generation) setResults([]);
+      });
+  }, [query]);
+
+  const searchRows = useMemo(() => {
+    if (results === null) return null;
+    return typeFilter === null
+      ? results
+      : results.filter((snippet) => snippet.snippetType === typeFilter);
+  }, [results, typeFilter]);
+
+  const rowCount = searchRows === null ? total : searchRows.length;
+  const rowSource = (index: number): Snippet | undefined =>
+    searchRows === null ? rowAt(index) : searchRows[index];
+
   const { first, last, totalHeight } = useVirtualRows({
-    count: total,
+    count: rowCount,
     rowHeight: ROW_HEIGHT,
     viewportRef,
   });
 
   useEffect(() => {
-    ensureRange(first, last);
-  }, [ensureRange, first, last]);
+    if (searchRows === null) ensureRange(first, last);
+  }, [ensureRange, first, last, searchRows]);
 
   useEffect(() => {
     libraryCounts()
@@ -115,12 +156,44 @@ export function LibraryPage() {
     });
   };
 
-  const selectedSnippet = selectedIndex === null ? null : (rowAt(selectedIndex) ?? null);
+  const selectedSnippet = selectedIndex === null ? null : (rowSource(selectedIndex) ?? null);
+
+  /** ↑↓ move the selection (viewport follows); ↵ opens the selected row. */
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+    if (event.key === 'Enter') {
+      if (selectedSnippet !== null) {
+        event.preventDefault();
+        void navigate(`/editor/${selectedSnippet.id}`);
+      }
+      return;
+    }
+    if (rowCount === 0) return;
+    event.preventDefault();
+    const next =
+      event.key === 'ArrowDown'
+        ? Math.min((selectedIndex ?? -1) + 1, rowCount - 1)
+        : Math.max((selectedIndex ?? 1) - 1, 0);
+    setSelectedIndex(next);
+    const viewport = viewportRef.current;
+    if (viewport !== null) {
+      const rowTop = next * ROW_HEIGHT;
+      if (rowTop < viewport.scrollTop) viewport.scrollTop = rowTop;
+      else if (rowTop + ROW_HEIGHT > viewport.scrollTop + viewport.clientHeight)
+        viewport.scrollTop = rowTop + ROW_HEIGHT - viewport.clientHeight;
+    }
+  };
+
+  const clearFilters = () => {
+    setQuery('');
+    setTypeFilter(null);
+    setSelectedIndex(null);
+  };
 
   const rows = [];
-  if (total > 0) {
+  if (rowCount > 0) {
     for (let index = first; index <= last; index += 1) {
-      const snippet = rowAt(index);
+      const snippet = rowSource(index);
       rows.push(
         <div key={index} className="tv-lib-row-slot" style={{ top: index * ROW_HEIGHT }}>
           {snippet === undefined ? (
@@ -149,7 +222,9 @@ export function LibraryPage() {
   }
 
   return (
-    <main className="tv-lib">
+    // Keyboard list navigation works from anywhere on the page, including
+    // while typing in the search line (design: type to filter; ↑↓ ↵).
+    <main className="tv-lib" onKeyDown={handleKeyDown}>
       <LibraryRail
         counts={counts}
         folders={folders}
@@ -165,7 +240,13 @@ export function LibraryPage() {
             onChange={setQuery}
             placeholder="Search titles, content, triggers, tags…"
             label="Search snippets"
-            trailing={total.toLocaleString('en-US')}
+            trailing={
+              <span aria-live="polite" role="status">
+                {searchRows === null
+                  ? total.toLocaleString('en-US')
+                  : `${String(searchRows.length)} results`}
+              </span>
+            }
           />
           <div className="tv-lib-scopes">
             {[
@@ -224,7 +305,30 @@ export function LibraryPage() {
                   Retry
                 </button>
               </div>
-            ) : total === 0 ? (
+            ) : searchRows !== null && rowCount === 0 ? (
+              <div className="tv-lib-state tv-lib-state-center">
+                <div className="tv-lib-state-figure">
+                  <span className="tv-lib-state-bar" />
+                  <Caret height={17} />
+                </div>
+                <div className="tv-lib-state-title">No snippet matches that</div>
+                <div className="tv-lib-state-text">
+                  Save what you typed as a new snippet, or clear the filters.
+                </div>
+                <div className="tv-lib-state-actions">
+                  <button
+                    type="button"
+                    className="tv-lib-state-primary"
+                    onClick={() => void navigate('/editor', { state: { draftTitle: query } })}
+                  >
+                    Save as snippet
+                  </button>
+                  <button type="button" className="tv-lib-state-action" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                </div>
+              </div>
+            ) : rowCount === 0 ? (
               <div className="tv-lib-state">
                 <div className="tv-lib-state-figure">
                   <span className="tv-lib-state-slot" />
@@ -266,7 +370,9 @@ export function LibraryPage() {
             </>
           )}
           <span className="tv-lib-foot-count">
-            Local library · {total.toLocaleString('en-US')} items
+            {searchRows === null || searchMs === null
+              ? `Local library · ${total.toLocaleString('en-US')} items`
+              : `Local search across ${total.toLocaleString('en-US')} items · ${searchMs.toFixed(1)} ms`}
           </span>
         </footer>
       </section>

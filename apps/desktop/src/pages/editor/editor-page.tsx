@@ -2,7 +2,7 @@ import { getSnippet, listFolderChildren } from '@typvia/shared';
 import type { Snippet } from '@typvia/shared';
 import { TypeMark } from '@typvia/ui';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { markFor } from '../library/preview';
 import type { FolderEntry } from '../library/rail';
 import { EditorBody } from './editor-body';
@@ -49,15 +49,29 @@ async function fetchFolderTree(): Promise<FolderEntry[]> {
   return entries;
 }
 
+/** Router-state title carried from the Library's "Save as snippet" action. */
+function draftTitleFrom(state: unknown): string {
+  if (
+    typeof state === 'object' &&
+    state !== null &&
+    'draftTitle' in state &&
+    typeof state.draftTitle === 'string'
+  ) {
+    return state.draftTitle;
+  }
+  return '';
+}
+
 interface LoadedEditorProps {
   initial: Snippet | null;
+  initialTitle: string;
   folders: FolderEntry[];
 }
 
-function LoadedEditor({ initial, folders }: LoadedEditorProps) {
+function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
   const navigate = useNavigate();
   const { draft, patch, status, errorMessage, version, savedAt, sensitiveKinds, savePulse } =
-    useEditorDraft(initial);
+    useEditorDraft(initial, initialTitle);
 
   const folderName = folders.find(({ folder }) => folder.id === draft.folderId)?.folder.name;
 
@@ -161,6 +175,7 @@ function LoadedEditor({ initial, folders }: LoadedEditorProps) {
  */
 export function EditorPage() {
   const { id } = useParams();
+  const location = useLocation();
   const [initial, setInitial] = useState<Snippet | null>(null);
   const [ready, setReady] = useState(id === undefined);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -195,5 +210,11 @@ export function EditorPage() {
     );
   }
   if (!ready) return <main className="tv-ed" aria-busy="true" />;
-  return <LoadedEditor initial={initial} folders={folders} />;
+  return (
+    <LoadedEditor
+      initial={initial}
+      initialTitle={draftTitleFrom(location.state)}
+      folders={folders}
+    />
+  );
 }

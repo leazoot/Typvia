@@ -45,6 +45,7 @@ fn main() {
             commands::tag_rename,
             commands::tag_delete,
             commands::search_snippets,
+            commands::search_library,
             commands::detect_sensitive,
         ])
         .run(tauri::generate_context!());

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { Snippet } from '@typvia/shared';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as SharedModule from '@typvia/shared';
 import { LibraryPage } from './library-page';
@@ -33,6 +33,16 @@ function fakeSnippet(index: number): Snippet {
 }
 
 const countSnippets = vi.fn(() => Promise.resolve(TOTAL));
+const searchLibrary = vi.fn((query: string) =>
+  Promise.resolve(
+    query.includes('zzz')
+      ? []
+      : [fakeSnippet(7), fakeSnippet(21), fakeSnippet(35)].map((s, i) => ({
+          ...s,
+          title: `Hit ${String(i)}`,
+        })),
+  ),
+);
 const listSnippetPage = vi.fn(
   (_view: string, _folderId: string | null, _type: string | null, limit: number, offset: number) =>
     Promise.resolve(
@@ -54,6 +64,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
       }),
     countSnippets: (...args: Parameters<typeof countSnippets>) => countSnippets(...args),
     listSnippetPage: (...args: Parameters<typeof listSnippetPage>) => listSnippetPage(...args),
+    searchLibrary: (...args: Parameters<typeof searchLibrary>) => searchLibrary(...args),
     listFolderChildren: (parentId: string | null) =>
       Promise.resolve(
         parentId === null
@@ -75,8 +86,12 @@ vi.mock('@typvia/shared', async (importOriginal) => {
 
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <LibraryPage />
+    <MemoryRouter initialEntries={['/library']}>
+      <Routes>
+        <Route path="/library" element={<LibraryPage />} />
+        <Route path="/editor" element={<div>editor-new-stub</div>} />
+        <Route path="/editor/:id" element={<div>editor-edit-stub</div>} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -127,6 +142,58 @@ describe('LibraryPage', () => {
     // A preview, never an edit form (design 1b).
     expect(within(preview).queryAllByRole('textbox')).toHaveLength(0);
     expect(preview.querySelectorAll('input, textarea, select')).toHaveLength(0);
+  });
+
+  it('replaces results instantly per keystroke and auto-selects the first hit', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    const input = screen.getByLabelText('Search snippets');
+    fireEvent.change(input, { target: { value: 'd' } });
+    fireEvent.change(input, { target: { value: 'do' } });
+    // One search per keystroke — no debounce.
+    expect(searchLibrary).toHaveBeenCalledTimes(2);
+    expect(searchLibrary).toHaveBeenLastCalledWith('do', 500);
+
+    await screen.findAllByText('Hit 0');
+    expect(screen.queryByText('Snippet 0')).toBeNull();
+    // First hit is selected: the plate sits at row 0.
+    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(0px)');
+    // Result count is announced politely.
+    expect(screen.getByRole('status').textContent).toBe('3 results');
+  });
+
+  it('moves the selection with arrows and opens with Enter', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    const input = screen.getByLabelText('Search snippets');
+    fireEvent.change(input, { target: { value: 'docker' } });
+    await screen.findAllByText('Hit 0');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(52px)');
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(0px)');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(await screen.findByText('editor-edit-stub')).toBeDefined();
+  });
+
+  it('offers two real actions when nothing matches', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    const input = screen.getByLabelText('Search snippets');
+    fireEvent.change(input, { target: { value: 'zzz' } });
+    await screen.findByText('No snippet matches that');
+
+    // Clear filters returns to browsing.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect((input as HTMLInputElement).value).toBe('');
+    expect(await screen.findByText('Snippet 0')).toBeDefined();
+
+    // Save as snippet goes to the editor with the typed text.
+    fireEvent.change(input, { target: { value: 'zzz again' } });
+    await screen.findByText('No snippet matches that');
+    fireEvent.click(screen.getByRole('button', { name: 'Save as snippet' }));
+    expect(await screen.findByText('editor-new-stub')).toBeDefined();
   });
 
   it('checkbox selection raises the batch bar with a real count', async () => {

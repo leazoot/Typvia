@@ -76,8 +76,10 @@ const EMPTY_DRAFT: Draft = {
  * settle are the only feedback. The sensitive scan runs on every successful
  * save and only ever advises; it never blocks the save.
  */
-export function useEditorDraft(initial: Snippet | null): EditorDraft {
-  const [draft, setDraft] = useState<Draft>(initial === null ? EMPTY_DRAFT : draftFrom(initial));
+export function useEditorDraft(initial: Snippet | null, initialTitle = ''): EditorDraft {
+  const [draft, setDraft] = useState<Draft>(
+    initial === null ? { ...EMPTY_DRAFT, title: initialTitle } : draftFrom(initial),
+  );
   const [status, setStatus] = useState<SaveStatus>(initial === null ? 'draft' : 'saved');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [version, setVersion] = useState<number | null>(initial?.version ?? null);

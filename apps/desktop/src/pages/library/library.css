@@ -262,6 +262,47 @@
   line-height: 1.6;
 }
 
+/* Search no-results (design 1b): centered, a settled bar + caret figure. */
+.tv-lib-state-center {
+  align-items: center;
+  text-align: center;
+}
+
+.tv-lib-state-bar {
+  width: 52px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-hairline-hover, var(--color-hairline));
+}
+
+[data-theme='dark'] .tv-lib-state-bar {
+  background: var(--color-hairline);
+}
+
+.tv-lib-state-actions {
+  display: flex;
+  gap: var(--space-9);
+}
+
+.tv-lib-state-primary {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-row);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lib-state-primary:focus-visible,
+.tv-lib-state-action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .tv-lib-state-action {
   height: 30px;
   padding: 0 11px;

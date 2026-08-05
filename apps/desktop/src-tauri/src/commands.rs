@@ -198,6 +198,15 @@ pub fn tag_delete(state: State<'_, AppState>, id: String) -> Result<(), IpcError
 }
 
 #[tauri::command]
+pub fn search_library(
+    state: State<'_, AppState>,
+    query: String,
+    limit: u32,
+) -> Result<Vec<SnippetDto>, IpcError> {
+    service::search_library(&*state.lock()?, &query, limit)
+}
+
+#[tauri::command]
 pub fn detect_sensitive(text: String) -> Vec<String> {
     service::detect_sensitive(&text)
 }

@@ -160,6 +160,27 @@ pub fn snippet_update(
     Ok(snippet.into())
 }
 
+/// Ranked search that returns full row data for the Library list. Runs the
+/// STAGE-05 Searcher, then loads each hit's snippet in ranked order — one
+/// lock, at most `limit` point lookups (candidate pool is already capped).
+pub fn search_library(
+    conn: &Connection,
+    query: &str,
+    limit: u32,
+) -> Result<Vec<SnippetDto>, IpcError> {
+    check_limit(limit)?;
+    let hits = Searcher::new(conn).search(query, limit, 0)?;
+    let repo = SnippetRepo::new(conn);
+    let mut rows = Vec::with_capacity(hits.len());
+    for hit in hits {
+        // A hit can race a deletion; skipping is correct, not an error.
+        if let Some(snippet) = repo.get(&hit.snippet_id)? {
+            rows.push(snippet.into());
+        }
+    }
+    Ok(rows)
+}
+
 /// Offline sensitive-content scan (PRD §12.10): advisory kinds only, never
 /// matched text — safe to cross the IPC boundary and to show in the editor.
 pub fn detect_sensitive(text: &str) -> Vec<String> {
@@ -578,6 +599,29 @@ mod tests {
         assert!(kinds.contains(&"pem_private_key".to_string()));
         assert!(kinds.contains(&"password_field".to_string()));
         assert!(detect_sensitive("just a plain sentence").is_empty());
+    }
+
+    #[test]
+    fn search_library_returns_full_rows_in_rank_order() {
+        let conn = test_conn();
+        // Title-exact should outrank a content match (STAGE-05 tiers).
+        let mut content_hit = create_input("Restart notes", None);
+        content_hit.body = "docker restart tips".to_string();
+        snippet_create(&conn, content_hit, 1).unwrap();
+        let title_hit = snippet_create(&conn, create_input("Docker", Some(";dk")), 2).unwrap();
+
+        let rows = search_library(&conn, "docker", 50).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].id, title_hit.id);
+        assert_eq!(rows[0].trigger.as_deref(), Some(";dk"));
+        assert!(rows[0].body.is_some(), "full row data, not just hits");
+
+        // Queries with nothing indexable return empty, not an error.
+        assert!(search_library(&conn, "   ", 50).unwrap().is_empty());
+        assert_eq!(
+            search_library(&conn, "docker", 0).unwrap_err().code,
+            IpcErrorCode::Validation
+        );
     }
 
     #[test]

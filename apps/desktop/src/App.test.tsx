@@ -18,6 +18,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     listSnippetPage: () => Promise.resolve([]),
     listFolderChildren: () => Promise.resolve([]),
     listTags: () => Promise.resolve([]),
+    detectSensitive: () => Promise.resolve([]),
   };
 });
 
@@ -55,8 +56,19 @@ describe('app shell routing', () => {
     expect(await screen.findByLabelText('Search snippets')).toBeDefined();
   });
 
+  it('reaches the real editor screen at /editor', async () => {
+    render(
+      <MemoryRouter initialEntries={['/editor']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText('Snippet title')).toBeDefined();
+  });
+
   it.each(
-    APP_ROUTES.filter((route) => route.path !== '/library').map((route) => [route.labelEn, route]),
+    APP_ROUTES.filter((route) => route.path !== '/library' && route.path !== '/editor').map(
+      (route) => [route.labelEn, route],
+    ),
   )('reaches the %s placeholder page at its route', (_label, route) => {
     render(
       <MemoryRouter initialEntries={[route.path]}>

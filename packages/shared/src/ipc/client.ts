@@ -128,3 +128,11 @@ export function deleteTag(id: string): Promise<void> {
 export function searchSnippets(query: string, limit: number, offset: number): Promise<SearchHit[]> {
   return call('search_snippets', { query, limit, offset });
 }
+
+/**
+ * Offline sensitive-content scan. Returns advisory pattern codes (never the
+ * matched text); an empty array means nothing suspicious.
+ */
+export function detectSensitive(text: string): Promise<string[]> {
+  return call('detect_sensitive', { text });
+}

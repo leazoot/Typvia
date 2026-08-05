@@ -7,9 +7,11 @@ use std::str::FromStr;
 
 use rusqlite::Connection;
 use typvia_core::model::{
-    Folder, SecurityLevel, Snippet, SnippetContent, SnippetType, Tag, TriggerMode,
+    Folder, SecurityLevel, Snippet, SnippetContent, SnippetType, SnippetVersion, Tag, TriggerMode,
 };
-use typvia_core::repo::{FolderRepo, ListScope, SnippetRepo, TRASH_RETENTION_MS, TagRepo, new_id};
+use typvia_core::repo::{
+    FolderRepo, ListScope, RepoError, SnippetRepo, TRASH_RETENTION_MS, TagRepo, VersionRepo, new_id,
+};
 use typvia_search::{SearchIndex, Searcher};
 
 use crate::dto::{
@@ -83,11 +85,26 @@ pub fn snippet_create(
         version: 1,
         deleted_at: None,
     };
-    let repo = SnippetRepo::new(conn);
-    check_trigger_free(&repo, snippet.trigger.as_deref(), None)?;
-    repo.insert(&snippet)?;
+    check_trigger_free(&SnippetRepo::new(conn), snippet.trigger.as_deref(), None)?;
+    // Insert and its v1 history entry land atomically (fail-closed rule).
+    let tx = conn.unchecked_transaction().map_err(RepoError::from)?;
+    SnippetRepo::new(&tx).insert(&snippet)?;
+    VersionRepo::new(&tx).append(&history_entry(&snippet, now))?;
+    tx.commit().map_err(RepoError::from)?;
     SearchIndex::new(conn).sync_snippet(&snippet.id)?;
     Ok(snippet.into())
+}
+
+/// Snapshot of a snippet's current state as a history row.
+fn history_entry(snippet: &Snippet, now: i64) -> SnippetVersion {
+    SnippetVersion {
+        id: new_id(),
+        snippet_id: snippet.id.clone(),
+        version: snippet.version,
+        title: snippet.title.clone(),
+        content: snippet.content.clone(),
+        created_at: now,
+    }
 }
 
 pub fn snippet_update(
@@ -102,6 +119,11 @@ pub fn snippet_update(
             "sensitive snippets are edited through the vault flow",
         ));
     }
+    let content_before = (
+        snippet.title.clone(),
+        snippet.content.clone(),
+        snippet.snippet_type,
+    );
     snippet.title = input.title;
     snippet.content = SnippetContent::Plaintext(input.body);
     snippet.snippet_type = parse_snippet_type(&input.snippet_type)?;
@@ -114,12 +136,37 @@ pub fn snippet_update(
     snippet.is_pinned = input.is_pinned;
     snippet.is_enabled = input.is_enabled;
     snippet.updated_at = now;
-    // Content-version history semantics (append + bump) belong to the editor
-    // save flow (TASK-030); until then `version` is left untouched.
+    // Version history is append-on-write (PRD §12.16): a content change bumps
+    // the version and records the new state. Metadata-only edits (folder,
+    // trigger, toggles) do not create versions. Retention pruning is open
+    // (OQ-R5); `prune_versions` stays the hook.
+    let content_changed = content_before
+        != (
+            snippet.title.clone(),
+            snippet.content.clone(),
+            snippet.snippet_type,
+        );
+    if content_changed {
+        snippet.version += 1;
+    }
     check_trigger_free(&repo, snippet.trigger.as_deref(), Some(&snippet.id))?;
-    repo.update(&snippet)?;
+    let tx = conn.unchecked_transaction().map_err(RepoError::from)?;
+    SnippetRepo::new(&tx).update(&snippet)?;
+    if content_changed {
+        VersionRepo::new(&tx).append(&history_entry(&snippet, now))?;
+    }
+    tx.commit().map_err(RepoError::from)?;
     SearchIndex::new(conn).sync_snippet(&snippet.id)?;
     Ok(snippet.into())
+}
+
+/// Offline sensitive-content scan (PRD §12.10): advisory kinds only, never
+/// matched text — safe to cross the IPC boundary and to show in the editor.
+pub fn detect_sensitive(text: &str) -> Vec<String> {
+    typvia_core::sensitive::detect(text)
+        .into_iter()
+        .map(|kind| kind.as_str().to_string())
+        .collect()
 }
 
 pub fn snippet_get(conn: &Connection, id: &str) -> Result<SnippetDto, IpcError> {
@@ -474,6 +521,63 @@ mod tests {
             snippet_list(&conn, 0, 0).unwrap_err().code,
             IpcErrorCode::Validation
         );
+    }
+
+    #[test]
+    fn save_flow_appends_versions_only_on_content_change() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Draft", None), 1).unwrap();
+        assert_eq!(created.version, 1);
+        let history_count = |id: &str| {
+            VersionRepo::new(&conn)
+                .list(id, 100, 0)
+                .map(|rows| rows.len())
+                .unwrap()
+        };
+        // Creation recorded v1.
+        assert_eq!(history_count(&created.id), 1);
+
+        let mut input = SnippetUpdateInput {
+            id: created.id.clone(),
+            title: "Draft".to_string(),
+            body: "Draft body".to_string(),
+            snippet_type: "command".to_string(),
+            description: None,
+            folder_id: None,
+            trigger: None,
+            trigger_mode: None,
+            language: None,
+            is_favorite: false,
+            is_pinned: false,
+            is_enabled: true,
+        };
+
+        // Metadata-only change: no bump, no new history row.
+        input.is_favorite = true;
+        let updated = snippet_update(&conn, input.clone(), 2).unwrap();
+        assert_eq!(updated.version, 1);
+        assert_eq!(history_count(&created.id), 1);
+
+        // Content change: bump + snapshot of the new state.
+        input.body = "Draft body, revised".to_string();
+        let updated = snippet_update(&conn, input.clone(), 3).unwrap();
+        assert_eq!(updated.version, 2);
+        assert_eq!(history_count(&created.id), 2);
+
+        input.title = "Draft renamed".to_string();
+        let updated = snippet_update(&conn, input, 4).unwrap();
+        assert_eq!(updated.version, 3);
+        assert_eq!(history_count(&created.id), 3);
+    }
+
+    #[test]
+    fn detect_sensitive_maps_kinds_to_stable_codes() {
+        let kinds = detect_sensitive(
+            "password = hunter2-not-real\n-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----",
+        );
+        assert!(kinds.contains(&"pem_private_key".to_string()));
+        assert!(kinds.contains(&"password_field".to_string()));
+        assert!(detect_sensitive("just a plain sentence").is_empty());
     }
 
     #[test]

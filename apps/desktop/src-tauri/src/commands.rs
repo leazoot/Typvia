@@ -198,6 +198,11 @@ pub fn tag_delete(state: State<'_, AppState>, id: String) -> Result<(), IpcError
 }
 
 #[tauri::command]
+pub fn detect_sensitive(text: String) -> Vec<String> {
+    service::detect_sensitive(&text)
+}
+
+#[tauri::command]
 pub fn search_snippets(
     state: State<'_, AppState>,
     query: String,

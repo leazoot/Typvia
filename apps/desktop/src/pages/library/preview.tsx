@@ -77,7 +77,7 @@ export function LibraryPreview({ snippet, folderName, onClose }: PreviewProps) {
             <button
               type="button"
               className="tv-lib-preview-edit"
-              onClick={() => void navigate('/editor')}
+              onClick={() => void navigate(`/editor/${snippet.id}`)}
             >
               Edit
             </button>

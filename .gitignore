@@ -36,3 +36,9 @@ spikes/ffi/swift/ffi-spike-swift
 # iOS keyboard spike (TASK-011) generated project and build products
 native/ios-keyboard/TypviaKbSpike.xcodeproj/
 native/ios-keyboard/build/
+
+# Android IME spike (TASK-012) build products and local SDK path
+native/android-ime/.gradle/
+native/android-ime/app/build/
+native/android-ime/local.properties
+native/android-ime/build/

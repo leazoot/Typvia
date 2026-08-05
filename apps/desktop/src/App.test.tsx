@@ -19,6 +19,8 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     listFolderChildren: () => Promise.resolve([]),
     listTags: () => Promise.resolve([]),
     detectSensitive: () => Promise.resolve([]),
+    listTrash: () => Promise.resolve([]),
+    purgeExpiredTrash: () => Promise.resolve(0),
   };
 });
 
@@ -75,9 +77,22 @@ describe('app shell routing', () => {
     expect(screen.getByText('Start typing · 直接开始输入')).toBeDefined();
   });
 
+  it('reaches the real Trash screen at /trash', async () => {
+    render(
+      <MemoryRouter initialEntries={['/trash']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Trash is empty')).toBeDefined();
+  });
+
   it.each(
     APP_ROUTES.filter(
-      (route) => route.path !== '/library' && route.path !== '/editor' && route.path !== '/',
+      (route) =>
+        route.path !== '/library' &&
+        route.path !== '/editor' &&
+        route.path !== '/' &&
+        route.path !== '/trash',
     ).map((route) => [route.labelEn, route]),
   )('reaches the %s placeholder page at its route', (_label, route) => {
     render(

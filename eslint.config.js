@@ -7,6 +7,7 @@ export default tseslint.config(
       '**/dist/',
       '**/target/',
       '**/src-tauri/gen/',
+      'native/**/build/',
       'espanso/',
       'design/',
       'docs/',

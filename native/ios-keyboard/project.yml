@@ -17,9 +17,27 @@ schemes:
       targets:
         HostApp: all
         EnableKbUITests: [test]
+        KbUnitTests: [test]
     test:
-      targets: [EnableKbUITests]
+      targets: [EnableKbUITests, KbUnitTests]
+  UnitOnly:
+    build:
+      targets:
+        HostApp: all
+        KbUnitTests: [test]
+    test:
+      targets: [KbUnitTests]
 targets:
+  KbUnitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [UnitTests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.spike.unittests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: HostApp
   EnableKbUITests:
     type: bundle.ui-testing
     platform: iOS

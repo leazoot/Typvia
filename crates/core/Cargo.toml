@@ -8,6 +8,8 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+# SQLite access library fixed by DEC-005 (bundled build, FTS5 included).
+rusqlite = { version = "0.38", features = ["bundled"] }
 # KeyboardSnapshot is a versioned JSON document (DEC-007 #4); serde is the
 # maintained standard for that boundary (MIT/Apache-2.0, MPL-2.0 compatible).
 serde = { version = "1", features = ["derive"] }

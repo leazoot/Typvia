@@ -26,3 +26,9 @@ Thumbs.db
 
 # Tauri generated artifacts
 **/src-tauri/gen/
+
+# FFI spike (TASK-010) build products and regenerable bindings
+spikes/ffi/kotlin/.gradle/
+spikes/ffi/kotlin/build/
+spikes/ffi/*/generated/
+spikes/ffi/swift/ffi-spike-swift

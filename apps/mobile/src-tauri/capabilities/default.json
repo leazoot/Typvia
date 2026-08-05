@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "Baseline WebView capabilities for the spike window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

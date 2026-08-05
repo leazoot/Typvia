@@ -24,6 +24,11 @@
     "build:rust": "cargo build --workspace",
     "build:js": "pnpm -r --if-present run build"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
   "devDependencies": {
     "eslint": "^10.8.0",
     "prettier": "^3.9.6",

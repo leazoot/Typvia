@@ -1,0 +1,20 @@
+# SPIKE (TASK-009): minimal Tauri 2 mobile shell. Throwaway — excluded from
+# the root workspace; not to be merged into formal modules.
+[package]
+name = "typvia-mobile-spike"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+# Mobile targets link the app as a library (staticlib for iOS, cdylib for
+# Android); rlib keeps the desktop `cargo run` path working.
+name = "typvia_mobile_spike_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

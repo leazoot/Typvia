@@ -2,7 +2,15 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/', '**/dist/', '**/target/', 'espanso/', 'design/', 'docs/'],
+    ignores: [
+      '**/node_modules/',
+      '**/dist/',
+      '**/target/',
+      '**/src-tauri/gen/',
+      'espanso/',
+      'design/',
+      'docs/',
+    ],
   },
   ...tseslint.configs.recommended,
   {

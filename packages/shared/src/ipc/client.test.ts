@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSnippet, getSnippet, searchSnippets } from './client';
+import {
+  createSnippet,
+  getSnippet,
+  libraryCounts,
+  listSnippetPage,
+  searchSnippets,
+} from './client';
 import { IpcError, toIpcError } from './error';
 import type { Snippet } from './types';
 
@@ -61,6 +67,30 @@ describe('typed IPC client', () => {
     await searchSnippets('docker', 10, 0);
     expect(seen[1]?.cmd).toBe('search_snippets');
     expect(seen[1]?.args).toEqual({ query: 'docker', limit: 10, offset: 0 });
+  });
+
+  it('sends library page and counts requests with the wire contract', async () => {
+    const seen: Array<{ cmd: string; args: unknown }> = [];
+    mockIPC((cmd, args) => {
+      seen.push({ cmd, args });
+      if (cmd === 'snippet_list_page') return [SNIPPET];
+      return { total: 1, recent: 0, starred: 0, unsorted: 1, folders: [] };
+    });
+
+    const page = await listSnippetPage('folder', 'f-1', 'command', 200, 400);
+    expect(page).toHaveLength(1);
+    expect(seen[0]?.cmd).toBe('snippet_list_page');
+    expect(seen[0]?.args).toEqual({
+      view: 'folder',
+      folderId: 'f-1',
+      snippetType: 'command',
+      limit: 200,
+      offset: 400,
+    });
+
+    const counts = await libraryCounts();
+    expect(counts.total).toBe(1);
+    expect(seen[1]?.cmd).toBe('library_counts');
   });
 
   it('normalizes structured rejections into typed IpcError', async () => {

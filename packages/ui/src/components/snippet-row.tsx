@@ -8,14 +8,15 @@ const ROW_HEIGHT = designTokens.space.rowHeightDesktop;
 
 interface ListTrayProps {
   children: ReactNode;
+  className?: string;
 }
 
 /**
  * The sunken tray behind list rows. Position-relative so the selection
  * plate can travel inside it.
  */
-export function ListTray({ children }: ListTrayProps) {
-  return <div className="tv-list-tray">{children}</div>;
+export function ListTray({ children, className }: ListTrayProps) {
+  return <div className={className ? `tv-list-tray ${className}` : 'tv-list-tray'}>{children}</div>;
 }
 
 interface SelectionPlateProps {
@@ -50,9 +51,16 @@ interface SnippetRowProps {
   /** Mono content preview; hidden from screen readers (announced via title/type). */
   preview?: string;
   trigger?: string;
+  /** Folder-name column (right-aligned, Library layout). */
+  folder?: string;
   selected?: boolean;
   /** Label next to ↵ when selected, e.g. "Open". */
   selectedAction?: string;
+  /** Row activation (single select / open). */
+  onClick?: () => void;
+  /** Batch-selection checkbox state; rendered only when onCheckedChange exists. */
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }
 
 /**
@@ -66,11 +74,29 @@ export function SnippetRow({
   cn,
   preview,
   trigger,
+  folder,
   selected = false,
   selectedAction = 'Open',
+  onClick,
+  checked = false,
+  onCheckedChange,
 }: SnippetRowProps) {
   return (
-    <div className="tv-row" data-selected={selected || undefined}>
+    <div className="tv-row" data-selected={selected || undefined} onClick={onClick}>
+      {onCheckedChange !== undefined && (
+        <input
+          type="checkbox"
+          className="tv-row-check"
+          aria-label={`Select ${title}`}
+          checked={checked}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+          onChange={(event) => {
+            onCheckedChange(event.target.checked);
+          }}
+        />
+      )}
       <TypeMark code={mark} />
       <span className="tv-row-title">{title}</span>
       {cn !== undefined && (
@@ -83,6 +109,7 @@ export function SnippetRow({
           {preview}
         </span>
       )}
+      {folder !== undefined && <span className="tv-row-folder">{folder}</span>}
       {selected ? (
         <span className="tv-row-open">
           <span className="tv-row-return">↵</span>
@@ -92,6 +119,20 @@ export function SnippetRow({
       ) : (
         trigger !== undefined && <span className="tv-row-trigger">{trigger}</span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Loading placeholder for a not-yet-fetched row: static text-shaped bars,
+ * never a spinner (design rule). Same fixed height as a real row.
+ */
+export function SnippetRowSkeleton() {
+  return (
+    <div aria-hidden="true" className="tv-row tv-row-skeleton">
+      <span className="tv-row-skeleton-mark" />
+      <span className="tv-row-skeleton-bar tv-row-skeleton-title" />
+      <span className="tv-row-skeleton-bar tv-row-skeleton-line" />
     </div>
   );
 }

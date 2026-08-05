@@ -9,12 +9,12 @@ use rusqlite::Connection;
 use typvia_core::model::{
     Folder, SecurityLevel, Snippet, SnippetContent, SnippetType, Tag, TriggerMode,
 };
-use typvia_core::repo::{FolderRepo, SnippetRepo, TRASH_RETENTION_MS, TagRepo, new_id};
+use typvia_core::repo::{FolderRepo, ListScope, SnippetRepo, TRASH_RETENTION_MS, TagRepo, new_id};
 use typvia_search::{SearchIndex, Searcher};
 
 use crate::dto::{
-    FolderCreateInput, FolderDto, FolderUpdateInput, SearchHitDto, SnippetCreateInput, SnippetDto,
-    SnippetUpdateInput, TagDto,
+    FolderCountDto, FolderCreateInput, FolderDto, FolderUpdateInput, LibraryCountsDto,
+    SearchHitDto, SnippetCreateInput, SnippetDto, SnippetUpdateInput, TagDto,
 };
 use crate::error::IpcError;
 
@@ -148,6 +148,66 @@ pub fn snippet_list_by_folder(
     check_limit(limit)?;
     let rows = SnippetRepo::new(conn).list_by_folder(folder_id, limit, offset)?;
     Ok(rows.into_iter().map(Into::into).collect())
+}
+
+/// Maps the wire view name + optional folder id onto a repo scope. The view
+/// vocabulary is the Library rail: all | recent | starred | unsorted | folder.
+fn parse_scope<'a>(view: &str, folder_id: Option<&'a str>) -> Result<ListScope<'a>, IpcError> {
+    match (view, folder_id) {
+        ("folder", Some(id)) => Ok(ListScope::Folder(id)),
+        ("folder", None) => Err(IpcError::validation("folder view requires folderId")),
+        (_, Some(_)) => Err(IpcError::validation(
+            "folderId only applies to the folder view",
+        )),
+        ("all", None) => Ok(ListScope::All),
+        ("recent", None) => Ok(ListScope::Recent),
+        ("starred", None) => Ok(ListScope::Starred),
+        ("unsorted", None) => Ok(ListScope::Unsorted),
+        _ => Err(IpcError::validation("unknown library view")),
+    }
+}
+
+pub fn snippet_list_page(
+    conn: &Connection,
+    view: &str,
+    folder_id: Option<&str>,
+    snippet_type: Option<&str>,
+    limit: u32,
+    offset: u32,
+) -> Result<Vec<SnippetDto>, IpcError> {
+    check_limit(limit)?;
+    let scope = parse_scope(view, folder_id)?;
+    let type_filter = snippet_type.map(parse_snippet_type).transpose()?;
+    let rows = SnippetRepo::new(conn).list_scoped(scope, type_filter, limit, offset)?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+/// Exact row count behind one Library page query — the virtual list sizes
+/// its scroll range from this, so it honours the same type filter.
+pub fn snippet_count(
+    conn: &Connection,
+    view: &str,
+    folder_id: Option<&str>,
+    snippet_type: Option<&str>,
+) -> Result<u32, IpcError> {
+    let scope = parse_scope(view, folder_id)?;
+    let type_filter = snippet_type.map(parse_snippet_type).transpose()?;
+    Ok(SnippetRepo::new(conn).count_scoped(scope, type_filter)?)
+}
+
+pub fn library_counts(conn: &Connection) -> Result<LibraryCountsDto, IpcError> {
+    let repo = SnippetRepo::new(conn);
+    Ok(LibraryCountsDto {
+        total: repo.count_scoped(ListScope::All, None)?,
+        recent: repo.count_scoped(ListScope::Recent, None)?,
+        starred: repo.count_scoped(ListScope::Starred, None)?,
+        unsorted: repo.count_scoped(ListScope::Unsorted, None)?,
+        folders: repo
+            .count_by_folder()?
+            .into_iter()
+            .map(|(folder_id, count)| FolderCountDto { folder_id, count })
+            .collect(),
+    })
 }
 
 pub fn snippet_trash(conn: &Connection, id: &str, now: i64) -> Result<(), IpcError> {
@@ -414,6 +474,82 @@ mod tests {
             snippet_list(&conn, 0, 0).unwrap_err().code,
             IpcErrorCode::Validation
         );
+    }
+
+    #[test]
+    fn library_page_and_counts_reflect_scopes() {
+        let conn = test_conn();
+        let folder = folder_create(
+            &conn,
+            FolderCreateInput {
+                name: "Infra".to_string(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            1,
+        )
+        .unwrap();
+
+        let mut filed = create_input("Filed one", None);
+        filed.folder_id = Some(folder.id.clone());
+        snippet_create(&conn, filed, 1).unwrap();
+        let mut text_kind = create_input("Loose text", None);
+        text_kind.snippet_type = "text".to_string();
+        snippet_create(&conn, text_kind, 2).unwrap();
+        let starred = snippet_create(&conn, create_input("Starred one", None), 3).unwrap();
+        let mut make_fav = SnippetUpdateInput {
+            id: starred.id.clone(),
+            title: starred.title.clone(),
+            body: "Starred one body".to_string(),
+            snippet_type: "command".to_string(),
+            description: None,
+            folder_id: None,
+            trigger: None,
+            trigger_mode: None,
+            language: None,
+            is_favorite: true,
+            is_pinned: false,
+            is_enabled: true,
+        };
+        snippet_update(&conn, make_fav.clone(), 4).unwrap();
+
+        let counts = library_counts(&conn).unwrap();
+        assert_eq!(
+            (counts.total, counts.recent, counts.starred, counts.unsorted),
+            (3, 0, 1, 2)
+        );
+        assert_eq!(counts.folders.len(), 1);
+        assert_eq!(counts.folders[0].folder_id, folder.id);
+        assert_eq!(counts.folders[0].count, 1);
+
+        let page = snippet_list_page(&conn, "folder", Some(&folder.id), None, 50, 0).unwrap();
+        assert_eq!(page.len(), 1);
+        assert_eq!(page[0].title, "Filed one");
+
+        let texts = snippet_list_page(&conn, "unsorted", None, Some("text"), 50, 0).unwrap();
+        assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].title, "Loose text");
+
+        // The type-filtered count matches the type-filtered page query.
+        assert_eq!(
+            snippet_count(&conn, "unsorted", None, Some("text")).unwrap(),
+            1
+        );
+        assert_eq!(snippet_count(&conn, "all", None, None).unwrap(), 3);
+
+        // Validation: unknown view, folder view without id, stray folderId.
+        for (view, folder_id) in [("nonsense", None), ("folder", None), ("all", Some("x"))] {
+            let err = snippet_list_page(&conn, view, folder_id, None, 50, 0).unwrap_err();
+            assert_eq!(err.code, IpcErrorCode::Validation);
+        }
+        let err = snippet_list_page(&conn, "all", None, Some("nonsense"), 50, 0).unwrap_err();
+        assert_eq!(err.code, IpcErrorCode::Validation);
+
+        // A trashed snippet drops out of pages and counts.
+        make_fav.is_favorite = false;
+        snippet_update(&conn, make_fav, 5).unwrap();
+        snippet_trash(&conn, &starred.id, 6).unwrap();
+        assert_eq!(library_counts(&conn).unwrap().total, 2);
     }
 
     #[test]

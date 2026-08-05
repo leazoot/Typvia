@@ -1,0 +1,544 @@
+/* Library (design Phase 2 · 1b, dark Phase 7 · 1c, breakpoints Phase 4 · 1a).
+   Colors, radii, shadows and motion come from token variables; the pixel
+   measurements are taken from the design artboards. */
+
+.tv-lib {
+  position: relative;
+  display: flex;
+  height: calc(100vh - 46px);
+  overflow: hidden;
+}
+
+/* ---- rail -------------------------------------------------------------- */
+
+.tv-lib-rail {
+  width: 212px;
+  flex: none;
+  overflow-y: auto;
+  padding: var(--space-22) 0 var(--space-22);
+  background: var(--color-paper);
+  border-right: 1px solid var(--color-edge);
+}
+
+[data-theme='dark'] .tv-lib-rail {
+  border-right-color: var(--color-hairline-quiet);
+}
+
+.tv-lib-rail-label {
+  padding: 0 var(--space-22) 10px;
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: var(--type-section-label-size);
+  font-weight: var(--type-section-label-weight);
+  letter-spacing: var(--type-section-label-tracking);
+  line-height: var(--type-section-label-leading);
+  text-transform: uppercase;
+}
+
+.tv-lib-rail-section {
+  padding-top: var(--space-22);
+}
+
+.tv-lib-rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+  width: 100%;
+  padding: 6px var(--space-22);
+  border: none;
+  background: transparent;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tv-lib-rail-item[data-active] {
+  background: var(--color-edge);
+  color: var(--color-ink);
+}
+
+[data-theme='dark'] .tv-lib-rail-item[data-active] {
+  background: var(--color-lifted);
+}
+
+.tv-lib-rail-item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-lib-rail-count {
+  margin-left: auto;
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.tv-lib-rail-item[data-active] .tv-lib-rail-count {
+  color: var(--color-secondary);
+}
+
+.tv-lib-rail-count[data-attention] {
+  color: var(--color-warning-text, var(--color-warning));
+}
+
+.tv-lib-rail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  padding: 0 var(--space-22);
+}
+
+.tv-lib-tag {
+  padding: 5px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-chip);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ---- main column ------------------------------------------------------- */
+
+.tv-lib-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tv-lib-head {
+  flex: none;
+  padding: var(--space-22) var(--space-26) 0;
+}
+
+.tv-lib-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-14) 0 12px;
+}
+
+.tv-lib-chip {
+  padding: 6px 9px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lib-chip[data-active] {
+  background: var(--color-edge);
+  color: var(--color-ink);
+}
+
+[data-theme='dark'] .tv-lib-chip[data-active] {
+  background: var(--color-lifted);
+  border-color: var(--color-lifted-border);
+}
+
+.tv-lib-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-lib-chip-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--color-hairline);
+}
+
+.tv-lib-sort {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+}
+
+/* ---- list -------------------------------------------------------------- */
+
+/* The tray goes full-bleed and hosts an inner scrolling viewport. */
+.tv-lib-list.tv-list-tray {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--color-edge);
+}
+
+[data-theme='dark'] .tv-lib-list.tv-list-tray {
+  border-top-color: var(--color-hairline-quiet);
+}
+
+.tv-lib-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-8) 0;
+}
+
+.tv-lib-spacer {
+  position: relative;
+}
+
+/* Rows are windowed: each rendered slot is absolutely placed at index * 52. */
+.tv-lib-row-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--space-row-height-desktop);
+}
+
+.tv-lib .tv-row {
+  padding: 0 var(--space-26);
+  cursor: pointer;
+}
+
+.tv-lib .tv-row-title {
+  width: 176px;
+}
+
+.tv-lib .tv-row-cn {
+  width: 104px;
+}
+
+/* The plate travels inside the spacer, inset like the design (18px). */
+.tv-lib-spacer .tv-selection-plate {
+  top: 0;
+  left: var(--space-18);
+  right: var(--space-18);
+}
+
+/* ---- empty / error states (caret + text lines, never an illustration) -- */
+
+.tv-lib-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 64px var(--space-26);
+}
+
+.tv-lib-state-figure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-14);
+}
+
+.tv-lib-state-slot {
+  width: 44px;
+  height: 30px;
+  border: 1px dashed var(--color-hairline-hover, var(--color-hairline));
+  border-radius: var(--radius-chip);
+}
+
+[data-theme='dark'] .tv-lib-state-slot {
+  border-color: var(--color-lifted-border);
+}
+
+.tv-lib-state-title {
+  margin-bottom: 5px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-mobile-row-size);
+  line-height: 1.4;
+}
+
+.tv-lib-state-text {
+  margin-bottom: var(--space-14);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.tv-lib-state-action {
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-row);
+  background: var(--color-paper);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---- footer / batch bar ------------------------------------------------ */
+
+.tv-lib-foot {
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+  padding: 0 var(--space-26);
+  background: var(--color-paper);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.tv-lib-foot-selected {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+}
+
+.tv-lib-foot-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--color-hairline);
+}
+
+.tv-lib-foot-action {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lib-foot-action:disabled {
+  color: var(--color-meta);
+  cursor: default;
+}
+
+.tv-lib-foot-danger,
+.tv-lib-foot-danger:disabled {
+  color: var(--color-error);
+}
+
+.tv-lib-foot-count {
+  margin-left: auto;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ---- preview pane ------------------------------------------------------ */
+
+.tv-lib-preview {
+  width: 330px;
+  flex: none;
+  overflow-y: auto;
+  padding: var(--space-22) 24px 0;
+  background: var(--color-paper);
+  border-left: 1px solid var(--color-edge);
+}
+
+[data-theme='dark'] .tv-lib-preview {
+  border-left-color: var(--color-hairline-quiet);
+}
+
+.tv-lib-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+  height: 20px;
+  margin-bottom: 10px;
+}
+
+.tv-lib-preview-kind {
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tv-lib-preview-trigger {
+  margin-left: auto;
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tv-lib-preview-close {
+  display: none;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lib-preview-title {
+  margin: 0 0 3px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-card-title-weight);
+  letter-spacing: var(--type-card-title-tracking);
+  line-height: var(--type-card-title-leading);
+}
+
+.tv-lib-preview-desc {
+  margin-bottom: var(--space-18);
+  color: var(--color-meta);
+  font-family: var(--font-cjk);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tv-lib-preview-body {
+  max-height: 236px;
+  overflow: hidden;
+  margin-bottom: var(--space-18);
+  padding: var(--space-13) var(--space-14);
+  background: var(--color-sunken);
+  border: 1px solid var(--color-edge);
+  border-radius: var(--radius-row);
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+[data-theme='dark'] .tv-lib-preview-body {
+  border-color: var(--color-hairline-quiet);
+}
+
+.tv-lib-preview-meta {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tv-lib-preview-meta > div {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-hairline-quiet);
+}
+
+.tv-lib-preview-meta > div:last-child {
+  border-bottom: none;
+}
+
+.tv-lib-preview-meta dt {
+  color: var(--color-meta);
+}
+
+.tv-lib-preview-meta dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.tv-lib-preview-actions {
+  display: flex;
+  gap: var(--space-8);
+  margin-top: 20px;
+  padding-bottom: var(--space-22);
+}
+
+.tv-lib-preview-edit {
+  height: 32px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-row);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lib-preview-edit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ---- breakpoints (values from tokens.json breakpoint.*) ---------------- */
+
+/* below reference (1360): narrower rail, preview becomes a drawer on selection */
+@media (max-width: 1359px) {
+  .tv-lib-rail {
+    width: 190px;
+  }
+
+  .tv-lib-preview {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    border-left: 1px solid var(--color-hairline);
+    box-shadow: var(--elevation-e2);
+    animation: tv-lib-drawer-in var(--duration-overlay-enter) var(--curve-standard);
+  }
+
+  .tv-lib-preview[data-empty] {
+    display: none;
+  }
+
+  .tv-lib-preview-close {
+    display: block;
+  }
+}
+
+@keyframes tv-lib-drawer-in {
+  from {
+    transform: translateX(12px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Horizontal scope chips replacing the rail under 1160 (Phase 4 · 1a). */
+.tv-lib-scopes {
+  display: none;
+  align-items: center;
+  gap: var(--space-7);
+  padding: 11px 0 0;
+  overflow-x: auto;
+}
+
+/* below drawerPreview (1160): rail collapses; CN + folder columns drop */
+@media (max-width: 1159px) {
+  .tv-lib-rail {
+    display: none;
+  }
+
+  .tv-lib .tv-row-cn,
+  .tv-lib .tv-row-folder {
+    display: none;
+  }
+
+  .tv-lib-scopes {
+    display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-lib-preview {
+    animation: none;
+  }
+}

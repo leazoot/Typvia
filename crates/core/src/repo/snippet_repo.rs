@@ -1,6 +1,7 @@
 //! Snippet CRUD, batch operations, toggles, usage tracking, and the
 //! trigger-conflict / duplicate checks (PRD §12.1).
 
+use rusqlite::types::ToSql;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use super::RepoError;
@@ -21,6 +22,51 @@ const SELECT_COLUMNS: &str = "id, workspace_id, title, content_plaintext, conten
 
 /// Recycle-bin retention before automatic cleanup (PRD §12.16: 30 days).
 pub const TRASH_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1000;
+
+/// One Library list scope: a saved view or a single folder. Trashed rows are
+/// excluded from every scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListScope<'a> {
+    /// Every live snippet.
+    All,
+    /// Snippets used at least once, most recently used first.
+    Recent,
+    /// Favorites.
+    Starred,
+    /// Live snippets outside any folder.
+    Unsorted,
+    /// Live snippets directly inside one folder.
+    Folder(&'a str),
+}
+
+impl<'a> ListScope<'a> {
+    /// Static WHERE fragment. Only compile-time constants reach the SQL text;
+    /// the folder id travels as the `:folder` bind parameter.
+    fn where_clause(self) -> &'static str {
+        match self {
+            ListScope::All => "1 = 1",
+            ListScope::Recent => "last_used_at IS NOT NULL",
+            ListScope::Starred => "is_favorite = 1",
+            ListScope::Unsorted => "folder_id IS NULL",
+            ListScope::Folder(_) => "folder_id = :folder",
+        }
+    }
+
+    /// Recent orders by usage recency; every other scope by last update.
+    fn order_clause(self) -> &'static str {
+        match self {
+            ListScope::Recent => "last_used_at DESC, id",
+            _ => "updated_at DESC, id",
+        }
+    }
+
+    fn folder_id(self) -> Option<&'a str> {
+        match self {
+            ListScope::Folder(id) => Some(id),
+            _ => None,
+        }
+    }
+}
 
 impl<'c> SnippetRepo<'c> {
     pub fn new(conn: &'c Connection) -> Self {
@@ -160,6 +206,90 @@ impl<'c> SnippetRepo<'c> {
         ))?;
         let rows = stmt.query_map(params![folder_id, limit, offset], row_to_snippet)?;
         collect_snippets(rows)
+    }
+
+    /// Lists live snippets in a Library scope, optionally narrowed to one
+    /// snippet type, bounded by limit/offset.
+    pub fn list_scoped(
+        &self,
+        scope: ListScope<'_>,
+        snippet_type: Option<SnippetType>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<Snippet>, RepoError> {
+        let type_text = snippet_type.map(|t| t.as_str());
+        let folder = scope.folder_id();
+        let mut sql = format!(
+            "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NULL AND {}",
+            scope.where_clause()
+        );
+        if type_text.is_some() {
+            sql.push_str(" AND type = :type");
+        }
+        sql.push_str(&format!(
+            " ORDER BY {} LIMIT :limit OFFSET :offset",
+            scope.order_clause()
+        ));
+
+        let mut binds: Vec<(&str, &dyn ToSql)> = vec![(":limit", &limit), (":offset", &offset)];
+        if let Some(folder) = folder.as_ref() {
+            binds.push((":folder", folder));
+        }
+        if let Some(type_text) = type_text.as_ref() {
+            binds.push((":type", type_text));
+        }
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(&binds[..], row_to_snippet)?;
+        collect_snippets(rows)
+    }
+
+    /// Counts live snippets in a Library scope (same filters as
+    /// [`Self::list_scoped`]).
+    pub fn count_scoped(
+        &self,
+        scope: ListScope<'_>,
+        snippet_type: Option<SnippetType>,
+    ) -> Result<u32, RepoError> {
+        let type_text = snippet_type.map(|t| t.as_str());
+        let folder = scope.folder_id();
+        let mut sql = format!(
+            "SELECT COUNT(*) FROM snippet WHERE deleted_at IS NULL AND {}",
+            scope.where_clause()
+        );
+        if type_text.is_some() {
+            sql.push_str(" AND type = :type");
+        }
+        let mut binds: Vec<(&str, &dyn ToSql)> = Vec::new();
+        if let Some(folder) = folder.as_ref() {
+            binds.push((":folder", folder));
+        }
+        if let Some(type_text) = type_text.as_ref() {
+            binds.push((":type", type_text));
+        }
+        let count = self
+            .conn
+            .prepare(&sql)?
+            .query_row(&binds[..], |row| row.get::<_, u32>(0))?;
+        Ok(count)
+    }
+
+    /// Per-folder live-snippet counts (folders with zero snippets are simply
+    /// absent). Feeds the Library rail without one query per folder.
+    pub fn count_by_folder(&self) -> Result<Vec<(String, u32)>, RepoError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT folder_id, COUNT(*) FROM snippet
+             WHERE deleted_at IS NULL AND folder_id IS NOT NULL
+             GROUP BY folder_id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))
+        })?;
+        let mut counts = Vec::new();
+        for row in rows {
+            counts.push(row?);
+        }
+        Ok(counts)
     }
 
     /// Moves a live snippet into the recycle bin.

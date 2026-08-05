@@ -153,6 +153,26 @@ impl From<Tag> for TagDto {
     }
 }
 
+/// Live-snippet count inside one folder (zero-count folders are absent).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderCountDto {
+    pub folder_id: String,
+    pub count: u32,
+}
+
+/// Rail numbers for the Library page: the four saved views plus per-folder
+/// counts, all in one round trip.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryCountsDto {
+    pub total: u32,
+    pub recent: u32,
+    pub starred: u32,
+    pub unsorted: u32,
+    pub folders: Vec<FolderCountDto>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchHitDto {

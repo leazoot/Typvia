@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@typvia/shared';
 import { Page, PlaceholderPage, TopNav } from '@typvia/ui';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { LibraryPage } from './pages/library';
 
 const NAV_ITEMS = APP_ROUTES.map((route) => ({ key: route.path, label: route.labelEn }));
 
@@ -17,17 +18,21 @@ export function App() {
         onNavigate={(path) => void navigate(path)}
       />
       <Routes>
-        {APP_ROUTES.map((route) => (
-          <Route
-            key={route.path}
-            path={route.path}
-            element={
-              <Page>
-                <PlaceholderPage labelEn={route.labelEn} labelCn={route.labelCn} />
-              </Page>
-            }
-          />
-        ))}
+        {APP_ROUTES.map((route) =>
+          route.path === '/library' ? (
+            <Route key={route.path} path={route.path} element={<LibraryPage />} />
+          ) : (
+            <Route
+              key={route.path}
+              path={route.path}
+              element={
+                <Page>
+                  <PlaceholderPage labelEn={route.labelEn} labelCn={route.labelCn} />
+                </Page>
+              }
+            />
+          ),
+        )}
       </Routes>
     </>
   );

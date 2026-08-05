@@ -80,6 +80,22 @@ export interface Tag {
   createdAt: number;
 }
 
+/** The Library rail vocabulary: four saved views plus single-folder scope. */
+export type LibraryView = 'all' | 'recent' | 'starred' | 'unsorted' | 'folder';
+
+export interface FolderCount {
+  folderId: string;
+  count: number;
+}
+
+export interface LibraryCounts {
+  total: number;
+  recent: number;
+  starred: number;
+  unsorted: number;
+  folders: FolderCount[];
+}
+
 export type SearchTier = 'title_exact' | 'trigger' | 'title_prefix' | 'tag' | 'content';
 
 export interface SearchHit {

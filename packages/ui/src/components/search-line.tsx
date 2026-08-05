@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Caret } from './caret';
 import './search-line.css';
 
@@ -17,6 +18,8 @@ interface SearchLineProps {
   placeholder: string;
   /** Accessible name for the input (the search line has no visible label). */
   label: string;
+  /** Optional right-aligned slot inside the underlined row (e.g. a count). */
+  trailing?: ReactNode;
 }
 
 /**
@@ -25,7 +28,14 @@ interface SearchLineProps {
  * shows while the line is empty; once text exists the native caret
  * (accent-coloured) takes over.
  */
-export function SearchLine({ scale, value, onChange, placeholder, label }: SearchLineProps) {
+export function SearchLine({
+  scale,
+  value,
+  onChange,
+  placeholder,
+  label,
+  trailing,
+}: SearchLineProps) {
   return (
     <div className={`tv-search-line tv-search-line-${scale}`}>
       {value === '' && <Caret height={CARET_HEIGHT[scale]} />}
@@ -36,6 +46,7 @@ export function SearchLine({ scale, value, onChange, placeholder, label }: Searc
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {trailing !== undefined && <span className="tv-search-line-trailing">{trailing}</span>}
     </div>
   );
 }

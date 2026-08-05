@@ -8,7 +8,7 @@ use typvia_core::db::{migrate_to_latest, open_in_memory};
 use typvia_core::model::{
     Folder, SecurityLevel, Snippet, SnippetContent, SnippetType, Tag, TriggerMode,
 };
-use typvia_core::repo::{FolderRepo, RepoError, SnippetRepo, TagRepo, new_id};
+use typvia_core::repo::{FolderRepo, ListScope, RepoError, SnippetRepo, TagRepo, new_id};
 
 fn fresh_db() -> Connection {
     let mut conn = open_in_memory().unwrap();
@@ -457,4 +457,128 @@ fn new_id_produces_unique_uuid_text() {
     assert_ne!(a, b);
     assert_eq!(a.len(), 36);
     assert_eq!(a.chars().filter(|c| *c == '-').count(), 4);
+}
+
+#[test]
+fn list_scoped_filters_each_scope_and_excludes_trash() {
+    let conn = fresh_db();
+    let folders = FolderRepo::new(&conn);
+    let infra = folder("Infra", None);
+    folders.insert(&infra).unwrap();
+
+    let repo = SnippetRepo::new(&conn);
+    let mut starred = snippet("Starred one", "body");
+    starred.is_favorite = true;
+    starred.folder_id = Some(infra.id.clone());
+    let mut used = snippet("Used one", "body");
+    used.last_used_at = Some(9_000);
+    used.usage_count = 3;
+    let mut used_later = snippet("Used two", "body");
+    used_later.last_used_at = Some(12_000);
+    used_later.usage_count = 1;
+    let mut text_kind = snippet("Text one", "body");
+    text_kind.snippet_type = SnippetType::Text;
+    let mut trashed = snippet("Trashed", "body");
+    trashed.deleted_at = Some(5_000);
+    for s in [&starred, &used, &used_later, &text_kind, &trashed] {
+        repo.insert(s).unwrap();
+    }
+
+    let all = repo.list_scoped(ListScope::All, None, 50, 0).unwrap();
+    assert_eq!(all.len(), 4, "trashed rows never appear in a scope");
+
+    let starred_rows = repo.list_scoped(ListScope::Starred, None, 50, 0).unwrap();
+    assert_eq!(
+        starred_rows.iter().map(|s| &s.title).collect::<Vec<_>>(),
+        ["Starred one"]
+    );
+
+    // Recent = used at least once, most recently used first.
+    let recent = repo.list_scoped(ListScope::Recent, None, 50, 0).unwrap();
+    assert_eq!(
+        recent.iter().map(|s| &s.title).collect::<Vec<_>>(),
+        ["Used two", "Used one"]
+    );
+
+    let unsorted = repo.list_scoped(ListScope::Unsorted, None, 50, 0).unwrap();
+    assert_eq!(unsorted.len(), 3, "folderless live rows only");
+
+    let in_folder = repo
+        .list_scoped(ListScope::Folder(&infra.id), None, 50, 0)
+        .unwrap();
+    assert_eq!(
+        in_folder.iter().map(|s| &s.title).collect::<Vec<_>>(),
+        ["Starred one"]
+    );
+
+    // The type filter narrows any scope.
+    let texts = repo
+        .list_scoped(ListScope::All, Some(SnippetType::Text), 50, 0)
+        .unwrap();
+    assert_eq!(
+        texts.iter().map(|s| &s.title).collect::<Vec<_>>(),
+        ["Text one"]
+    );
+}
+
+#[test]
+fn count_scoped_matches_list_scoped() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let mut fav = snippet("Fav", "body");
+    fav.is_favorite = true;
+    let mut text_kind = snippet("Plain text", "body");
+    text_kind.snippet_type = SnippetType::Text;
+    let plain = snippet("Plain command", "body");
+    for s in [&fav, &text_kind, &plain] {
+        repo.insert(s).unwrap();
+    }
+
+    assert_eq!(repo.count_scoped(ListScope::All, None).unwrap(), 3);
+    assert_eq!(repo.count_scoped(ListScope::Starred, None).unwrap(), 1);
+    assert_eq!(repo.count_scoped(ListScope::Recent, None).unwrap(), 0);
+    assert_eq!(
+        repo.count_scoped(ListScope::All, Some(SnippetType::Command))
+            .unwrap(),
+        2
+    );
+
+    repo.soft_delete(&plain.id, 10_000).unwrap();
+    assert_eq!(repo.count_scoped(ListScope::All, None).unwrap(), 2);
+}
+
+#[test]
+fn count_by_folder_groups_live_rows_only() {
+    let conn = fresh_db();
+    let folders = FolderRepo::new(&conn);
+    let a = folder("A", None);
+    let b = folder("B", None);
+    let empty = folder("Empty", None);
+    for f in [&a, &b, &empty] {
+        folders.insert(f).unwrap();
+    }
+
+    let repo = SnippetRepo::new(&conn);
+    let mut one = snippet("One", "body");
+    one.folder_id = Some(a.id.clone());
+    let mut two = snippet("Two", "body");
+    two.folder_id = Some(a.id.clone());
+    let mut three = snippet("Three", "body");
+    three.folder_id = Some(b.id.clone());
+    let mut gone = snippet("Gone", "body");
+    gone.folder_id = Some(b.id.clone());
+    gone.deleted_at = Some(5_000);
+    let loose = snippet("Loose", "body");
+    for s in [&one, &two, &three, &gone, &loose] {
+        repo.insert(s).unwrap();
+    }
+
+    let mut counts = repo.count_by_folder().unwrap();
+    counts.sort();
+    let mut expected = vec![(a.id.clone(), 2), (b.id.clone(), 1)];
+    expected.sort();
+    assert_eq!(
+        counts, expected,
+        "trashed and folderless rows are excluded; empty folders absent"
+    );
 }

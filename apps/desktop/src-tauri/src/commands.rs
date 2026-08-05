@@ -8,8 +8,8 @@ use rusqlite::Connection;
 use tauri::State;
 
 use crate::dto::{
-    FolderCreateInput, FolderDto, FolderUpdateInput, SearchHitDto, SnippetCreateInput, SnippetDto,
-    SnippetUpdateInput, TagDto,
+    FolderCreateInput, FolderDto, FolderUpdateInput, LibraryCountsDto, SearchHitDto,
+    SnippetCreateInput, SnippetDto, SnippetUpdateInput, TagDto,
 };
 use crate::error::IpcError;
 use crate::service;
@@ -78,6 +78,45 @@ pub fn snippet_list_by_folder(
     offset: u32,
 ) -> Result<Vec<SnippetDto>, IpcError> {
     service::snippet_list_by_folder(&*state.lock()?, folder_id.as_deref(), limit, offset)
+}
+
+#[tauri::command]
+pub fn snippet_list_page(
+    state: State<'_, AppState>,
+    view: String,
+    folder_id: Option<String>,
+    snippet_type: Option<String>,
+    limit: u32,
+    offset: u32,
+) -> Result<Vec<SnippetDto>, IpcError> {
+    service::snippet_list_page(
+        &*state.lock()?,
+        &view,
+        folder_id.as_deref(),
+        snippet_type.as_deref(),
+        limit,
+        offset,
+    )
+}
+
+#[tauri::command]
+pub fn snippet_count(
+    state: State<'_, AppState>,
+    view: String,
+    folder_id: Option<String>,
+    snippet_type: Option<String>,
+) -> Result<u32, IpcError> {
+    service::snippet_count(
+        &*state.lock()?,
+        &view,
+        folder_id.as_deref(),
+        snippet_type.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn library_counts(state: State<'_, AppState>) -> Result<LibraryCountsDto, IpcError> {
+    service::library_counts(&*state.lock()?)
 }
 
 #[tauri::command]

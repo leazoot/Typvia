@@ -18,6 +18,14 @@
   caret-color: var(--color-accent);
 }
 
+.tv-search-line-trailing {
+  flex: none;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+}
+
 .tv-search-line input::placeholder {
   color: var(--color-meta);
   opacity: 1;

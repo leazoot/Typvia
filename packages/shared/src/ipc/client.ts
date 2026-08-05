@@ -10,6 +10,8 @@ import type {
   Folder,
   FolderCreateInput,
   FolderUpdateInput,
+  LibraryCounts,
+  LibraryView,
   SearchHit,
   Snippet,
   SnippetCreateInput,
@@ -47,6 +49,28 @@ export function listSnippetsByFolder(
   offset: number,
 ): Promise<Snippet[]> {
   return call('snippet_list_by_folder', { folderId, limit, offset });
+}
+
+export function listSnippetPage(
+  view: LibraryView,
+  folderId: string | null,
+  snippetType: string | null,
+  limit: number,
+  offset: number,
+): Promise<Snippet[]> {
+  return call('snippet_list_page', { view, folderId, snippetType, limit, offset });
+}
+
+export function countSnippets(
+  view: LibraryView,
+  folderId: string | null,
+  snippetType: string | null,
+): Promise<number> {
+  return call('snippet_count', { view, folderId, snippetType });
+}
+
+export function libraryCounts(): Promise<LibraryCounts> {
+  return call('library_counts');
 }
 
 export function trashSnippet(id: string): Promise<void> {

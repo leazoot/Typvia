@@ -12,7 +12,7 @@ mod version_repo;
 use std::fmt;
 
 pub use folder_repo::FolderRepo;
-pub use snippet_repo::{SnippetRepo, TRASH_RETENTION_MS};
+pub use snippet_repo::{ListScope, SnippetRepo, TRASH_RETENTION_MS};
 pub use tag_repo::TagRepo;
 pub use version_repo::VersionRepo;
 

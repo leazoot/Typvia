@@ -77,6 +77,75 @@
   line-height: 1;
 }
 
+.tv-row-check {
+  flex: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  border: 1px solid var(--color-hairline-hover, var(--color-hairline));
+  border-radius: var(--radius-mark);
+  background: var(--color-paper);
+  cursor: pointer;
+}
+
+.tv-row-check:checked {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+}
+
+.tv-row-check:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Graphite has no hairlineHover: the checkbox edge uses the lifted border. */
+[data-theme='dark'] .tv-row-check {
+  border-color: var(--color-lifted-border);
+}
+
+[data-theme='dark'] .tv-row-check:checked {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+}
+
+.tv-row-folder {
+  flex: none;
+  width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tv-row-skeleton-mark {
+  flex: none;
+  width: 22px;
+  height: 15px;
+  background: var(--color-edge);
+  border-radius: var(--radius-mark);
+}
+
+.tv-row-skeleton-bar {
+  height: 9px;
+  background: var(--color-edge);
+  border-radius: var(--radius-mark);
+}
+
+.tv-row-skeleton-title {
+  flex: none;
+  width: 150px;
+}
+
+.tv-row-skeleton-line {
+  flex: none;
+  width: 40%;
+}
+
 .tv-row-trigger {
   flex: none;
   color: var(--color-meta);

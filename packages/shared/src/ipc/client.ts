@@ -73,6 +73,18 @@ export function libraryCounts(): Promise<LibraryCounts> {
   return call('library_counts');
 }
 
+export function batchMoveSnippets(ids: string[], folderId: string | null): Promise<void> {
+  return call('snippet_batch_move', { ids, folderId });
+}
+
+export function batchTagSnippets(ids: string[], tagId: string): Promise<void> {
+  return call('snippet_batch_add_tag', { ids, tagId });
+}
+
+export function batchTrashSnippets(ids: string[]): Promise<void> {
+  return call('snippet_batch_trash', { ids });
+}
+
 export function trashSnippet(id: string): Promise<void> {
   return call('snippet_trash', { id });
 }

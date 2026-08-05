@@ -149,6 +149,29 @@ pub fn trash_purge_expired(state: State<'_, AppState>) -> Result<usize, IpcError
 }
 
 #[tauri::command]
+pub fn snippet_batch_move(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    folder_id: Option<String>,
+) -> Result<(), IpcError> {
+    service::snippet_batch_move(&*state.lock()?, &ids, folder_id.as_deref())
+}
+
+#[tauri::command]
+pub fn snippet_batch_add_tag(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    tag_id: String,
+) -> Result<(), IpcError> {
+    service::snippet_batch_add_tag(&*state.lock()?, &ids, &tag_id)
+}
+
+#[tauri::command]
+pub fn snippet_batch_trash(state: State<'_, AppState>, ids: Vec<String>) -> Result<(), IpcError> {
+    service::snippet_batch_trash(&*state.lock()?, &ids, now_ms()?)
+}
+
+#[tauri::command]
 pub fn folder_create(
     state: State<'_, AppState>,
     input: FolderCreateInput,

@@ -33,6 +33,15 @@ function fakeSnippet(index: number): Snippet {
 }
 
 const countSnippets = vi.fn(() => Promise.resolve(TOTAL));
+const batchMoveSnippets = vi.fn(() => Promise.resolve());
+const batchTagSnippets = vi.fn(() => Promise.resolve());
+const batchTrashSnippets = vi.fn(() => Promise.resolve());
+const createFolder = vi.fn(() => Promise.resolve({}));
+const updateFolder = vi.fn(() => Promise.resolve({}));
+const deleteFolder = vi.fn(() => Promise.resolve());
+const createTag = vi.fn(() => Promise.resolve({}));
+const renameTag = vi.fn(() => Promise.resolve());
+const deleteTag = vi.fn(() => Promise.resolve());
 const searchLibrary = vi.fn((query: string) =>
   Promise.resolve(
     query.includes('zzz')
@@ -60,7 +69,10 @@ vi.mock('@typvia/shared', async (importOriginal) => {
         recent: 128,
         starred: 41,
         unsorted: 14,
-        folders: [{ folderId: 'f-1', count: 2104 }],
+        folders: [
+          { folderId: 'f-1', count: 2104 },
+          { folderId: 'f-2', count: 12 },
+        ],
       }),
     countSnippets: (...args: Parameters<typeof countSnippets>) => countSnippets(...args),
     listSnippetPage: (...args: Parameters<typeof listSnippetPage>) => listSnippetPage(...args),
@@ -77,9 +89,28 @@ vi.mock('@typvia/shared', async (importOriginal) => {
                 createdAt: 1,
                 updatedAt: 1,
               },
+              {
+                id: 'f-2',
+                parentId: null,
+                name: 'Support',
+                sortOrder: 1,
+                createdAt: 1,
+                updatedAt: 1,
+              },
             ]
           : [],
       ),
+    batchMoveSnippets: (...args: Parameters<typeof batchMoveSnippets>) =>
+      batchMoveSnippets(...args),
+    batchTagSnippets: (...args: Parameters<typeof batchTagSnippets>) => batchTagSnippets(...args),
+    batchTrashSnippets: (...args: Parameters<typeof batchTrashSnippets>) =>
+      batchTrashSnippets(...args),
+    createFolder: (...args: Parameters<typeof createFolder>) => createFolder(...args),
+    updateFolder: (...args: Parameters<typeof updateFolder>) => updateFolder(...args),
+    deleteFolder: (...args: Parameters<typeof deleteFolder>) => deleteFolder(...args),
+    createTag: (...args: Parameters<typeof createTag>) => createTag(...args),
+    renameTag: (...args: Parameters<typeof renameTag>) => renameTag(...args),
+    deleteTag: (...args: Parameters<typeof deleteTag>) => deleteTag(...args),
     listTags: () => Promise.resolve([{ id: 'tag-1', name: 'prod', createdAt: 1 }]),
   };
 });
@@ -202,11 +233,112 @@ describe('LibraryPage', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 1' }));
     expect(screen.getByText('2 selected')).toBeDefined();
-    // Batch mutations arrive with TASK-032/034; the actions are disabled.
-    const remove = screen.getByRole('button', { name: 'Delete' });
-    expect(remove.hasAttribute('disabled')).toBe(true);
-
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 1' }));
     expect(screen.getByText('1 selected')).toBeDefined();
+  });
+
+  it('batch move and tag go through the batch APIs via popovers', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 1' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }));
+    const movePopover = screen.getByRole('listbox', { name: 'Move to folder' });
+    fireEvent.click(within(movePopover).getByRole('button', { name: 'Infra' }));
+    expect(batchMoveSnippets).toHaveBeenCalledWith(['s-0', 's-1'], 'f-1');
+    // The batch clears once the operation lands.
+    expect(await screen.findByText(/Local library/)).toBeDefined();
+    expect(screen.queryByText('2 selected')).toBeNull();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+    const tagPopover = screen.getByRole('listbox', { name: 'Add tag' });
+    fireEvent.click(within(tagPopover).getByRole('button', { name: 'prod' }));
+    expect(batchTagSnippets).toHaveBeenCalledWith(['s-0'], 'tag-1');
+  });
+
+  it('batch delete asks with the real number before trashing', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    // Real count, never "Clear all".
+    const confirm = screen.getByRole('button', { name: 'Delete 2 snippets' });
+    fireEvent.click(confirm);
+    expect(batchTrashSnippets).toHaveBeenCalledWith(['s-0', 's-2']);
+  });
+
+  it('creates, renames and deletes folders with inline confirmation', async () => {
+    renderPage();
+    const rail = await screen.findByRole('navigation', { name: 'Library' });
+
+    // Create.
+    fireEvent.click(within(rail).getAllByRole('button', { name: 'New' })[0]!);
+    const input = within(rail).getByLabelText('New folder name');
+    fireEvent.change(input, { target: { value: 'Notes' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(createFolder).toHaveBeenCalledWith({ name: 'Notes', parentId: null, sortOrder: 2 });
+
+    // Activate a folder to reveal its management actions, then rename.
+    fireEvent.click(within(rail).getByRole('button', { name: /Infra/ }));
+    fireEvent.click(within(rail).getByRole('button', { name: 'Rename' }));
+    const rename = within(rail).getByLabelText('Rename Infra');
+    fireEvent.change(rename, { target: { value: 'Infrastructure' } });
+    fireEvent.keyDown(rename, { key: 'Enter' });
+    expect(updateFolder).toHaveBeenCalledWith({
+      id: 'f-1',
+      name: 'Infrastructure',
+      parentId: null,
+      sortOrder: 0,
+    });
+
+    // Delete: inline confirmation carries the real subtree count.
+    fireEvent.click(within(rail).getByRole('button', { name: /Infra/ }));
+    fireEvent.click(within(rail).getByRole('button', { name: 'Delete' }));
+    expect(within(rail).getByText(/2,104 snippets move out/)).toBeDefined();
+    const confirmRow = within(rail).getByText(/snippets move out/).parentElement;
+    fireEvent.click(within(confirmRow as HTMLElement).getByRole('button', { name: 'Delete' }));
+    expect(deleteFolder).toHaveBeenCalledWith('f-1');
+  });
+
+  it('reorders sibling folders with alt+arrows', async () => {
+    renderPage();
+    const rail = await screen.findByRole('navigation', { name: 'Library' });
+    fireEvent.keyDown(within(rail).getByRole('button', { name: /Infra/ }), {
+      key: 'ArrowDown',
+      altKey: true,
+    });
+    // Swap persists a clean sequential order: both siblings get new slots.
+    expect(updateFolder).toHaveBeenCalledWith({
+      id: 'f-2',
+      name: 'Support',
+      parentId: null,
+      sortOrder: 0,
+    });
+    expect(updateFolder).toHaveBeenCalledWith({
+      id: 'f-1',
+      name: 'Infra',
+      parentId: null,
+      sortOrder: 1,
+    });
+  });
+
+  it('creates and deletes tags from the rail', async () => {
+    renderPage();
+    const rail = await screen.findByRole('navigation', { name: 'Library' });
+    fireEvent.click(within(rail).getAllByRole('button', { name: 'New' })[1]!);
+    const input = within(rail).getByLabelText('New tag name');
+    fireEvent.change(input, { target: { value: 'urgent' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(createTag).toHaveBeenCalledWith('urgent');
+
+    fireEvent.click(within(rail).getByRole('button', { name: 'prod' }));
+    fireEvent.click(within(rail).getByRole('button', { name: 'Delete' }));
+    expect(within(rail).getByText(/Delete tag “prod”/)).toBeDefined();
+    const confirmRow = within(rail).getByText(/Delete tag/).parentElement;
+    fireEvent.click(within(confirmRow as HTMLElement).getByRole('button', { name: 'Delete' }));
+    expect(deleteTag).toHaveBeenCalledWith('tag-1');
   });
 });

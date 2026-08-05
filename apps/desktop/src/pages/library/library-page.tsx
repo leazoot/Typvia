@@ -1,5 +1,19 @@
-import { libraryCounts, listFolderChildren, listTags, searchLibrary } from '@typvia/shared';
-import type { LibraryCounts, Snippet, Tag } from '@typvia/shared';
+import {
+  batchMoveSnippets,
+  batchTagSnippets,
+  batchTrashSnippets,
+  createFolder,
+  createTag,
+  deleteFolder,
+  deleteTag,
+  libraryCounts,
+  listFolderChildren,
+  listTags,
+  renameTag,
+  searchLibrary,
+  updateFolder,
+} from '@typvia/shared';
+import type { Folder, LibraryCounts, Snippet, Tag } from '@typvia/shared';
 import {
   Caret,
   ListTray,
@@ -117,7 +131,7 @@ export function LibraryPage() {
     if (searchRows === null) ensureRange(first, last);
   }, [ensureRange, first, last, searchRows]);
 
-  useEffect(() => {
+  const refreshMeta = () => {
     libraryCounts()
       .then(setCounts)
       .catch(() => {
@@ -133,7 +147,15 @@ export function LibraryPage() {
       .catch(() => {
         setTags([]);
       });
-  }, []);
+  };
+
+  useEffect(refreshMeta, []);
+
+  /** Re-reads rows and rail numbers after any mutation. */
+  const refreshAll = () => {
+    retry();
+    refreshMeta();
+  };
 
   const folderNames = useMemo(
     () => new Map(folders.map(({ folder }) => [folder.id, folder.name])),
@@ -190,6 +212,76 @@ export function LibraryPage() {
     setSelectedIndex(null);
   };
 
+  // ---- folder / tag management (rail callbacks) -------------------------
+
+  const childrenOf = useMemo(() => {
+    const map = new Map<string | null, FolderEntry[]>();
+    for (const entry of folders) {
+      const key = entry.folder.parentId;
+      map.set(key, [...(map.get(key) ?? []), entry]);
+    }
+    return map;
+  }, [folders]);
+
+  /** Live snippet count of a folder plus all of its descendants. */
+  const subtreeCount = (folderId: string): number => {
+    const direct = new Map(counts?.folders.map((f) => [f.folderId, f.count]));
+    let sum = 0;
+    const queue = [folderId];
+    while (queue.length > 0) {
+      const current = queue.pop();
+      if (current === undefined) break;
+      sum += direct.get(current) ?? 0;
+      for (const child of childrenOf.get(current) ?? []) queue.push(child.folder.id);
+    }
+    return sum;
+  };
+
+  const run = (operation: Promise<unknown>) => {
+    operation.then(refreshAll).catch(refreshAll);
+  };
+
+  const handleReorderFolder = (folder: Folder, direction: -1 | 1) => {
+    const siblings = (childrenOf.get(folder.parentId) ?? []).map((entry) => entry.folder);
+    const index = siblings.findIndex((sibling) => sibling.id === folder.id);
+    const swapWith = index + direction;
+    if (index < 0 || swapWith < 0 || swapWith >= siblings.length) return;
+    const reordered = [...siblings];
+    const moved = reordered[index];
+    const other = reordered[swapWith];
+    if (moved === undefined || other === undefined) return;
+    reordered[index] = other;
+    reordered[swapWith] = moved;
+    // Persist a clean sequential order so future swaps stay stable.
+    run(
+      Promise.all(
+        reordered.map((sibling, position) =>
+          sibling.sortOrder === position
+            ? Promise.resolve()
+            : updateFolder({
+                id: sibling.id,
+                name: sibling.name,
+                parentId: sibling.parentId,
+                sortOrder: position,
+              }),
+        ),
+      ),
+    );
+  };
+
+  // ---- batch bar --------------------------------------------------------
+
+  const [batchMenu, setBatchMenu] = useState<'none' | 'move' | 'tag' | 'confirm-delete'>('none');
+  const batchDone = () => {
+    setBatchIds(new Set());
+    setBatchMenu('none');
+    setSelectedIndex(null);
+    refreshAll();
+  };
+  const runBatch = (operation: Promise<void>) => {
+    operation.then(batchDone).catch(batchDone);
+  };
+
   const rows = [];
   if (rowCount > 0) {
     for (let index = first; index <= last; index += 1) {
@@ -231,6 +323,34 @@ export function LibraryPage() {
         tags={tags}
         scope={scope}
         onScopeChange={selectScope}
+        onCreateFolder={(name, parentId) => {
+          run(createFolder({ name, parentId, sortOrder: folders.length }));
+        }}
+        onRenameFolder={(folder, name) => {
+          run(
+            updateFolder({
+              id: folder.id,
+              name,
+              parentId: folder.parentId,
+              sortOrder: folder.sortOrder,
+            }),
+          );
+        }}
+        onDeleteFolder={(folder) => {
+          if (scope.folderId === folder.id) setScope({ view: 'all', folderId: null });
+          run(deleteFolder(folder.id));
+        }}
+        onReorderFolder={handleReorderFolder}
+        subtreeCount={subtreeCount}
+        onCreateTag={(name) => {
+          run(createTag(name));
+        }}
+        onRenameTag={(tag, name) => {
+          run(renameTag(tag.id, name));
+        }}
+        onDeleteTag={(tag) => {
+          run(deleteTag(tag.id));
+        }}
       />
       <section className="tv-lib-main">
         <div className="tv-lib-head">
@@ -354,21 +474,116 @@ export function LibraryPage() {
           </div>
         </ListTray>
         <footer className="tv-lib-foot">
-          {batchIds.size > 0 && (
-            <>
-              <span className="tv-lib-foot-selected">{batchIds.size} selected</span>
-              <span className="tv-lib-foot-divider" />
-              <button type="button" className="tv-lib-foot-action" disabled>
-                Move to folder
-              </button>
-              <button type="button" className="tv-lib-foot-action" disabled>
-                Add tag
-              </button>
-              <button type="button" className="tv-lib-foot-action tv-lib-foot-danger" disabled>
-                Delete
-              </button>
-            </>
-          )}
+          {batchIds.size > 0 &&
+            (batchMenu === 'confirm-delete' ? (
+              <>
+                <span className="tv-lib-foot-selected">
+                  Delete {batchIds.size} snippet{batchIds.size === 1 ? '' : 's'}?
+                </span>
+                <button
+                  type="button"
+                  className="tv-lib-foot-action tv-lib-foot-danger"
+                  onClick={() => {
+                    runBatch(batchTrashSnippets([...batchIds]));
+                  }}
+                >
+                  Delete {batchIds.size} snippet{batchIds.size === 1 ? '' : 's'}
+                </button>
+                <button
+                  type="button"
+                  className="tv-lib-foot-action"
+                  onClick={() => {
+                    setBatchMenu('none');
+                  }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="tv-lib-foot-selected">{batchIds.size} selected</span>
+                <span className="tv-lib-foot-divider" />
+                <span className="tv-lib-foot-menu-anchor">
+                  <button
+                    type="button"
+                    className="tv-lib-foot-action"
+                    onClick={() => {
+                      setBatchMenu(batchMenu === 'move' ? 'none' : 'move');
+                    }}
+                  >
+                    Move to folder
+                  </button>
+                  {batchMenu === 'move' && (
+                    <div className="tv-lib-popover" role="listbox" aria-label="Move to folder">
+                      <button
+                        type="button"
+                        className="tv-lib-popover-item"
+                        onClick={() => {
+                          runBatch(batchMoveSnippets([...batchIds], null));
+                        }}
+                      >
+                        Unsorted
+                      </button>
+                      {folders.map(({ folder, depth }) => (
+                        <button
+                          key={folder.id}
+                          type="button"
+                          className="tv-lib-popover-item"
+                          style={{ paddingLeft: 12 + depth * 12 }}
+                          onClick={() => {
+                            runBatch(batchMoveSnippets([...batchIds], folder.id));
+                          }}
+                        >
+                          {folder.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </span>
+                <span className="tv-lib-foot-menu-anchor">
+                  <button
+                    type="button"
+                    className="tv-lib-foot-action"
+                    onClick={() => {
+                      setBatchMenu(batchMenu === 'tag' ? 'none' : 'tag');
+                    }}
+                  >
+                    Add tag
+                  </button>
+                  {batchMenu === 'tag' && (
+                    <div className="tv-lib-popover" role="listbox" aria-label="Add tag">
+                      {tags.length === 0 ? (
+                        <span className="tv-lib-popover-empty">
+                          No tags yet — create one in the rail.
+                        </span>
+                      ) : (
+                        tags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            className="tv-lib-popover-item"
+                            onClick={() => {
+                              runBatch(batchTagSnippets([...batchIds], tag.id));
+                            }}
+                          >
+                            {tag.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="tv-lib-foot-action tv-lib-foot-danger"
+                  onClick={() => {
+                    setBatchMenu('confirm-delete');
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            ))}
           <span className="tv-lib-foot-count">
             {searchRows === null || searchMs === null
               ? `Local library · ${total.toLocaleString('en-US')} items`

@@ -307,6 +307,89 @@ pub fn trash_purge_expired(conn: &Connection, now: i64) -> Result<usize, IpcErro
     Ok(SnippetRepo::new(conn).purge_expired_trash(now, TRASH_RETENTION_MS)?)
 }
 
+fn check_ids(ids: &[String]) -> Result<(), IpcError> {
+    if ids.is_empty() {
+        return Err(IpcError::validation("no snippets selected"));
+    }
+    if ids.len() > MAX_PAGE_LIMIT as usize {
+        return Err(IpcError::validation("too many snippets in one batch"));
+    }
+    Ok(())
+}
+
+/// Moves a batch into a folder (`None` = unfiled) atomically, then re-indexes
+/// each row — the folder name is part of the search index.
+pub fn snippet_batch_move(
+    conn: &Connection,
+    ids: &[String],
+    folder_id: Option<&str>,
+) -> Result<(), IpcError> {
+    check_ids(ids)?;
+    SnippetRepo::new(conn).batch_move(ids, folder_id)?;
+    let index = SearchIndex::new(conn);
+    for id in ids {
+        index.sync_snippet(id)?;
+    }
+    Ok(())
+}
+
+/// Tags a batch atomically, then re-indexes (tags are searchable).
+pub fn snippet_batch_add_tag(
+    conn: &Connection,
+    ids: &[String],
+    tag_id: &str,
+) -> Result<(), IpcError> {
+    check_ids(ids)?;
+    SnippetRepo::new(conn).batch_add_tag(ids, tag_id)?;
+    let index = SearchIndex::new(conn);
+    for id in ids {
+        index.sync_snippet(id)?;
+    }
+    Ok(())
+}
+
+/// Moves a batch into the recycle bin atomically; trashed rows leave the
+/// search index.
+pub fn snippet_batch_trash(conn: &Connection, ids: &[String], now: i64) -> Result<(), IpcError> {
+    check_ids(ids)?;
+    let tx = conn.unchecked_transaction().map_err(RepoError::from)?;
+    let repo = SnippetRepo::new(&tx);
+    for id in ids {
+        repo.soft_delete(id, now)?;
+    }
+    tx.commit().map_err(RepoError::from)?;
+    let index = SearchIndex::new(conn);
+    for id in ids {
+        index.sync_snippet(id)?;
+    }
+    Ok(())
+}
+
+/// Every snippet id inside a folder subtree (the folder itself plus all
+/// descendants), collected via the repositories — no SQL in the host.
+fn snippet_ids_in_subtree(conn: &Connection, folder_id: &str) -> Result<Vec<String>, IpcError> {
+    let folders = FolderRepo::new(conn);
+    let snippets = SnippetRepo::new(conn);
+    let mut queue = vec![folder_id.to_string()];
+    let mut ids = Vec::new();
+    while let Some(current) = queue.pop() {
+        for child in folders.list_children(Some(&current))? {
+            queue.push(child.id);
+        }
+        let mut offset = 0;
+        loop {
+            let page = snippets.list_by_folder(Some(&current), MAX_PAGE_LIMIT, offset)?;
+            let page_len = page.len();
+            ids.extend(page.into_iter().map(|s| s.id));
+            if page_len < MAX_PAGE_LIMIT as usize {
+                break;
+            }
+            offset += MAX_PAGE_LIMIT;
+        }
+    }
+    Ok(ids)
+}
+
 pub fn folder_create(
     conn: &Connection,
     input: FolderCreateInput,
@@ -331,16 +414,43 @@ pub fn folder_update(
 ) -> Result<FolderDto, IpcError> {
     let repo = FolderRepo::new(conn);
     let mut folder = repo.get(&input.id)?.ok_or_else(IpcError::not_found)?;
+    let renamed = folder.name != input.name;
     folder.name = input.name;
     folder.parent_id = input.parent_id;
     folder.sort_order = input.sort_order;
     folder.updated_at = now;
     repo.update(&folder)?;
+    // The folder name is indexed with each snippet: a rename must re-index
+    // the folder's direct contents.
+    if renamed {
+        let index = SearchIndex::new(conn);
+        let mut offset = 0;
+        loop {
+            let page =
+                SnippetRepo::new(conn).list_by_folder(Some(&folder.id), MAX_PAGE_LIMIT, offset)?;
+            let page_len = page.len();
+            for snippet in page {
+                index.sync_snippet(&snippet.id)?;
+            }
+            if page_len < MAX_PAGE_LIMIT as usize {
+                break;
+            }
+            offset += MAX_PAGE_LIMIT;
+        }
+    }
     Ok(folder.into())
 }
 
+/// Deletes a folder: child folders cascade away and contents fall back to
+/// unfiled (schema rules), so the affected snippets are re-indexed after.
 pub fn folder_delete(conn: &Connection, id: &str) -> Result<(), IpcError> {
-    Ok(FolderRepo::new(conn).delete(id)?)
+    let affected = snippet_ids_in_subtree(conn, id)?;
+    FolderRepo::new(conn).delete(id)?;
+    let index = SearchIndex::new(conn);
+    for snippet_id in &affected {
+        index.sync_snippet(snippet_id)?;
+    }
+    Ok(())
 }
 
 pub fn folder_list_children(
@@ -698,6 +808,77 @@ mod tests {
         snippet_update(&conn, make_fav, 5).unwrap();
         snippet_trash(&conn, &starred.id, 6).unwrap();
         assert_eq!(library_counts(&conn).unwrap().total, 2);
+    }
+
+    #[test]
+    fn batch_operations_keep_the_search_index_in_step() {
+        let conn = test_conn();
+        let a = snippet_create(&conn, create_input("Alpha", None), 1).unwrap();
+        let b = snippet_create(&conn, create_input("Beta", None), 2).unwrap();
+        let ids = vec![a.id.clone(), b.id.clone()];
+        let folder = folder_create(
+            &conn,
+            FolderCreateInput {
+                name: "Runbooks".to_string(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            3,
+        )
+        .unwrap();
+
+        // Move: the folder name becomes searchable for both rows.
+        snippet_batch_move(&conn, &ids, Some(&folder.id)).unwrap();
+        assert_eq!(search_snippets(&conn, "runbooks", 10, 0).unwrap().len(), 2);
+
+        // Tag: the tag name becomes searchable.
+        let tag = tag_create(&conn, "prod".to_string(), 4).unwrap();
+        snippet_batch_add_tag(&conn, &ids, &tag.id).unwrap();
+        assert_eq!(search_snippets(&conn, "prod", 10, 0).unwrap().len(), 2);
+
+        // Folder rename: contents re-index under the new name.
+        folder_update(
+            &conn,
+            FolderUpdateInput {
+                id: folder.id.clone(),
+                name: "Playbooks".to_string(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            5,
+        )
+        .unwrap();
+        assert_eq!(search_snippets(&conn, "playbooks", 10, 0).unwrap().len(), 2);
+        assert!(
+            search_snippets(&conn, "runbooks", 10, 0)
+                .unwrap()
+                .is_empty()
+        );
+
+        // Folder delete: contents move out (unfiled) and stay alive.
+        folder_delete(&conn, &folder.id).unwrap();
+        let listed = snippet_list(&conn, 50, 0).unwrap();
+        assert_eq!(listed.len(), 2);
+        assert!(listed.iter().all(|s| s.folder_id.is_none()));
+        assert!(
+            search_snippets(&conn, "playbooks", 10, 0)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(search_snippets(&conn, "alpha", 10, 0).unwrap().len(), 1);
+
+        // Batch trash: rows leave lists, counts and the index together.
+        snippet_batch_trash(&conn, &ids, 10).unwrap();
+        assert!(snippet_list(&conn, 50, 0).unwrap().is_empty());
+        assert!(search_snippets(&conn, "alpha", 10, 0).unwrap().is_empty());
+        assert_eq!(library_counts(&conn).unwrap().total, 0);
+        assert_eq!(trash_list(&conn, 50, 0).unwrap().len(), 2);
+
+        // Empty batches are user errors.
+        assert_eq!(
+            snippet_batch_trash(&conn, &[], 11).unwrap_err().code,
+            IpcErrorCode::Validation
+        );
     }
 
     #[test]

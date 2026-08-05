@@ -6,3 +6,11 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# KeyboardSnapshot is a versioned JSON document (DEC-007 #4); serde is the
+# maintained standard for that boundary (MIT/Apache-2.0, MPL-2.0 compatible).
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

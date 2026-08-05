@@ -1,0 +1,257 @@
+//! String-backed enums stored as controlled TEXT values in SQLite.
+
+use std::fmt;
+use std::str::FromStr;
+
+/// A TEXT value read from storage (or sync payload) that no known enum
+/// variant matches. Newer schema versions may introduce values this build
+/// does not know; callers must decide explicitly how to degrade.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownEnumValue {
+    /// Name of the enum type that failed to parse.
+    pub enum_name: &'static str,
+    /// The unrecognized TEXT value.
+    pub value: String,
+}
+
+impl fmt::Display for UnknownEnumValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown {} value: {}", self.enum_name, self.value)
+    }
+}
+
+impl std::error::Error for UnknownEnumValue {}
+
+macro_rules! text_enum {
+    (
+        $(#[$meta:meta])*
+        $name:ident {
+            $($(#[$vmeta:meta])* $variant:ident => $text:literal),+ $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum $name {
+            $($(#[$vmeta])* $variant),+
+        }
+
+        impl $name {
+            /// Every known variant, in declaration order.
+            pub const ALL: &'static [$name] = &[$(Self::$variant),+];
+
+            /// Stable TEXT value stored in the database.
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(Self::$variant => $text),+
+                }
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = UnknownEnumValue;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($text => Ok(Self::$variant),)+
+                    other => Err(UnknownEnumValue {
+                        enum_name: stringify!($name),
+                        value: other.to_string(),
+                    }),
+                }
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+    };
+}
+
+text_enum! {
+    /// Snippet content type (PRD §12.1 / §15.1 `type`).
+    SnippetType {
+        /// Plain text.
+        Text => "text",
+        /// Markdown document.
+        Markdown => "markdown",
+        /// Code fragment (with an optional `language`).
+        Code => "code",
+        /// Shell or CLI command.
+        Command => "command",
+        /// AI prompt text.
+        Prompt => "prompt",
+        /// Template with fillable fields (see `TemplateField`).
+        Template => "template",
+        /// Sensitive text; requires `SecurityLevel::Sensitive`.
+        Sensitive => "sensitive",
+        /// Stored AI action invocation.
+        AiAction => "ai_action",
+        /// URL / link.
+        Link => "link",
+        /// Temporary snippet; expiry semantics are open (OQ-R4), not implemented.
+        Temporary => "temporary",
+    }
+}
+
+text_enum! {
+    /// Content security level (docs/02_REQUIREMENTS.md §3).
+    ///
+    /// Sensitive content is ciphertext-only at rest, indexed by
+    /// title/tags/description only, and never enters Espanso YAML or logs.
+    SecurityLevel {
+        /// Plaintext storage, full-text indexed, direct injection.
+        Normal => "normal",
+        /// Application-layer encrypted, metadata-only index, verify-then-inject.
+        Sensitive => "sensitive",
+    }
+}
+
+text_enum! {
+    /// How a trigger string fires expansion (PRD §12.4).
+    ///
+    /// Case sensitivity, cursor placeholders, and date variables are
+    /// compile-time options of the Espanso adapter, not persisted trigger
+    /// modes.
+    TriggerMode {
+        /// Expands after the trigger plus a terminator character.
+        Delimiter => "delimiter",
+        /// Expands as soon as the trigger is typed.
+        Immediate => "immediate",
+        /// Expands only when the trigger forms a whole word.
+        WordBoundary => "word_boundary",
+        /// The trigger string is a regular expression. Pattern validity is
+        /// checked by the Espanso adapter at compile time, not by the model.
+        Regex => "regex",
+    }
+}
+
+text_enum! {
+    /// Supported platforms (PRD §15.1 `platform_scope`, §15.6/§15.7 `platform`).
+    Platform {
+        Windows => "windows",
+        Macos => "macos",
+        Ios => "ios",
+        Android => "android",
+    }
+}
+
+text_enum! {
+    /// Template field input type (PRD §12.8).
+    TemplateFieldType {
+        SingleLineText => "single_line_text",
+        MultiLineText => "multi_line_text",
+        Number => "number",
+        Date => "date",
+        Time => "time",
+        /// Single choice from `options`.
+        SingleSelect => "single_select",
+        /// Multiple choices from `options`.
+        MultiSelect => "multi_select",
+        Toggle => "toggle",
+        /// Dropdown choice from `options`.
+        Dropdown => "dropdown",
+        /// Value produced at render time (date, clipboard, ...).
+        DynamicVariable => "dynamic_variable",
+        /// Reference to a vault secret; only the reference is stored, never
+        /// the value (cross-domain rule, .claude/rules/security.md).
+        SecretRef => "secret_ref",
+    }
+}
+
+text_enum! {
+    /// Per-snippet application rule effect (PRD §12.14 / §15.6 `rule_type`).
+    ///
+    /// The app-level "show only tagged snippets" rule has no snippet-scoped
+    /// representation and is an open question (OQ-R8).
+    AppRuleType {
+        /// Show this snippet only in the matched application.
+        ShowOnly => "show_only",
+        /// Hide this snippet in the matched application.
+        Disable => "disable",
+        /// Keep the snippet visible but disable abbreviation expansion.
+        DisableExpansion => "disable_expansion",
+        /// Forbid sensitive injection into the matched application.
+        DenySensitiveInjection => "deny_sensitive_injection",
+    }
+}
+
+text_enum! {
+    /// Device trust state (PRD §15.7 `trust_level`).
+    TrustLevel {
+        /// Paired and allowed to sync.
+        Trusted => "trusted",
+        /// Revoked; the server rejects it and keys are rotated.
+        Revoked => "revoked",
+    }
+}
+
+text_enum! {
+    /// Entity kind carried by a sync record (PRD §15.8 `entity_type`).
+    SyncEntityType {
+        Snippet => "snippet",
+        TemplateField => "template_field",
+        Folder => "folder",
+        Tag => "tag",
+        SnippetTag => "snippet_tag",
+        AppRule => "app_rule",
+        AiAction => "ai_action",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_round_trip<T>(variants: &[T])
+    where
+        T: FromStr<Err = UnknownEnumValue> + PartialEq + Copy + fmt::Debug,
+        T: fmt::Display,
+    {
+        for v in variants {
+            let text = v.to_string();
+            assert_eq!(text.parse::<T>(), Ok(*v), "round-trip failed for {text}");
+        }
+    }
+
+    #[test]
+    fn every_variant_round_trips_through_its_text_value() {
+        assert_round_trip(SnippetType::ALL);
+        assert_round_trip(SecurityLevel::ALL);
+        assert_round_trip(TriggerMode::ALL);
+        assert_round_trip(Platform::ALL);
+        assert_round_trip(TemplateFieldType::ALL);
+        assert_round_trip(AppRuleType::ALL);
+        assert_round_trip(TrustLevel::ALL);
+        assert_round_trip(SyncEntityType::ALL);
+    }
+
+    #[test]
+    fn snippet_type_covers_all_ten_prd_types() {
+        assert_eq!(SnippetType::ALL.len(), 10);
+    }
+
+    #[test]
+    fn unknown_value_is_reported_with_enum_name_and_value() {
+        let err = "vault".parse::<SecurityLevel>();
+        assert_eq!(
+            err,
+            Err(UnknownEnumValue {
+                enum_name: "SecurityLevel",
+                value: "vault".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn text_values_are_snake_case_and_unique() {
+        let mut seen = std::collections::HashSet::new();
+        for v in SnippetType::ALL {
+            let s = v.as_str();
+            assert!(seen.insert(s), "duplicate text value {s}");
+            assert_eq!(s, s.to_lowercase());
+            assert!(!s.contains(' '));
+        }
+    }
+}

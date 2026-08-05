@@ -20,4 +20,22 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
     },
   },
+  {
+    // The typed IPC layer in packages/shared is the frontend's only data
+    // entry point; nothing else may talk to the Tauri bridge directly.
+    files: ['apps/**/src/**', 'packages/ui/src/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tauri-apps/api/core',
+              message: 'Use the typed IPC layer from @typvia/shared instead of invoke().',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

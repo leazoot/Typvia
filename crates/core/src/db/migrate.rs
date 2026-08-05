@@ -34,6 +34,12 @@ const MIGRATIONS: &[Migration] = &[
         up: include_str!("../../migrations/0002_trash_and_versions.up.sql"),
         down: include_str!("../../migrations/0002_trash_and_versions.down.sql"),
     },
+    Migration {
+        version: 3,
+        name: "search_index_language",
+        up: include_str!("../../migrations/0003_search_index_language.up.sql"),
+        down: include_str!("../../migrations/0003_search_index_language.down.sql"),
+    },
 ];
 
 /// Highest schema version known to this build.
@@ -177,6 +183,25 @@ mod tests {
         let tables = table_names(&conn);
         assert!(tables.contains(&"snippet".to_string()));
         assert!(!tables.contains(&"snippet_version".to_string()));
+    }
+
+    #[test]
+    fn fts_language_column_exists_only_from_version_three() {
+        let fts_columns = |conn: &Connection| -> Vec<String> {
+            let mut stmt = conn.prepare("PRAGMA table_info(snippet_fts)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(fts_columns(&conn).contains(&"language".to_string()));
+
+        migrate_to(&mut conn, 2).unwrap();
+        assert!(!fts_columns(&conn).contains(&"language".to_string()));
+
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(fts_columns(&conn).contains(&"language".to_string()));
     }
 
     #[test]

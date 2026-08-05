@@ -7,10 +7,14 @@ license.workspace = true
 [lints]
 workspace = true
 
-[dev-dependencies]
-# Benchmark-only for now (TASK-006 baseline); promoted to a runtime dependency
-# when the search module is implemented (TASK-019, per DEC-005).
+[dependencies]
+# rusqlite per DEC-005; promoted from dev-dependency now that the search
+# module maintains the FTS5 index (TASK-019).
 rusqlite = { version = "0.38", features = ["bundled"] }
+# Domain models and enum source of truth (dependency direction: search -> core).
+typvia-core = { path = "../core" }
+
+[dev-dependencies]
 criterion = "0.7"
 
 [[bench]]

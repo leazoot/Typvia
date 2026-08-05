@@ -680,6 +680,28 @@ button.tv-lib-rail-danger {
   box-shadow: var(--focus-ring);
 }
 
+/* Secondary action: hairline outline, not a filled block (design rule 3). */
+.tv-lib-preview-copy {
+  height: 32px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-hairline-hover, var(--color-hairline));
+  border-radius: var(--radius-row);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lib-preview-copy:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* ---- breakpoints (values from tokens.json breakpoint.*) ---------------- */
 
 /* below reference (1360): narrower rail, preview becomes a drawer on selection */

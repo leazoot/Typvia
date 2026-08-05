@@ -1,10 +1,11 @@
 /** Stable error codes shared with the Rust IPC layer (error.rs). */
-export type IpcErrorCode = 'validation' | 'conflict' | 'not_found' | 'system';
+export type IpcErrorCode = 'validation' | 'conflict' | 'not_found' | 'permission_denied' | 'system';
 
 /**
  * Typed IPC failure. `validation` is user-correctable input, `conflict` /
- * `not_found` are business outcomes, `system` is an internal failure with a
- * deliberately generic message.
+ * `not_found` / `permission_denied` are business outcomes (the last one means
+ * injection needs OS permission — callers fall back to copy), `system` is an
+ * internal failure with a deliberately generic message.
  */
 export class IpcError extends Error {
   readonly code: IpcErrorCode;
@@ -16,7 +17,13 @@ export class IpcError extends Error {
   }
 }
 
-const CODES: readonly IpcErrorCode[] = ['validation', 'conflict', 'not_found', 'system'];
+const CODES: readonly IpcErrorCode[] = [
+  'validation',
+  'conflict',
+  'not_found',
+  'permission_denied',
+  'system',
+];
 
 /** Normalizes whatever the bridge rejected with into an IpcError. */
 export function toIpcError(raw: unknown): IpcError {

@@ -1,5 +1,7 @@
+import { copySnippet } from '@typvia/shared';
 import type { Snippet } from '@typvia/shared';
 import { TYPE_MARKS, TypeMark } from '@typvia/ui';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 const MARK_BY_TYPE: Record<string, string> = {
@@ -25,15 +27,44 @@ interface PreviewProps {
   folderName: string | null;
   /** Rendered as a drawer below 1360px; Close clears the selection there. */
   onClose: () => void;
+  /** Called after a successful copy so the caller can refresh usage counts. */
+  onCopied: () => void;
 }
+
+const COPIED_LABEL_MS = 1400;
 
 /**
  * The 330px read-only preview pane (design 1b): a preview, never an edit
  * form — editing is the separate editor screen. Sensitive bodies never reach
  * this side of the IPC boundary, so nothing is rendered for them.
  */
-export function LibraryPreview({ snippet, folderName, onClose }: PreviewProps) {
+export function LibraryPreview({ snippet, folderName, onClose, onCopied }: PreviewProps) {
   const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+
+  const handleCopy = (id: string) => {
+    copySnippet(id)
+      .then(() => {
+        setCopied(true);
+        if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+        copiedTimer.current = setTimeout(() => {
+          setCopied(false);
+        }, COPIED_LABEL_MS);
+        onCopied();
+      })
+      .catch(() => {
+        // A copy failure is a rare system error; leave the button as-is.
+      });
+  };
+
   return (
     <aside
       aria-label="Snippet preview"
@@ -81,6 +112,18 @@ export function LibraryPreview({ snippet, folderName, onClose }: PreviewProps) {
             >
               Edit
             </button>
+            {snippet.body !== null && (
+              <button
+                type="button"
+                className="tv-lib-preview-copy"
+                aria-live="polite"
+                onClick={() => {
+                  handleCopy(snippet.id);
+                }}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            )}
           </div>
         </div>
       )}

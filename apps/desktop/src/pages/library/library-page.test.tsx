@@ -42,6 +42,7 @@ const deleteFolder = vi.fn(() => Promise.resolve());
 const createTag = vi.fn(() => Promise.resolve({}));
 const renameTag = vi.fn(() => Promise.resolve());
 const deleteTag = vi.fn(() => Promise.resolve());
+const copySnippet = vi.fn(() => Promise.resolve());
 const searchLibrary = vi.fn((query: string) =>
   Promise.resolve(
     query.includes('zzz')
@@ -112,6 +113,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     createTag: (...args: Parameters<typeof createTag>) => createTag(...args),
     renameTag: (...args: Parameters<typeof renameTag>) => renameTag(...args),
     deleteTag: (...args: Parameters<typeof deleteTag>) => deleteTag(...args),
+    copySnippet: (...args: Parameters<typeof copySnippet>) => copySnippet(...args),
     listTags: () => Promise.resolve([{ id: 'tag-1', name: 'prod', createdAt: 1 }]),
   };
 });
@@ -174,6 +176,16 @@ describe('LibraryPage', () => {
     // A preview, never an edit form (design 1b).
     expect(within(preview).queryAllByRole('textbox')).toHaveLength(0);
     expect(preview.querySelectorAll('input, textarea, select')).toHaveLength(0);
+  });
+
+  it('copies the selected snippet from the preview and confirms inline', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByText('Snippet 2'));
+    const preview = screen.getByRole('complementary', { name: 'Snippet preview' });
+    fireEvent.click(within(preview).getByRole('button', { name: 'Copy' }));
+    expect(copySnippet).toHaveBeenCalledWith('s-2');
+    // The label flips to a confirmation (usage is recorded host-side).
+    expect(await within(preview).findByRole('button', { name: 'Copied' })).toBeDefined();
   });
 
   it('replaces results instantly per keystroke and auto-selects the first hit', async () => {

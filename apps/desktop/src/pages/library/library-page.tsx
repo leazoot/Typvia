@@ -615,6 +615,7 @@ export function LibraryPage() {
         onClose={() => {
           setSelectedIndex(null);
         }}
+        onCopied={refreshAll}
       />
     </main>
   );

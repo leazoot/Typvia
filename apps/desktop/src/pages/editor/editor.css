@@ -77,6 +77,48 @@
   white-space: nowrap;
 }
 
+.tv-ed-top-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-18);
+}
+
+.tv-ed-testinsert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.tv-ed-testinsert-btn {
+  height: 26px;
+  padding: 0 var(--space-14);
+  border: 1px solid var(--color-hairline-hover, var(--color-hairline));
+  border-radius: var(--radius-row);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-ed-testinsert-btn:disabled {
+  color: var(--color-meta);
+  cursor: default;
+}
+
+.tv-ed-testinsert-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-ed-testinsert-hint {
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+}
+
 .tv-ed-status {
   display: flex;
   align-items: center;

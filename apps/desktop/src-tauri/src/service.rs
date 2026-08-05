@@ -19,6 +19,7 @@ use crate::dto::{
     SearchHitDto, SnippetCreateInput, SnippetDto, SnippetUpdateInput, TagDto,
 };
 use crate::error::IpcError;
+use crate::injector::{InjectionMethod, Injector};
 
 /// v1.0 has a single implicit workspace (PRD §15.1).
 const WORKSPACE_ID: &str = "default";
@@ -195,6 +196,51 @@ pub fn snippet_get(conn: &Connection, id: &str) -> Result<SnippetDto, IpcError> 
         .get(id)?
         .ok_or_else(IpcError::not_found)?;
     Ok(snippet.into())
+}
+
+/// Loads a normal snippet's plaintext body for delivery. v1 injection covers
+/// normal snippets only; sensitive (ciphertext) injection arrives with the
+/// vault after unlock/verification (STAGE-13).
+fn deliverable_body(conn: &Connection, id: &str) -> Result<String, IpcError> {
+    let snippet = SnippetRepo::new(conn)
+        .get(id)?
+        .ok_or_else(IpcError::not_found)?;
+    match snippet.content {
+        SnippetContent::Plaintext(text) => Ok(text),
+        SnippetContent::Ciphertext(_) => Err(IpcError::validation(
+            "sensitive snippets cannot be injected yet",
+        )),
+    }
+}
+
+/// Injects a snippet into the frontmost application, then records one usage.
+/// Usage is recorded only after a successful delivery, so a failed or
+/// permission-denied injection leaves usage_count untouched.
+pub fn snippet_inject(
+    conn: &Connection,
+    injector: &mut dyn Injector,
+    id: &str,
+    method: InjectionMethod,
+    now: i64,
+) -> Result<(), IpcError> {
+    let body = deliverable_body(conn, id)?;
+    injector.inject(&body, method)?;
+    SnippetRepo::new(conn).record_usage(id, now)?;
+    Ok(())
+}
+
+/// Copies a snippet to the clipboard (also the no-permission fallback for
+/// injection), then records one usage on success.
+pub fn snippet_copy(
+    conn: &Connection,
+    injector: &mut dyn Injector,
+    id: &str,
+    now: i64,
+) -> Result<(), IpcError> {
+    let body = deliverable_body(conn, id)?;
+    injector.copy(&body)?;
+    SnippetRepo::new(conn).record_usage(id, now)?;
+    Ok(())
 }
 
 pub fn snippet_list(
@@ -501,11 +547,154 @@ pub fn search_snippets(
 mod tests {
     use super::*;
     use crate::error::IpcErrorCode;
+    use crate::injector::InjectorError;
 
     fn test_conn() -> Connection {
         let mut conn = typvia_core::db::open_in_memory().unwrap();
         typvia_core::db::migrate_to_latest(&mut conn).unwrap();
         conn
+    }
+
+    /// Records what it was asked to deliver, or fails with a set error, so
+    /// tests can drive the inject/copy use cases without a GUI.
+    struct FakeInjector {
+        granted: bool,
+        fail_with: Option<InjectorError>,
+        injected: Vec<String>,
+        copied: Vec<String>,
+    }
+
+    impl FakeInjector {
+        fn granted() -> Self {
+            Self {
+                granted: true,
+                fail_with: None,
+                injected: Vec::new(),
+                copied: Vec::new(),
+            }
+        }
+
+        fn failing(error: InjectorError) -> Self {
+            Self {
+                granted: true,
+                fail_with: Some(error),
+                injected: Vec::new(),
+                copied: Vec::new(),
+            }
+        }
+    }
+
+    impl Injector for FakeInjector {
+        fn accessibility_granted(&self) -> bool {
+            self.granted
+        }
+
+        fn inject(&mut self, text: &str, _method: InjectionMethod) -> Result<(), InjectorError> {
+            if let Some(error) = self.fail_with {
+                return Err(error);
+            }
+            self.injected.push(text.to_string());
+            Ok(())
+        }
+
+        fn copy(&mut self, text: &str) -> Result<(), InjectorError> {
+            if let Some(error) = self.fail_with {
+                return Err(error);
+            }
+            self.copied.push(text.to_string());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn inject_delivers_body_and_records_one_usage() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Deploy", None), 1).unwrap();
+        let mut injector = FakeInjector::granted();
+
+        snippet_inject(
+            &conn,
+            &mut injector,
+            &created.id,
+            InjectionMethod::Paste,
+            100,
+        )
+        .unwrap();
+
+        assert_eq!(injector.injected, vec!["Deploy body".to_string()]);
+        let after = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(after.usage_count, 1);
+        assert_eq!(after.last_used_at, Some(100));
+    }
+
+    #[test]
+    fn copy_delivers_body_and_records_one_usage() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Token", None), 1).unwrap();
+        let mut injector = FakeInjector::granted();
+
+        snippet_copy(&conn, &mut injector, &created.id, 200).unwrap();
+
+        assert_eq!(injector.copied, vec!["Token body".to_string()]);
+        let after = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(after.usage_count, 1);
+        assert_eq!(after.last_used_at, Some(200));
+    }
+
+    #[test]
+    fn failed_injection_records_no_usage() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Deploy", None), 1).unwrap();
+        let mut injector = FakeInjector::failing(InjectorError::PermissionDenied);
+
+        let err = snippet_inject(
+            &conn,
+            &mut injector,
+            &created.id,
+            InjectionMethod::Paste,
+            100,
+        )
+        .unwrap_err();
+
+        // Permission denial is a recoverable business error (offer copy), and
+        // a failed delivery must not bump usage.
+        assert_eq!(err.code, IpcErrorCode::PermissionDenied);
+        let after = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(after.usage_count, 0);
+        assert_eq!(after.last_used_at, None);
+    }
+
+    /// Real-hardware proof that the actual platform injector, driven through
+    /// the service, records the usage that feeds the Home ledger. Posts a real
+    /// ⌘V into the frontmost app, so it is ignored by default. Cross-app
+    /// delivery + clipboard restore are proven separately by
+    /// `tests/injector_live.rs`.
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "posts a real ⌘V and needs Accessibility permission; run manually"]
+    fn real_injector_inject_records_usage_on_hardware() {
+        use crate::injector::platform_injector_or_null;
+
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Ledger", None), 1).unwrap();
+        let mut injector = platform_injector_or_null();
+        assert!(
+            injector.accessibility_granted(),
+            "grant Accessibility to the invoking terminal before running"
+        );
+
+        snippet_inject(
+            &conn,
+            injector.as_mut(),
+            &created.id,
+            InjectionMethod::Paste,
+            500,
+        )
+        .unwrap();
+
+        let after = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(after.usage_count, 1);
+        assert_eq!(after.last_used_at, Some(500));
     }
 
     fn create_input(title: &str, trigger: Option<&str>) -> SnippetCreateInput {

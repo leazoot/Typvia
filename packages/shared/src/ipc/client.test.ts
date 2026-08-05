@@ -2,8 +2,10 @@
 import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  copySnippet,
   createSnippet,
   getSnippet,
+  injectSnippet,
   libraryCounts,
   listSnippetPage,
   searchSnippets,
@@ -91,6 +93,35 @@ describe('typed IPC client', () => {
     const counts = await libraryCounts();
     expect(counts.total).toBe(1);
     expect(seen[1]?.cmd).toBe('library_counts');
+  });
+
+  it('sends inject and copy requests with the wire contract', async () => {
+    const seen: Array<{ cmd: string; args: unknown }> = [];
+    mockIPC((cmd, args) => {
+      seen.push({ cmd, args });
+      return null;
+    });
+
+    await injectSnippet('s-1', 'keystrokes');
+    expect(seen[0]?.cmd).toBe('snippet_inject');
+    expect(seen[0]?.args).toEqual({ id: 's-1', method: 'keystrokes' });
+
+    // Default method sends null so the host applies its default (paste).
+    await injectSnippet('s-2');
+    expect(seen[1]?.args).toEqual({ id: 's-2', method: null });
+
+    await copySnippet('s-3');
+    expect(seen[2]?.cmd).toBe('snippet_copy');
+    expect(seen[2]?.args).toEqual({ id: 's-3' });
+  });
+
+  it('surfaces a permission_denied rejection as a typed IpcError', async () => {
+    mockIPC(() => {
+      throw { code: 'permission_denied', message: 'accessibility permission not granted' };
+    });
+    const error = await injectSnippet('s-1').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IpcError);
+    expect((error as IpcError).code).toBe('permission_denied');
   });
 
   it('normalizes structured rejections into typed IpcError', async () => {

@@ -12,17 +12,21 @@ use crate::dto::{
     SnippetCreateInput, SnippetDto, SnippetUpdateInput, TagDto,
 };
 use crate::error::IpcError;
+use crate::injector::{InjectionMethod, Injector};
 use crate::service;
 
 /// Single-writer SQLite connection (WAL, database rules): one mutex, no pool.
+/// The injector is stateful (owns a clipboard handle) and reused across calls.
 pub struct AppState {
     conn: Mutex<Connection>,
+    injector: Mutex<Box<dyn Injector>>,
 }
 
 impl AppState {
-    pub fn new(conn: Connection) -> Self {
+    pub fn new(conn: Connection, injector: Box<dyn Injector>) -> Self {
         Self {
             conn: Mutex::new(conn),
+            injector: Mutex::new(injector),
         }
     }
 
@@ -30,6 +34,21 @@ impl AppState {
         // A poisoned mutex means a command panicked mid-write; surface it as
         // a system error instead of poisoning every later call with a panic.
         self.conn.lock().map_err(|_| IpcError::system())
+    }
+
+    fn lock_injector(&self) -> Result<std::sync::MutexGuard<'_, Box<dyn Injector>>, IpcError> {
+        self.injector.lock().map_err(|_| IpcError::system())
+    }
+}
+
+/// Maps the optional wire method name onto an [`InjectionMethod`]; absent
+/// means the default (paste, per DEC-007).
+fn parse_method(method: Option<&str>) -> Result<InjectionMethod, IpcError> {
+    match method {
+        None => Ok(InjectionMethod::default()),
+        Some("paste") => Ok(InjectionMethod::Paste),
+        Some("keystrokes") => Ok(InjectionMethod::Keystrokes),
+        Some(_) => Err(IpcError::validation("unknown injection method")),
     }
 }
 
@@ -227,6 +246,27 @@ pub fn search_library(
     limit: u32,
 ) -> Result<Vec<SnippetDto>, IpcError> {
     service::search_library(&*state.lock()?, &query, limit)
+}
+
+#[tauri::command]
+pub fn snippet_inject(
+    state: State<'_, AppState>,
+    id: String,
+    method: Option<String>,
+) -> Result<(), IpcError> {
+    let method = parse_method(method.as_deref())?;
+    let now = now_ms()?;
+    let conn = state.lock()?;
+    let mut injector = state.lock_injector()?;
+    service::snippet_inject(&conn, injector.as_mut(), &id, method, now)
+}
+
+#[tauri::command]
+pub fn snippet_copy(state: State<'_, AppState>, id: String) -> Result<(), IpcError> {
+    let now = now_ms()?;
+    let conn = state.lock()?;
+    let mut injector = state.lock_injector()?;
+    service::snippet_copy(&conn, injector.as_mut(), &id, now)
 }
 
 #[tauri::command]

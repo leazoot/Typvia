@@ -146,6 +146,23 @@ export function searchLibrary(query: string, limit: number): Promise<Snippet[]> 
   return call('search_library', { query, limit });
 }
 
+/** How injected text reaches the target app; omit for the default (paste). */
+export type InjectionMethod = 'paste' | 'keystrokes';
+
+/**
+ * Injects a snippet into the frontmost application and records one usage.
+ * Rejects with an IpcError of code `permission_denied` when the OS has not
+ * granted injection permission — callers fall back to {@link copySnippet}.
+ */
+export function injectSnippet(id: string, method?: InjectionMethod): Promise<void> {
+  return call('snippet_inject', { id, method: method ?? null });
+}
+
+/** Copies a snippet to the clipboard and records one usage. */
+export function copySnippet(id: string): Promise<void> {
+  return call('snippet_copy', { id });
+}
+
 /**
  * Offline sensitive-content scan. Returns advisory pattern codes (never the
  * matched text); an empty array means nothing suspicious.

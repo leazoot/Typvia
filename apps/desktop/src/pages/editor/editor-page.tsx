@@ -8,6 +8,7 @@ import type { FolderEntry } from '../library/rail';
 import { EditorBody } from './editor-body';
 import { EditorRail } from './editor-rail';
 import { EditorTabs } from './editor-tabs';
+import { TestInsert } from './test-insert';
 import { useEditorDraft, type SaveStatus } from './use-editor-draft';
 import './editor.css';
 
@@ -101,9 +102,12 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
             {draft.title === '' ? 'New snippet' : draft.title}
           </span>
         </nav>
-        <div className="tv-ed-status" data-status={status}>
-          <span aria-hidden="true" className="tv-ed-status-dot" />
-          <span role="status">{statusText(status, version, savedAt)}</span>
+        <div className="tv-ed-top-right">
+          <TestInsert snippetId={draft.id} ready={status === 'saved' && draft.body.trim() !== ''} />
+          <div className="tv-ed-status" data-status={status}>
+            <span aria-hidden="true" className="tv-ed-status-dot" />
+            <span role="status">{statusText(status, version, savedAt)}</span>
+          </div>
         </div>
       </div>
 

@@ -7,6 +7,8 @@ use typvia_core::db::DbError;
 use typvia_core::repo::RepoError;
 use typvia_search::SearchError;
 
+use crate::injector::InjectorError;
+
 /// Stable machine-readable error codes shared with the frontend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -17,6 +19,9 @@ pub enum IpcErrorCode {
     Conflict,
     /// Business error: the addressed record does not exist.
     NotFound,
+    /// Business error: injection needs OS permission the app lacks; the
+    /// frontend degrades to copy on this code.
+    PermissionDenied,
     /// System error: storage or internal failure; not user-correctable.
     System,
 }
@@ -49,12 +54,33 @@ impl IpcError {
         }
     }
 
+    pub fn permission_denied(message: impl Into<String>) -> Self {
+        Self {
+            code: IpcErrorCode::PermissionDenied,
+            message: message.into(),
+        }
+    }
+
     /// System errors keep a generic message: backend details (SQL text,
     /// paths) must not cross the IPC boundary.
     pub fn system() -> Self {
         Self {
             code: IpcErrorCode::System,
             message: "internal storage error".into(),
+        }
+    }
+}
+
+impl From<InjectorError> for IpcError {
+    fn from(error: InjectorError) -> Self {
+        // InjectorError Display strings are static and payload-free, so they
+        // are safe to forward. PermissionDenied is a recoverable business
+        // error (offer copy); the rest are non-correctable system failures.
+        match error {
+            InjectorError::PermissionDenied => Self::permission_denied(error.to_string()),
+            InjectorError::Clipboard | InjectorError::Synthesis | InjectorError::Unsupported => {
+                Self::system()
+            }
         }
     }
 }

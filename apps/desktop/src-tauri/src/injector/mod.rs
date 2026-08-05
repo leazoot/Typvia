@@ -87,6 +87,31 @@ pub fn platform_injector() -> Result<Box<dyn Injector>, InjectorError> {
     }
 }
 
+/// Stand-in when no platform injector could be built (unsupported OS, or a
+/// clipboard handle that failed to open). Every operation reports
+/// `Unsupported` so the app still runs and other features keep working.
+pub struct NullInjector;
+
+impl Injector for NullInjector {
+    fn accessibility_granted(&self) -> bool {
+        false
+    }
+
+    fn inject(&mut self, _text: &str, _method: InjectionMethod) -> Result<(), InjectorError> {
+        Err(InjectorError::Unsupported)
+    }
+
+    fn copy(&mut self, _text: &str) -> Result<(), InjectorError> {
+        Err(InjectorError::Unsupported)
+    }
+}
+
+/// The platform injector, or a [`NullInjector`] if one can't be built. Used
+/// at startup so a clipboard-init failure never blocks the app from running.
+pub fn platform_injector_or_null() -> Box<dyn Injector> {
+    platform_injector().unwrap_or_else(|_| Box::new(NullInjector))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{InjectionMethod, InjectorError};

@@ -20,7 +20,8 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
             let mut conn = typvia_core::db::open(&data_dir.join("typvia.db"))?;
             typvia_core::db::migrate_to_latest(&mut conn)?;
-            app.manage(AppState::new(conn));
+            let injector = injector::platform_injector_or_null();
+            app.manage(AppState::new(conn, injector));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -50,6 +51,8 @@ pub fn run() {
             commands::tag_delete,
             commands::search_snippets,
             commands::search_library,
+            commands::snippet_inject,
+            commands::snippet_copy,
             commands::detect_sensitive,
         ])
         .run(tauri::generate_context!());

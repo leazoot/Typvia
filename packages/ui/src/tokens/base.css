@@ -1,0 +1,20 @@
+/* Base surface wiring for the token system: font stack and the paper/ink
+ * pairing come from the active theme's CSS variables (applyTheme). All
+ * component styling arrives with the component library (TASK-027). */
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
+:lang(zh-Hans) {
+  font-family: var(--font-cjk);
+}

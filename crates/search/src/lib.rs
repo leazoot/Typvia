@@ -7,7 +7,10 @@
 
 mod error;
 mod index;
+mod query;
+mod search;
 pub mod segment;
 
 pub use error::SearchError;
 pub use index::SearchIndex;
+pub use search::{MatchTier, SearchHit, Searcher};

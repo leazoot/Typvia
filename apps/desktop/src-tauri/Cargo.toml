@@ -24,6 +24,18 @@ rusqlite = { version = "0.38", features = ["bundled"] }
 # Search index maintenance + queries; composed here because the dependency
 # direction is search -> core, so only the host can wire writes to the index.
 typvia-search = { path = "../../../crates/search" }
+# Wipes injection plaintext buffers after use (PRD §12.9.2 "注入后清理临时内存");
+# already in the tree via crates/crypto.
+zeroize = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Clipboard save/write/restore for the paste-injection path (DEC-007).
+# Maintained (1Password), MIT/Apache-2.0; validated in the TASK-007 spike.
+# Text-only usage, so default features (image support) stay off.
+arboard = { version = "3", default-features = false }
+# CGEvent keystroke synthesis: synthesized ⌘V plus Private-source unicode
+# typing. Servo-maintained bindings, MIT/Apache-2.0; validated in the spike.
+core-graphics = "0.25"
 
 [lints]
 workspace = true

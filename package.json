@@ -9,6 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "pnpm --filter @typvia/desktop dev",
     "lint": "pnpm lint:rust && pnpm lint:js",
     "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
     "lint:js": "eslint .",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "eslint": "^10.8.0",
+    "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.66.0",

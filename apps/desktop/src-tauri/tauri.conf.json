@@ -1,30 +1,38 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "typvia-shell-spike",
-  "version": "0.0.0",
-  "identifier": "com.typvia.spike.shell",
+  "productName": "Typvia",
+  "version": "0.1.0",
+  "identifier": "dev.typvia.desktop",
   "build": {
-    "frontendDist": "../ui"
+    "beforeDevCommand": "pnpm dev:web",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
-        "title": "Typvia Shell Spike",
-        "width": 800,
-        "height": 600,
-        "visible": true
-      },
-      {
-        "label": "panel",
-        "title": "Typvia Panel Spike",
-        "width": 640,
-        "height": 420,
-        "visible": false,
-        "decorations": false,
-        "alwaysOnTop": true
+        "title": "Typvia",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 840,
+        "minHeight": 600
       }
+    ],
+    "security": {
+      "csp": "default-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
     ]
   }
 }

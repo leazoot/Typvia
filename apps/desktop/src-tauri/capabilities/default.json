@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Spike windows need core event/window APIs for latency acks.",
-  "windows": ["main", "panel", "cold*"],
+  "description": "Main window baseline. Tauri 2 ACL is an allow-list (TASK-005 finding): every WebView API a window uses must be granted here explicitly.",
+  "windows": ["main"],
   "permissions": ["core:default"]
 }

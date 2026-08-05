@@ -6,3 +6,14 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+# Algorithms and libraries fixed by docs/06_SECURITY_MODEL.md §3 (DEC-009):
+# RustCrypto-maintained crates, MIT/Apache-2.0, MPL-2.0 compatible.
+[dependencies]
+# Argon2id master-password derivation (§3.1 parameter baseline).
+argon2 = "0.5"
+# XChaCha20-Poly1305 AEAD for record encryption and key wrapping; pulls in
+# the OS CSPRNG (rand_core OsRng) used for all keys, salts and nonces.
+chacha20poly1305 = "0.10"
+# Key material and plaintext buffers are wiped on drop (§8.1).
+zeroize = { version = "1", features = ["zeroize_derive"] }

@@ -38,6 +38,7 @@ fn snippet(title: &str, body: &str) -> Snippet {
         last_used_at: None,
         usage_count: 0,
         version: 1,
+        deleted_at: None,
     }
 }
 

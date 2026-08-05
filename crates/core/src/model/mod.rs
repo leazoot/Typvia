@@ -24,7 +24,7 @@ pub use enums::{
 };
 pub use keyboard_snapshot::{FolderMetadata, KeyboardSnapshot, SNAPSHOT_VERSION};
 pub use organization::{Folder, SnippetTag, Tag};
-pub use snippet::{Snippet, SnippetContent};
+pub use snippet::{Snippet, SnippetContent, SnippetVersion};
 pub use sync_record::SyncRecord;
 pub use template::TemplateField;
 pub use validation::ValidationError;

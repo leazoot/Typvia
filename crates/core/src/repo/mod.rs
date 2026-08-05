@@ -7,12 +7,14 @@
 mod folder_repo;
 mod snippet_repo;
 mod tag_repo;
+mod version_repo;
 
 use std::fmt;
 
 pub use folder_repo::FolderRepo;
-pub use snippet_repo::SnippetRepo;
+pub use snippet_repo::{SnippetRepo, TRASH_RETENTION_MS};
 pub use tag_repo::TagRepo;
+pub use version_repo::VersionRepo;
 
 use crate::model::{UnknownEnumValue, ValidationError};
 

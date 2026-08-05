@@ -21,12 +21,20 @@ pub struct Migration {
     pub down: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial_schema",
-    up: include_str!("../../migrations/0001_initial_schema.up.sql"),
-    down: include_str!("../../migrations/0001_initial_schema.down.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial_schema",
+        up: include_str!("../../migrations/0001_initial_schema.up.sql"),
+        down: include_str!("../../migrations/0001_initial_schema.down.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "trash_and_versions",
+        up: include_str!("../../migrations/0002_trash_and_versions.up.sql"),
+        down: include_str!("../../migrations/0002_trash_and_versions.down.sql"),
+    },
+];
 
 /// Highest schema version known to this build.
 pub fn latest_version() -> u32 {
@@ -158,6 +166,17 @@ mod tests {
         migrate_to(&mut conn, 0).unwrap();
         migrate_to_latest(&mut conn).unwrap();
         assert!(table_names(&conn).contains(&"snippet".to_string()));
+    }
+
+    #[test]
+    fn partial_rollback_to_version_one_keeps_the_initial_schema() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        migrate_to(&mut conn, 1).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(), 1);
+        let tables = table_names(&conn);
+        assert!(tables.contains(&"snippet".to_string()));
+        assert!(!tables.contains(&"snippet_version".to_string()));
     }
 
     #[test]

@@ -59,6 +59,10 @@ pub struct Snippet {
     pub usage_count: u64,
     /// Monotonic content version, starting at 1.
     pub version: u32,
+    /// Soft-delete marker (PRD §12.16 recycle bin); set while the snippet
+    /// sits in the recycle bin. Storage extension beyond the PRD §15.1 field
+    /// list, documented in docs/05_DATA_MODEL.md.
+    pub deleted_at: Option<TimestampMs>,
 }
 
 impl Snippet {
@@ -118,6 +122,33 @@ impl Snippet {
     }
 }
 
+/// One append-only history entry of a snippet's title and body
+/// (PRD §12.16). Restore never rewrites history: restoring an old version
+/// appends its state as a new version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnippetVersion {
+    pub id: String,
+    pub snippet_id: SnippetId,
+    /// The snippet `version` this entry captured; unique per snippet.
+    pub version: u32,
+    pub title: String,
+    /// Same body-pair rule as the live snippet: sensitive history entries
+    /// hold ciphertext only.
+    pub content: SnippetContent,
+    pub created_at: TimestampMs,
+}
+
+impl SnippetVersion {
+    /// Validates the history entry before it enters storage.
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        require_non_blank("title", &self.title)?;
+        if self.version == 0 {
+            return Err(ValidationError::new("version", "must start at 1"));
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -145,6 +176,7 @@ mod tests {
             last_used_at: None,
             usage_count: 0,
             version: 1,
+            deleted_at: None,
         }
     }
 

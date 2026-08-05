@@ -17,7 +17,10 @@ pub struct SnippetRepo<'c> {
 const SELECT_COLUMNS: &str = "id, workspace_id, title, content_plaintext, content_ciphertext, \
      type, description, folder_id, \"trigger\", trigger_mode, language, security_level, \
      is_favorite, is_pinned, is_enabled, platform_scope, created_at, updated_at, \
-     last_used_at, usage_count, version";
+     last_used_at, usage_count, version, deleted_at";
+
+/// Recycle-bin retention before automatic cleanup (PRD §12.16: 30 days).
+pub const TRASH_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 
 impl<'c> SnippetRepo<'c> {
     pub fn new(conn: &'c Connection) -> Self {
@@ -33,8 +36,8 @@ impl<'c> SnippetRepo<'c> {
                 id, workspace_id, title, content_plaintext, content_ciphertext,
                 type, description, folder_id, \"trigger\", trigger_mode, language,
                 security_level, is_favorite, is_pinned, is_enabled, platform_scope,
-                created_at, updated_at, last_used_at, usage_count, version
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                created_at, updated_at, last_used_at, usage_count, version, deleted_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
             params![
                 snippet.id,
                 snippet.workspace_id,
@@ -57,6 +60,7 @@ impl<'c> SnippetRepo<'c> {
                 snippet.last_used_at,
                 usage_to_db(snippet.usage_count),
                 snippet.version,
+                snippet.deleted_at,
             ],
         )?;
         Ok(())
@@ -85,7 +89,7 @@ impl<'c> SnippetRepo<'c> {
                 \"trigger\" = ?9, trigger_mode = ?10, language = ?11, security_level = ?12,
                 is_favorite = ?13, is_pinned = ?14, is_enabled = ?15, platform_scope = ?16,
                 created_at = ?17, updated_at = ?18, last_used_at = ?19, usage_count = ?20,
-                version = ?21
+                version = ?21, deleted_at = ?22
              WHERE id = ?1",
             params![
                 snippet.id,
@@ -109,6 +113,7 @@ impl<'c> SnippetRepo<'c> {
                 snippet.last_used_at,
                 usage_to_db(snippet.usage_count),
                 snippet.version,
+                snippet.deleted_at,
             ],
         )?;
         if changed == 0 {
@@ -128,17 +133,19 @@ impl<'c> SnippetRepo<'c> {
         Ok(())
     }
 
-    /// Lists snippets ordered by most recent update, bounded by limit/offset.
+    /// Lists live snippets ordered by most recent update, bounded by
+    /// limit/offset. Recycle-bin rows are excluded.
     pub fn list(&self, limit: u32, offset: u32) -> Result<Vec<Snippet>, RepoError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NULL
              ORDER BY updated_at DESC, id LIMIT ?1 OFFSET ?2"
         ))?;
         let rows = stmt.query_map(params![limit, offset], row_to_snippet)?;
         collect_snippets(rows)
     }
 
-    /// Lists the snippets directly inside a folder (`None` = unfiled).
+    /// Lists the live snippets directly inside a folder (`None` = unfiled).
     pub fn list_by_folder(
         &self,
         folder_id: Option<&str>,
@@ -147,11 +154,63 @@ impl<'c> SnippetRepo<'c> {
     ) -> Result<Vec<Snippet>, RepoError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {SELECT_COLUMNS} FROM snippet
-             WHERE (?1 IS NULL AND folder_id IS NULL) OR folder_id = ?1
+             WHERE deleted_at IS NULL
+               AND ((?1 IS NULL AND folder_id IS NULL) OR folder_id = ?1)
              ORDER BY updated_at DESC, id LIMIT ?2 OFFSET ?3"
         ))?;
         let rows = stmt.query_map(params![folder_id, limit, offset], row_to_snippet)?;
         collect_snippets(rows)
+    }
+
+    /// Moves a live snippet into the recycle bin.
+    pub fn soft_delete(&self, id: &str, deleted_at: TimestampMs) -> Result<(), RepoError> {
+        let changed = self.conn.execute(
+            "UPDATE snippet SET deleted_at = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+            params![id, deleted_at],
+        )?;
+        if changed == 0 {
+            return Err(RepoError::NotFound);
+        }
+        Ok(())
+    }
+
+    /// Restores a snippet from the recycle bin.
+    pub fn restore_from_trash(&self, id: &str) -> Result<(), RepoError> {
+        let changed = self.conn.execute(
+            "UPDATE snippet SET deleted_at = NULL WHERE id = ?1 AND deleted_at IS NOT NULL",
+            params![id],
+        )?;
+        if changed == 0 {
+            return Err(RepoError::NotFound);
+        }
+        Ok(())
+    }
+
+    /// Lists recycle-bin contents, most recently deleted first.
+    pub fn list_trashed(&self, limit: u32, offset: u32) -> Result<Vec<Snippet>, RepoError> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NOT NULL
+             ORDER BY deleted_at DESC, id LIMIT ?1 OFFSET ?2"
+        ))?;
+        let rows = stmt.query_map(params![limit, offset], row_to_snippet)?;
+        collect_snippets(rows)
+    }
+
+    /// Permanently deletes recycle-bin rows whose retention expired; returns
+    /// how many rows were purged. Callers pass `now` and a retention window
+    /// (default [`TRASH_RETENTION_MS`]).
+    pub fn purge_expired_trash(
+        &self,
+        now: TimestampMs,
+        retention_ms: i64,
+    ) -> Result<usize, RepoError> {
+        let cutoff = now.saturating_sub(retention_ms);
+        let purged = self.conn.execute(
+            "DELETE FROM snippet WHERE deleted_at IS NOT NULL AND deleted_at <= ?1",
+            params![cutoff],
+        )?;
+        Ok(purged)
     }
 
     /// Toggles favorite state.
@@ -273,7 +332,7 @@ impl<'c> SnippetRepo<'c> {
             .conn
             .query_row(
                 "SELECT id FROM snippet
-                 WHERE \"trigger\" = ?1 AND (?2 IS NULL OR id <> ?2)
+                 WHERE \"trigger\" = ?1 AND deleted_at IS NULL AND (?2 IS NULL OR id <> ?2)
                  LIMIT 1",
                 params![trigger, exclude_id],
                 |row| row.get::<_, String>(0),
@@ -293,7 +352,8 @@ impl<'c> SnippetRepo<'c> {
     ) -> Result<Vec<SnippetId>, RepoError> {
         let mut stmt = self.conn.prepare(
             "SELECT id FROM snippet
-             WHERE (title = ?1 OR (?2 IS NOT NULL AND content_plaintext = ?2))
+             WHERE deleted_at IS NULL
+               AND (title = ?1 OR (?2 IS NOT NULL AND content_plaintext = ?2))
                AND (?3 IS NULL OR id <> ?3)
              ORDER BY id",
         )?;
@@ -367,6 +427,7 @@ fn row_to_snippet(row: &Row<'_>) -> rusqlite::Result<SnippetRowResult> {
         last_used_at: row.get("last_used_at")?,
         usage_count: usage_from_db(row.get("usage_count")?),
         version: row.get("version")?,
+        deleted_at: row.get("deleted_at")?,
     };
 
     Ok(finish_snippet(

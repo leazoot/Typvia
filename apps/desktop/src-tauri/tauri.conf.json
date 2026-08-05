@@ -18,6 +18,20 @@
         "height": 900,
         "minWidth": 840,
         "minHeight": 600
+      },
+      {
+        "label": "panel",
+        "url": "index.html",
+        "title": "Typvia Panel",
+        "width": 760,
+        "height": 460,
+        "resizable": false,
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true,
+        "focus": false
       }
     ],
     "security": {

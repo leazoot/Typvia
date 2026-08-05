@@ -27,8 +27,20 @@ typvia-search = { path = "../../../crates/search" }
 # Wipes injection plaintext buffers after use (PRD §12.9.2 "注入后清理临时内存");
 # already in the tree via crates/crypto.
 zeroize = "1"
+# Registers the global summon shortcut ⌘⇧V for the command panel (PRD §12.3).
+# Official Tauri plugin, MIT/Apache-2.0; no third-party hotkey stack needed.
+tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# Reads the frontmost app when the panel is summoned and re-activates it on
+# hide (TASK-038 "记录原前台应用" + focus return). AppKit's NSWorkspace /
+# NSRunningApplication have no cross-platform wrapper; objc2 is the maintained
+# Rust binding (MIT/Apache-2.0), same family as the core-graphics deps below.
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = [
+    "NSWorkspace",
+    "NSRunningApplication",
+] }
 # Clipboard save/write/restore for the paste-injection path (DEC-007).
 # Maintained (1Password), MIT/Apache-2.0; validated in the TASK-007 spike.
 # Text-only usage, so default features (image support) stay off.

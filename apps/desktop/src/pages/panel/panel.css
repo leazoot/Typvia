@@ -1,0 +1,82 @@
+/*
+ * Global command panel window. Fills its resident decorationless window; the
+ * search field sits at the top with results (TASK-039) below and the key
+ * legend pinned to the foot.
+ *
+ * Deviation (recorded): the design's panel radius (--radius-panel) and the e3
+ * shadow / 28% scrim need a transparent window; this build ships an opaque
+ * panel, so corner rounding, drop shadow and the scrim are deferred to a
+ * transparency pass. The enter motion (below) matches the Motion spec.
+ */
+.tv-panel {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.tv-panel-enter {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-22) var(--space-26);
+  transform-origin: center top;
+  animation: tv-panel-enter var(--duration-overlay-enter) var(--curve-standard);
+}
+
+/* Enter 190ms scale .97→1 + opacity (whitelisted properties only). */
+@keyframes tv-panel-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.tv-panel-field {
+  flex: none;
+}
+
+/* Recent list, results, preview and injection land in TASK-039. */
+.tv-panel-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.tv-panel-footer {
+  flex: none;
+  padding-top: var(--space-13);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.tv-panel-keys {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tv-panel-keys kbd {
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.tv-panel-key-word {
+  margin-right: var(--space-8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-panel-enter {
+    animation: none;
+  }
+}

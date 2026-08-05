@@ -5,9 +5,11 @@ import {
   copySnippet,
   createSnippet,
   getSnippet,
+  hidePanel,
   injectSnippet,
   libraryCounts,
   listSnippetPage,
+  panelReady,
   searchSnippets,
 } from './client';
 import { IpcError, toIpcError } from './error';
@@ -113,6 +115,18 @@ describe('typed IPC client', () => {
     await copySnippet('s-3');
     expect(seen[2]?.cmd).toBe('snippet_copy');
     expect(seen[2]?.args).toEqual({ id: 's-3' });
+  });
+
+  it('sends panel window commands with no payload', async () => {
+    const seen: string[] = [];
+    mockIPC((cmd) => {
+      seen.push(cmd);
+      return null;
+    });
+
+    await hidePanel();
+    await panelReady();
+    expect(seen).toEqual(['panel_hide', 'panel_ready']);
   });
 
   it('surfaces a permission_denied rejection as a typed IpcError', async () => {

@@ -29,6 +29,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@tauri-apps/api':
+        specifier: ^2
+        version: 2.11.1
       '@typvia/shared':
         specifier: workspace:*
         version: link:../../packages/shared

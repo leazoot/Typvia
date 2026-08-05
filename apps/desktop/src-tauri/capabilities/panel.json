@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "panel",
+  "description": "Resident global command panel window: baseline core access so it can listen for the panel:show event and invoke the panel commands. Tauri 2 ACL is an allow-list, so the panel window is granted separately from main.",
+  "windows": ["panel"],
+  "permissions": ["core:default"]
+}

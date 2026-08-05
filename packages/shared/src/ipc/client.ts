@@ -170,3 +170,13 @@ export function copySnippet(id: string): Promise<void> {
 export function detectSensitive(text: string): Promise<string[]> {
   return call('detect_sensitive', { text });
 }
+
+/** Hides the global command panel and returns focus to the prior frontmost app. */
+export function hidePanel(): Promise<void> {
+  return call('panel_hide');
+}
+
+/** Signals the panel's first frame has painted (drives the debug latency probe). */
+export function panelReady(): Promise<void> {
+  return call('panel_ready');
+}

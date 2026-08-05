@@ -1,0 +1,76 @@
+# SPIKE (TASK-011): host app + keyboard extension sharing a snapshot file
+# through an App Group. Throwaway — the formal iOS keyboard lands with
+# BACKLOG-006.
+name: TypviaKbSpike
+options:
+  bundleIdPrefix: dev.typvia.spike
+  deploymentTarget:
+    iOS: '16.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    CODE_SIGN_IDENTITY: '-'
+    CODE_SIGNING_REQUIRED: 'NO'
+schemes:
+  HostApp:
+    build:
+      targets:
+        HostApp: all
+        EnableKbUITests: [test]
+    test:
+      targets: [EnableKbUITests]
+targets:
+  EnableKbUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.spike.uitests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: HostApp
+  HostApp:
+    type: application
+    platform: iOS
+    sources: [HostApp]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.spike.kbhost
+    info:
+      path: HostApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: TypviaKbSpike
+    entitlements:
+      path: HostApp/HostApp.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.typvia.spike
+    dependencies:
+      - target: KeyboardExt
+        embed: true
+  KeyboardExt:
+    type: app-extension
+    platform: iOS
+    sources: [KeyboardExt]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.spike.kbhost.keyboard
+    info:
+      path: KeyboardExt/Info.plist
+      properties:
+        CFBundleDisplayName: TypviaKb
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            RequestsOpenAccess: false
+    entitlements:
+      path: KeyboardExt/KeyboardExt.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.typvia.spike

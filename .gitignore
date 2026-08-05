@@ -32,3 +32,7 @@ spikes/ffi/kotlin/.gradle/
 spikes/ffi/kotlin/build/
 spikes/ffi/*/generated/
 spikes/ffi/swift/ffi-spike-swift
+
+# iOS keyboard spike (TASK-011) generated project and build products
+native/ios-keyboard/TypviaKbSpike.xcodeproj/
+native/ios-keyboard/build/

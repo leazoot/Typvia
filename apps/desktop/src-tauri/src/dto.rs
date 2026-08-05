@@ -170,6 +170,7 @@ pub struct LibraryCountsDto {
     pub recent: u32,
     pub starred: u32,
     pub unsorted: u32,
+    pub trash: u32,
     pub folders: Vec<FolderCountDto>,
 }
 

@@ -93,6 +93,7 @@ export interface LibraryCounts {
   recent: number;
   starred: number;
   unsorted: number;
+  trash: number;
   folders: FolderCount[];
 }
 

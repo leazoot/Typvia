@@ -2,6 +2,7 @@ import { APP_ROUTES } from '@typvia/shared';
 import { Page, PlaceholderPage, TopNav } from '@typvia/ui';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { EditorPage } from './pages/editor';
+import { HomePage } from './pages/home';
 import { LibraryPage } from './pages/library';
 
 const NAV_ITEMS = APP_ROUTES.map((route) => ({ key: route.path, label: route.labelEn }));
@@ -25,6 +26,8 @@ export function App() {
             <Route key={route.path} path={route.path} element={<LibraryPage />} />
           ) : route.path === '/editor' ? (
             <Route key={route.path} path={route.path} element={<EditorPage />} />
+          ) : route.path === '/' ? (
+            <Route key={route.path} path={route.path} element={<HomePage />} />
           ) : (
             <Route
               key={route.path}

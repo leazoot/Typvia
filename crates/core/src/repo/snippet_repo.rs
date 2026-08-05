@@ -274,6 +274,16 @@ impl<'c> SnippetRepo<'c> {
         Ok(count)
     }
 
+    /// Counts recycle-bin rows.
+    pub fn count_trashed(&self) -> Result<u32, RepoError> {
+        let count = self.conn.query_row(
+            "SELECT COUNT(*) FROM snippet WHERE deleted_at IS NOT NULL",
+            [],
+            |row| row.get::<_, u32>(0),
+        )?;
+        Ok(count)
+    }
+
     /// Per-folder live-snippet counts (folders with zero snippets are simply
     /// absent). Feeds the Library rail without one query per folder.
     pub fn count_by_folder(&self) -> Result<Vec<(String, u32)>, RepoError> {

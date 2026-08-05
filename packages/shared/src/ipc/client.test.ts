@@ -74,7 +74,7 @@ describe('typed IPC client', () => {
     mockIPC((cmd, args) => {
       seen.push({ cmd, args });
       if (cmd === 'snippet_list_page') return [SNIPPET];
-      return { total: 1, recent: 0, starred: 0, unsorted: 1, folders: [] };
+      return { total: 1, recent: 0, starred: 0, unsorted: 1, trash: 0, folders: [] };
     });
 
     const page = await listSnippetPage('folder', 'f-1', 'command', 200, 400);

@@ -69,6 +69,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
         recent: 128,
         starred: 41,
         unsorted: 14,
+        trash: 3,
         folders: [
           { folderId: 'f-1', count: 2104 },
           { folderId: 'f-2', count: 12 },

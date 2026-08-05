@@ -25,7 +25,7 @@ import {
   useVirtualRows,
 } from '@typvia/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { markFor, LibraryPreview } from './preview';
 import { LibraryRail, type FolderEntry } from './rail';
 import { useSnippetPages, type LibraryScope } from './use-snippet-pages';
@@ -49,6 +49,19 @@ const TYPE_CHIPS: Array<{ label: string; value: string | null }> = [
   { label: 'AI action', value: 'ai_action' },
 ];
 
+/** Query handed over from the Home search line via router state. */
+function initialQueryFrom(state: unknown): string {
+  if (
+    typeof state === 'object' &&
+    state !== null &&
+    'query' in state &&
+    typeof state.query === 'string'
+  ) {
+    return state.query;
+  }
+  return '';
+}
+
 async function fetchFolderTree(): Promise<FolderEntry[]> {
   const entries: FolderEntry[] = [];
   async function walk(parentId: string | null, depth: number): Promise<void> {
@@ -71,9 +84,10 @@ async function fetchFolderTree(): Promise<FolderEntry[]> {
  */
 export function LibraryPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [scope, setScope] = useState<LibraryScope>({ view: 'all', folderId: null });
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => initialQueryFrom(location.state));
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [batchIds, setBatchIds] = useState<ReadonlySet<string>>(new Set());
   const [counts, setCounts] = useState<LibraryCounts | null>(null);

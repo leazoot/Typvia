@@ -13,7 +13,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
   return {
     ...actual,
     libraryCounts: () =>
-      Promise.resolve({ total: 0, recent: 0, starred: 0, unsorted: 0, folders: [] }),
+      Promise.resolve({ total: 0, recent: 0, starred: 0, unsorted: 0, trash: 0, folders: [] }),
     countSnippets: () => Promise.resolve(0),
     listSnippetPage: () => Promise.resolve([]),
     listFolderChildren: () => Promise.resolve([]),
@@ -65,10 +65,20 @@ describe('app shell routing', () => {
     expect(await screen.findByLabelText('Snippet title')).toBeDefined();
   });
 
+  it('reaches the real Home screen at /', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText('Search snippets')).toBeDefined();
+    expect(screen.getByText('Start typing · 直接开始输入')).toBeDefined();
+  });
+
   it.each(
-    APP_ROUTES.filter((route) => route.path !== '/library' && route.path !== '/editor').map(
-      (route) => [route.labelEn, route],
-    ),
+    APP_ROUTES.filter(
+      (route) => route.path !== '/library' && route.path !== '/editor' && route.path !== '/',
+    ).map((route) => [route.labelEn, route]),
   )('reaches the %s placeholder page at its route', (_label, route) => {
     render(
       <MemoryRouter initialEntries={[route.path]}>

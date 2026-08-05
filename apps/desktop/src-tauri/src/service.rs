@@ -270,6 +270,7 @@ pub fn library_counts(conn: &Connection) -> Result<LibraryCountsDto, IpcError> {
         recent: repo.count_scoped(ListScope::Recent, None)?,
         starred: repo.count_scoped(ListScope::Starred, None)?,
         unsorted: repo.count_scoped(ListScope::Unsorted, None)?,
+        trash: repo.count_trashed()?,
         folders: repo
             .count_by_folder()?
             .into_iter()
@@ -773,8 +774,14 @@ mod tests {
 
         let counts = library_counts(&conn).unwrap();
         assert_eq!(
-            (counts.total, counts.recent, counts.starred, counts.unsorted),
-            (3, 0, 1, 2)
+            (
+                counts.total,
+                counts.recent,
+                counts.starred,
+                counts.unsorted,
+                counts.trash
+            ),
+            (3, 0, 1, 2, 0)
         );
         assert_eq!(counts.folders.len(), 1);
         assert_eq!(counts.folders[0].folder_id, folder.id);
@@ -807,7 +814,9 @@ mod tests {
         make_fav.is_favorite = false;
         snippet_update(&conn, make_fav, 5).unwrap();
         snippet_trash(&conn, &starred.id, 6).unwrap();
-        assert_eq!(library_counts(&conn).unwrap().total, 2);
+        let counts = library_counts(&conn).unwrap();
+        assert_eq!(counts.total, 2);
+        assert_eq!(counts.trash, 1);
     }
 
     #[test]

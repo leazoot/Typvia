@@ -1,0 +1,459 @@
+//! Repository CRUD behavior: snippets, folders, tags, batch operations,
+//! usage tracking, trigger conflicts, and duplicate detection.
+
+#![allow(clippy::unwrap_used)]
+
+use rusqlite::Connection;
+use typvia_core::db::{migrate_to_latest, open_in_memory};
+use typvia_core::model::{
+    Folder, SecurityLevel, Snippet, SnippetContent, SnippetType, Tag, TriggerMode,
+};
+use typvia_core::repo::{FolderRepo, RepoError, SnippetRepo, TagRepo, new_id};
+
+fn fresh_db() -> Connection {
+    let mut conn = open_in_memory().unwrap();
+    migrate_to_latest(&mut conn).unwrap();
+    conn
+}
+
+fn snippet(title: &str, body: &str) -> Snippet {
+    Snippet {
+        id: new_id(),
+        workspace_id: "w1".to_string(),
+        title: title.to_string(),
+        content: SnippetContent::Plaintext(body.to_string()),
+        snippet_type: SnippetType::Command,
+        description: None,
+        folder_id: None,
+        trigger: None,
+        trigger_mode: None,
+        language: None,
+        security_level: SecurityLevel::Normal,
+        is_favorite: false,
+        is_pinned: false,
+        is_enabled: true,
+        platform_scope: vec![],
+        created_at: 1_000,
+        updated_at: 1_000,
+        last_used_at: None,
+        usage_count: 0,
+        version: 1,
+    }
+}
+
+fn folder(name: &str, parent_id: Option<&str>) -> Folder {
+    Folder {
+        id: new_id(),
+        parent_id: parent_id.map(str::to_string),
+        name: name.to_string(),
+        sort_order: 0,
+        created_at: 1_000,
+        updated_at: 1_000,
+    }
+}
+
+fn tag(name: &str) -> Tag {
+    Tag {
+        id: new_id(),
+        name: name.to_string(),
+        created_at: 1_000,
+    }
+}
+
+#[test]
+fn snippet_insert_and_get_round_trips_every_field() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let mut s = snippet("Docker logs", "docker logs -f app");
+    s.trigger = Some(":dlog".to_string());
+    s.trigger_mode = Some(TriggerMode::Delimiter);
+    s.platform_scope = vec![
+        typvia_core::model::Platform::Macos,
+        typvia_core::model::Platform::Windows,
+    ];
+    s.description = Some("Tail app logs".to_string());
+    repo.insert(&s).unwrap();
+
+    let loaded = repo.get(&s.id).unwrap().unwrap();
+    assert_eq!(loaded, s);
+}
+
+#[test]
+fn snippet_get_returns_none_for_unknown_id() {
+    let conn = fresh_db();
+    assert!(SnippetRepo::new(&conn).get("missing").unwrap().is_none());
+}
+
+#[test]
+fn snippet_insert_rejects_invalid_values() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let mut s = snippet(" ", "body");
+    let err = repo.insert(&s).unwrap_err();
+    assert!(matches!(err, RepoError::Validation(_)));
+    s.title = "ok".to_string();
+    s.security_level = SecurityLevel::Sensitive;
+    assert!(matches!(
+        repo.insert(&s).unwrap_err(),
+        RepoError::Validation(_)
+    ));
+}
+
+#[test]
+fn snippet_update_replaces_columns_and_flags_missing_rows() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let mut s = snippet("Title", "body");
+    repo.insert(&s).unwrap();
+
+    s.title = "New title".to_string();
+    s.updated_at = 2_000;
+    repo.update(&s).unwrap();
+    assert_eq!(repo.get(&s.id).unwrap().unwrap().title, "New title");
+
+    let ghost = snippet("Ghost", "body");
+    assert!(matches!(
+        repo.update(&ghost).unwrap_err(),
+        RepoError::NotFound
+    ));
+}
+
+#[test]
+fn snippet_delete_removes_the_row() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let s = snippet("Doomed", "body");
+    repo.insert(&s).unwrap();
+    repo.delete(&s.id).unwrap();
+    assert!(repo.get(&s.id).unwrap().is_none());
+    assert!(matches!(
+        repo.delete(&s.id).unwrap_err(),
+        RepoError::NotFound
+    ));
+}
+
+#[test]
+fn snippet_list_orders_by_recency_and_respects_limit_offset() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    for (i, title) in ["a", "b", "c"].iter().enumerate() {
+        let mut s = snippet(title, "body");
+        s.updated_at = 1_000 + i as i64;
+        repo.insert(&s).unwrap();
+    }
+    let page = repo.list(2, 0).unwrap();
+    assert_eq!(
+        page.iter().map(|s| s.title.as_str()).collect::<Vec<_>>(),
+        ["c", "b"]
+    );
+    let rest = repo.list(2, 2).unwrap();
+    assert_eq!(rest.len(), 1);
+    assert_eq!(rest[0].title, "a");
+}
+
+#[test]
+fn snippet_list_by_folder_separates_unfiled_from_filed() {
+    let conn = fresh_db();
+    let folders = FolderRepo::new(&conn);
+    let f = folder("Shell", None);
+    folders.insert(&f).unwrap();
+
+    let repo = SnippetRepo::new(&conn);
+    let mut filed = snippet("Filed", "body");
+    filed.folder_id = Some(f.id.clone());
+    repo.insert(&filed).unwrap();
+    repo.insert(&snippet("Unfiled", "body")).unwrap();
+
+    let in_folder = repo.list_by_folder(Some(&f.id), 10, 0).unwrap();
+    assert_eq!(in_folder.len(), 1);
+    assert_eq!(in_folder[0].title, "Filed");
+
+    let unfiled = repo.list_by_folder(None, 10, 0).unwrap();
+    assert_eq!(unfiled.len(), 1);
+    assert_eq!(unfiled[0].title, "Unfiled");
+}
+
+#[test]
+fn favorite_pin_enable_toggles_persist() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let s = snippet("Toggles", "body");
+    repo.insert(&s).unwrap();
+
+    repo.set_favorite(&s.id, true).unwrap();
+    repo.set_pinned(&s.id, true).unwrap();
+    repo.set_enabled(&s.id, false).unwrap();
+
+    let loaded = repo.get(&s.id).unwrap().unwrap();
+    assert!(loaded.is_favorite);
+    assert!(loaded.is_pinned);
+    assert!(!loaded.is_enabled);
+    assert!(matches!(
+        repo.set_favorite("missing", true).unwrap_err(),
+        RepoError::NotFound
+    ));
+}
+
+#[test]
+fn batch_move_is_atomic_when_one_id_is_missing() {
+    let conn = fresh_db();
+    let folders = FolderRepo::new(&conn);
+    let f = folder("Target", None);
+    folders.insert(&f).unwrap();
+
+    let repo = SnippetRepo::new(&conn);
+    let a = snippet("A", "body");
+    repo.insert(&a).unwrap();
+
+    let err = repo
+        .batch_move(&[a.id.clone(), "missing".to_string()], Some(&f.id))
+        .unwrap_err();
+    assert!(matches!(err, RepoError::NotFound));
+    // The whole batch rolled back: A stays unfiled.
+    assert_eq!(repo.get(&a.id).unwrap().unwrap().folder_id, None);
+
+    repo.batch_move(std::slice::from_ref(&a.id), Some(&f.id))
+        .unwrap();
+    assert_eq!(repo.get(&a.id).unwrap().unwrap().folder_id, Some(f.id));
+}
+
+#[test]
+fn batch_enable_disable_applies_to_all_ids() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let a = snippet("A", "body");
+    let b = snippet("B", "body");
+    repo.insert(&a).unwrap();
+    repo.insert(&b).unwrap();
+
+    repo.batch_set_enabled(&[a.id.clone(), b.id.clone()], false)
+        .unwrap();
+    assert!(!repo.get(&a.id).unwrap().unwrap().is_enabled);
+    assert!(!repo.get(&b.id).unwrap().unwrap().is_enabled);
+}
+
+#[test]
+fn batch_tagging_attaches_detaches_and_ignores_duplicates() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let tags = TagRepo::new(&conn);
+    let a = snippet("A", "body");
+    let b = snippet("B", "body");
+    let t = tag("shell");
+    repo.insert(&a).unwrap();
+    repo.insert(&b).unwrap();
+    tags.insert(&t).unwrap();
+
+    let ids = [a.id.clone(), b.id.clone()];
+    repo.batch_add_tag(&ids, &t.id).unwrap();
+    repo.batch_add_tag(&ids, &t.id).unwrap();
+    assert_eq!(repo.tag_ids_of(&a.id).unwrap(), vec![t.id.clone()]);
+
+    repo.batch_remove_tag(std::slice::from_ref(&a.id), &t.id)
+        .unwrap();
+    assert!(repo.tag_ids_of(&a.id).unwrap().is_empty());
+    assert_eq!(repo.tag_ids_of(&b.id).unwrap(), vec![t.id]);
+}
+
+#[test]
+fn record_usage_bumps_count_and_last_used_only() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let s = snippet("Used", "body");
+    repo.insert(&s).unwrap();
+
+    repo.record_usage(&s.id, 5_000).unwrap();
+    repo.record_usage(&s.id, 6_000).unwrap();
+
+    let loaded = repo.get(&s.id).unwrap().unwrap();
+    assert_eq!(loaded.usage_count, 2);
+    assert_eq!(loaded.last_used_at, Some(6_000));
+    // Content metadata untouched by usage tracking.
+    assert_eq!(loaded.updated_at, s.updated_at);
+    assert_eq!(loaded.version, 1);
+}
+
+#[test]
+fn trigger_conflict_is_found_and_excludes_self() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let mut owner = snippet("Owner", "body");
+    owner.trigger = Some(":sig".to_string());
+    owner.trigger_mode = Some(TriggerMode::Delimiter);
+    repo.insert(&owner).unwrap();
+
+    // Positive: another snippet wanting :sig conflicts with owner.
+    assert_eq!(
+        repo.find_trigger_conflict(":sig", None).unwrap(),
+        Some(owner.id.clone())
+    );
+    // Negative: the owner editing itself is not a conflict.
+    assert_eq!(
+        repo.find_trigger_conflict(":sig", Some(&owner.id)).unwrap(),
+        None
+    );
+    // Negative: an unclaimed trigger is free.
+    assert_eq!(repo.find_trigger_conflict(":other", None).unwrap(), None);
+}
+
+#[test]
+fn duplicates_match_on_title_or_plaintext_body() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+    let original = snippet("Deploy steps", "kubectl rollout restart deploy/app");
+    repo.insert(&original).unwrap();
+
+    // Positive: same title.
+    let by_title = repo
+        .find_duplicates("Deploy steps", Some("different"), None)
+        .unwrap();
+    assert_eq!(by_title, vec![original.id.clone()]);
+
+    // Positive: same body, different title.
+    let by_body = repo
+        .find_duplicates("Other", Some("kubectl rollout restart deploy/app"), None)
+        .unwrap();
+    assert_eq!(by_body, vec![original.id.clone()]);
+
+    // Negative: nothing shared.
+    assert!(
+        repo.find_duplicates("Other", Some("nothing"), None)
+            .unwrap()
+            .is_empty()
+    );
+    // Negative: the row itself is excluded while editing.
+    assert!(
+        repo.find_duplicates("Deploy steps", None, Some(&original.id))
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn folder_nesting_lists_children_in_order() {
+    let conn = fresh_db();
+    let repo = FolderRepo::new(&conn);
+    let root = folder("Root", None);
+    repo.insert(&root).unwrap();
+    let mut child_b = folder("B", Some(&root.id));
+    child_b.sort_order = 2;
+    let mut child_a = folder("A", Some(&root.id));
+    child_a.sort_order = 1;
+    repo.insert(&child_b).unwrap();
+    repo.insert(&child_a).unwrap();
+
+    let children = repo.list_children(Some(&root.id)).unwrap();
+    assert_eq!(
+        children.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+        ["A", "B"]
+    );
+    let top = repo.list_children(None).unwrap();
+    assert_eq!(top.len(), 1);
+    assert_eq!(top[0].name, "Root");
+}
+
+#[test]
+fn folder_move_under_own_descendant_is_rejected() {
+    let conn = fresh_db();
+    let repo = FolderRepo::new(&conn);
+    let root = folder("Root", None);
+    repo.insert(&root).unwrap();
+    let child = folder("Child", Some(&root.id));
+    repo.insert(&child).unwrap();
+
+    let mut moved_root = root.clone();
+    moved_root.parent_id = Some(child.id.clone());
+    let err = repo.update(&moved_root).unwrap_err();
+    assert!(matches!(err, RepoError::Conflict(_)));
+
+    // A legal re-parent still works.
+    let other = folder("Other", None);
+    repo.insert(&other).unwrap();
+    let mut moved_child = child.clone();
+    moved_child.parent_id = Some(other.id.clone());
+    repo.update(&moved_child).unwrap();
+    assert_eq!(
+        repo.get(&child.id).unwrap().unwrap().parent_id,
+        Some(other.id)
+    );
+}
+
+#[test]
+fn folder_delete_cascades_children_and_unfiles_snippets() {
+    let conn = fresh_db();
+    let folders = FolderRepo::new(&conn);
+    let root = folder("Root", None);
+    folders.insert(&root).unwrap();
+    let child = folder("Child", Some(&root.id));
+    folders.insert(&child).unwrap();
+
+    let snippets = SnippetRepo::new(&conn);
+    let mut s = snippet("Filed", "body");
+    s.folder_id = Some(root.id.clone());
+    snippets.insert(&s).unwrap();
+
+    folders.delete(&root.id).unwrap();
+    assert!(folders.get(&child.id).unwrap().is_none());
+    assert_eq!(snippets.get(&s.id).unwrap().unwrap().folder_id, None);
+}
+
+#[test]
+fn tag_names_are_unique_and_renameable() {
+    let conn = fresh_db();
+    let repo = TagRepo::new(&conn);
+    let shell = tag("shell");
+    repo.insert(&shell).unwrap();
+
+    let err = repo.insert(&tag("shell")).unwrap_err();
+    assert!(matches!(err, RepoError::Conflict(_)));
+
+    repo.rename(&shell.id, "terminal").unwrap();
+    assert_eq!(repo.get(&shell.id).unwrap().unwrap().name, "terminal");
+
+    let docker = tag("docker");
+    repo.insert(&docker).unwrap();
+    let err = repo.rename(&docker.id, "terminal").unwrap_err();
+    assert!(matches!(err, RepoError::Conflict(_)));
+}
+
+#[test]
+fn tag_delete_detaches_links_but_keeps_snippets() {
+    let conn = fresh_db();
+    let tags = TagRepo::new(&conn);
+    let snippets = SnippetRepo::new(&conn);
+    let t = tag("shell");
+    let s = snippet("Kept", "body");
+    tags.insert(&t).unwrap();
+    snippets.insert(&s).unwrap();
+    snippets
+        .batch_add_tag(std::slice::from_ref(&s.id), &t.id)
+        .unwrap();
+
+    tags.delete(&t.id).unwrap();
+    assert!(snippets.tag_ids_of(&s.id).unwrap().is_empty());
+    assert!(snippets.get(&s.id).unwrap().is_some());
+}
+
+#[test]
+fn tag_list_all_is_name_ordered() {
+    let conn = fresh_db();
+    let repo = TagRepo::new(&conn);
+    repo.insert(&tag("zsh")).unwrap();
+    repo.insert(&tag("aws")).unwrap();
+    let names: Vec<String> = repo
+        .list_all()
+        .unwrap()
+        .into_iter()
+        .map(|t| t.name)
+        .collect();
+    assert_eq!(names, ["aws", "zsh"]);
+}
+
+#[test]
+fn new_id_produces_unique_uuid_text() {
+    let a = new_id();
+    let b = new_id();
+    assert_ne!(a, b);
+    assert_eq!(a.len(), 36);
+    assert_eq!(a.chars().filter(|c| *c == '-').count(), 4);
+}

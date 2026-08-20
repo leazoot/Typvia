@@ -1,0 +1,404 @@
+/* Mobile Settings grammar: a plain
+   page title, then caps section labels over hairline rows — no group cards,
+   no fills, no icons. The same classes carry the pushed sync/AI/privacy
+   screens, which reuse the identical row anatomy. */
+
+.tv-mset {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 0 26px 26px;
+}
+
+/* Root title: 27px at -.026em, no ornament. */
+.tv-mset-head {
+  padding: 26px 0 6px;
+}
+
+.tv-mset-head-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.026em;
+}
+
+:lang(zh-Hans) .tv-mset-head-title {
+  font-size: 26px;
+  letter-spacing: 0;
+}
+
+/* Pushed screen: a text back bar naming the parent, then the page's own
+   title. Navigation is a cut — no transition (motion neverAnimate). */
+.tv-mset-back {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 -26px;
+  padding: 0 26px;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  line-height: 1;
+  text-align: left;
+  cursor: default;
+}
+
+.tv-mset-back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mset-title {
+  margin: 10px 0 8px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.024em;
+}
+
+:lang(zh-Hans) .tv-mset-title {
+  letter-spacing: 0;
+}
+
+.tv-mset-intro {
+  margin: 0 0 18px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Section caps label (same voice as the shared .tv-mobile-label). */
+.tv-mset-label {
+  margin: 28px 0 2px;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+:lang(zh-Hans) .tv-mset-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: none;
+}
+
+/* A section is only its rows and their hairlines — no border, no fill. */
+.tv-mset-group {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A footnote belongs to the group above it, so the gap closes up. */
+.tv-mset-group.is-annotated {
+  margin-bottom: 0;
+}
+
+.tv-mset-note {
+  margin: 14px 0 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+/* One row: label left, reading right, a full-width hairline below — the
+   last row of a section runs free (rows are ~46px tall). */
+.tv-mset-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 14px 0;
+  border: none;
+  border-bottom: 1px solid var(--tvm-hairline);
+  background: none;
+  text-align: left;
+  cursor: default;
+}
+
+.tv-mset-row:last-child {
+  border-bottom: none;
+}
+
+.tv-mset-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mset-row-text {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+.tv-mset-row-label {
+  display: block;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.tv-mset-row-sub {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tv-mset-row-mono {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tv-mset-row-value {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* The pushed-row affordance: a thin › in the ghost grey, never an icon. */
+.tv-mset-chevron {
+  flex: none;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* Status shape: a circle when healthy, a square outline when the state is a
+   security or degradation statement. */
+.tv-mset-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.tv-mset-dot.is-success {
+  background: var(--color-success);
+}
+
+.tv-mset-dot.is-warning {
+  border: 1.5px solid var(--color-warning);
+  border-radius: 2px;
+}
+
+/* The single deliberate pill in the system (36x21, 15px thumb). */
+.tv-mset-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  width: 36px;
+  height: 21px;
+  padding: 0 3px;
+  border: none;
+  border-radius: 11px;
+  background: var(--tvm-hairline-strong);
+  cursor: default;
+  transition: background var(--tvm-motion-micro) ease;
+}
+
+.tv-mset-toggle[aria-pressed='true'] {
+  justify-content: flex-end;
+  background: var(--color-accent);
+}
+
+.tv-mset-toggle:disabled {
+  opacity: 0.5;
+}
+
+.tv-mset-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mset-toggle-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 8px;
+  background: var(--color-paper);
+}
+
+/* Word-choice control inside a row (Theme / Language): plain words, the
+   chosen one in ink over a 2px accent underline — never a filled pill. */
+.tv-mset-choice {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.tv-mset-choice .tv-mset-action {
+  min-height: 0;
+  padding: 0 0 6px;
+  border-bottom: 2px solid transparent;
+  color: var(--color-meta);
+  font-size: 13.5px;
+}
+
+.tv-mset-choice .tv-mset-action[aria-pressed='true'] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+/* Inline action inside a row: a word, never an icon. */
+.tv-mset-action {
+  flex: none;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mset-action:disabled {
+  color: var(--color-meta);
+}
+
+.tv-mset-action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Destructive: a red label on a tinted hairline, never a red fill. */
+.tv-mset-action.is-danger {
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--tvm-radius-button);
+  color: var(--color-error);
+}
+
+/* Full-width action under a group: 52px, radius 12. */
+.tv-mset-button {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  margin: 14px 0 0;
+  padding: 0 14px;
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--tvm-radius-button-lg);
+  background: none;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mset-button.is-primary {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--tvm-on-ink);
+}
+
+.tv-mset-button:disabled {
+  border-color: var(--tvm-hairline);
+  background: none;
+  color: var(--color-meta);
+}
+
+.tv-mset-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mset-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--tvm-hairline-field);
+  border-radius: var(--tvm-radius-block);
+  background: none;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.tv-mset-field:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mset-field-label {
+  display: block;
+  margin: 14px 0 -8px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Loading: text lines, never a spinner. */
+.tv-mset-skeleton {
+  height: 12px;
+  margin-top: 14px;
+  background: var(--tvm-hairline);
+  border-radius: 2px;
+}
+
+/* --- AI provider form (Settings · AI) -------------------------------- */
+
+.tv-mset-ai-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tv-mset-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tv-mset-kinds .tv-mset-button[aria-pressed='true'] {
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+}
+
+.tv-mset-ai-form-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}

@@ -1,0 +1,642 @@
+/* Vault: locked, unlocked and dark readings of one page.
+   The vault sits one paper notch below the app surface: the page paints
+   --tvm-vault-paper itself, including the status-bar inset the shell padded,
+   because the app shell only provides the regular paper. */
+
+.tv-mvault {
+  margin-top: calc(-1 * var(--tv-safe-top));
+  padding-top: var(--tv-safe-top);
+  background: var(--tvm-vault-paper);
+}
+
+/* --- Locked (09) ----------------------------------------------------------- */
+
+/* Generic placeholder lines blurred behind the lock — the shapes suggest
+   rows without carrying any data (blur 7px at .3, as drawn). */
+.tv-mvault-veil {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding-top: 34px;
+  filter: blur(7px);
+  opacity: 0.3;
+}
+
+.tv-mvault-veil-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tv-mvault-veil-title {
+  width: 128px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--color-ink);
+}
+
+.tv-mvault-veil-line {
+  width: 176px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--color-secondary);
+}
+
+/* Centre block: ring with the accent caret, name, one quiet promise. */
+.tv-mvault-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: auto 0;
+  padding: 26px 0;
+  text-align: center;
+}
+
+.tv-mvault-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--tvm-lock-ring);
+  border-radius: 50%;
+}
+
+.tv-mvault-ring-caret {
+  width: 2px;
+  height: 16px;
+  background: var(--color-accent);
+}
+
+.tv-mvault-lock-title {
+  margin: 30px 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.024em;
+}
+
+:lang(zh-Hans) .tv-mvault-lock-title {
+  letter-spacing: 0;
+}
+
+.tv-mvault-lock-sub {
+  margin: 13px 0 0;
+  color: var(--tvm-label);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+}
+
+/* Bottom cluster: the gate word above the quiet passcode path, kept 150px
+   above the frame, i.e. ~70px above the tab bar. */
+.tv-mvault-lock-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 26px 0 44px;
+}
+
+.tv-mvault-gate {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  cursor: default;
+}
+
+.tv-mvault-gate:disabled {
+  color: var(--color-meta);
+}
+
+.tv-mvault-pass-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mvault-pass-link:disabled {
+  opacity: 0.5;
+}
+
+/* --- Forms (setup · unlock · new secret) ----------------------------------- */
+
+.tv-mvault-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  width: 100%;
+  padding-top: 22px;
+}
+
+.tv-mvault-form-center {
+  align-items: center;
+}
+
+.tv-mvault-setup .tv-mvault-form {
+  align-items: center;
+  max-width: 300px;
+}
+
+/* Fields follow the search-line grammar: an ink hairline underline and the
+   accent caret — never a boxed input. */
+.tv-mvault-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 0;
+  border: none;
+  border-bottom: 1.5px solid var(--color-ink);
+  border-radius: 0;
+  background: none;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.tv-mvault-field::placeholder {
+  color: var(--color-meta);
+}
+
+.tv-mvault-field:focus-visible {
+  outline: none;
+}
+
+.tv-mvault-field-center {
+  max-width: 280px;
+  text-align: center;
+}
+
+/* Multi-line secret value: a quiet content block (radius ladder: block 8). */
+.tv-mvault-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--tvm-hairline-field);
+  border-radius: var(--tvm-radius-block);
+  background: none;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.tv-mvault-textarea::placeholder {
+  color: var(--color-meta);
+}
+
+.tv-mvault-new {
+  padding-top: 26px;
+}
+
+.tv-mvault-new-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+/* --- Unlocked (10) --------------------------------------------------------- */
+
+.tv-mvault-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 26px;
+}
+
+.tv-mvault-head-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.tv-mvault-head-bar {
+  width: 2px;
+  height: 22px;
+  background: var(--color-accent);
+}
+
+.tv-mvault-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.026em;
+}
+
+:lang(zh-Hans) .tv-mvault-title {
+  font-size: 26px;
+  letter-spacing: 0;
+}
+
+/* The re-lock countdown is mono micro-type, never a red ring. Dark draws it
+   at #8a8c90 — one point off --tvm-label, mapped to the label grey. */
+.tv-mvault-countdown {
+  color: var(--tvm-label);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+/* Quiet word actions under the head (not drawn: the design's screen only
+   lists; Lock now / New secret stay as words in the secondary grey). */
+.tv-mvault-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-top: 18px;
+}
+
+.tv-mvault-tool {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mvault-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 36px 0 0;
+  list-style: none;
+}
+
+.tv-mvault-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--tvm-hairline);
+}
+
+.tv-mvault-row:first-child {
+  padding-top: 0;
+}
+
+.tv-mvault-row:last-child {
+  border-bottom: none;
+}
+
+/* The whole text column is the press-and-hold surface. */
+.tv-mvault-hold {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: default;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tv-mvault-hold:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mvault-row-title {
+  display: block;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.014em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:lang(zh-Hans) .tv-mvault-row-title {
+  letter-spacing: 0;
+}
+
+.tv-mvault-row-mask {
+  display: block;
+  margin-top: 9px;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.16em;
+}
+
+.tv-mvault-row-plain {
+  display: block;
+  margin-top: 9px;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Meta caps line: SECRET · <folder> — one flat kind, no sub-types. */
+.tv-mvault-row-meta {
+  display: block;
+  margin-top: 11px;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.tv-mvault-row-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 45%;
+  padding-top: 2px;
+}
+
+/* The one-time copy is a quiet inline word, never a boxed button. */
+.tv-mvault-copy {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: default;
+}
+
+/* Status colour never stands alone — the words carry the meaning. */
+.tv-mvault-row-err {
+  color: var(--color-error);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Copy failure leads with what is still fine; plain ink, no red fill. */
+.tv-mvault-row-copyerr {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  white-space: normal;
+}
+
+/* The clipboard clear countdown: mono seconds over a linear shrinking bar.
+   The OS owns the actual clear; this only mirrors the returned delay. */
+.tv-mvault-copyclear {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.tv-mvault-copyclear-bar {
+  width: 64px;
+  height: 2px;
+  background: var(--tvm-hairline-mid);
+  overflow: hidden;
+}
+
+.tv-mvault-copyclear-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-ink);
+  transform-origin: left;
+  /* Linear by design: the shrink is a countdown, not an ease. */
+  transition: transform 1000ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-mvault-copyclear-fill {
+    transition: none;
+  }
+}
+
+.tv-mvault-copyclear-text {
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* The reveal contract, pinned above the page end as a bottom strip. */
+.tv-mvault-hint {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 40px;
+}
+
+.tv-mvault-hint-bar {
+  flex: none;
+  width: 2px;
+  height: 11px;
+  background: var(--color-accent);
+}
+
+.tv-mvault-hint-text {
+  color: var(--tvm-label);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1;
+}
+
+:root[data-theme='dark'] .tv-mvault-hint-text {
+  color: var(--color-meta);
+}
+
+/* --- Shared prose ---------------------------------------------------------- */
+
+.tv-mvault-empty,
+.tv-mvault-foot,
+.tv-mvault-enroll-note {
+  margin: 0;
+  padding-top: 22px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tv-mvault-error {
+  margin: 0;
+  padding-top: 14px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tv-mvault-enroll {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 18px;
+}
+
+.tv-mvault-enroll-err {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* The secure-field explainer: a plain collapsible block, no sheet, no icons. */
+.tv-mvault-securefield {
+  border-top: 1px solid var(--tvm-hairline);
+  margin-top: 22px;
+  padding-top: 14px;
+}
+
+.tv-mvault-securefield-summary {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: default;
+}
+
+.tv-mvault-securefield-summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mvault-securefield-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.tv-mvault-securefield-lead {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tv-mvault-securefield-steps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Loading is a skeleton row, never a spinner. */
+.tv-mvault-skeleton {
+  height: 52px;
+  margin-top: 26px;
+  border-radius: 2px;
+  background: var(--tvm-hairline);
+}
+
+/* --- Lost-password reset --------------------------------------------------- */
+
+.tv-mvault-forgot {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: default;
+}
+
+.tv-mvault-forgot:disabled {
+  opacity: 0.5;
+}
+
+.tv-mvault-reset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.tv-mvault-reset-warn {
+  margin: 0;
+  color: var(--color-error);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.tv-mvault-reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Destructive = red text + red hairline, never a filled red button. */
+.tv-mvault-danger {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--tvm-radius-button);
+  background: none;
+  color: var(--color-error);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mvault-danger:disabled {
+  opacity: 0.5;
+}
+
+.tv-mvault-gate:focus-visible,
+.tv-mvault-pass-link:focus-visible,
+.tv-mvault-tool:focus-visible,
+.tv-mvault-copy:focus-visible,
+.tv-mvault-forgot:focus-visible,
+.tv-mvault-danger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

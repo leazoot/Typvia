@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Main window baseline. Tauri 2 ACL is an allow-list: every WebView API a window uses must be granted here explicitly.","local":true,"windows":["main"],"permissions":["core:default","deep-link:default"]}}

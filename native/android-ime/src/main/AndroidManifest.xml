@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged into the main app manifest (same APK, same UID: the IME reads the
+     KeyboardSnapshot from the app's private dir with no cross-process grant).
+     The module adds NO permissions: the IME never touches the network, logs
+     no keystrokes, and keeps no key history.
+     android:process=":ime" gives the service its own process so its memory is
+     accounted separately from the WebView-heavy main app (mirrors the iOS
+     extension-process yardstick) and the keyboard never pays for the SPA. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <service
+            android:name="dev.typvia.ime.TypviaImeService"
+            android:label="@string/typvia_ime_label"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:process=":ime"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/typvia_ime_method" />
+        </service>
+    </application>
+</manifest>

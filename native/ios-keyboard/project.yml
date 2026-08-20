@@ -1,6 +1,5 @@
-# SPIKE (TASK-011): host app + keyboard extension sharing a snapshot file
-# through an App Group. Throwaway — the formal iOS keyboard lands with
-# BACKLOG-006.
+# SPIKE: host app + keyboard extension sharing a snapshot file through an
+# App Group. Throwaway — superseded by the formal iOS keyboard.
 name: TypviaKbSpike
 options:
   bundleIdPrefix: dev.typvia.spike

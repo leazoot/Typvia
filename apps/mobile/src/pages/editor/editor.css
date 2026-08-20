@@ -1,0 +1,518 @@
+/* Create / edit bottom sheet. */
+.tv-msheet-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: var(--tvm-scrim);
+  z-index: 10;
+}
+
+.tv-msheet {
+  width: 100%;
+  max-height: 86%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 14px 26px calc(var(--tv-safe-bottom, 0px) + 26px);
+  border-radius: var(--tvm-radius-sheet) var(--tvm-radius-sheet) 0 0;
+  background: var(--tvm-sheet);
+  box-shadow: var(--tvm-sheet-shadow);
+  animation: tv-msheet-rise var(--tvm-motion-sheet, 340ms) var(--curve-standard);
+}
+
+@keyframes tv-msheet-rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-msheet {
+    animation: none;
+  }
+}
+
+.tv-msheet-handle {
+  width: 34px;
+  height: 4px;
+  margin: 0 auto;
+  border-radius: 2px;
+  background: var(--tvm-handle);
+}
+
+.tv-med-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 26px;
+}
+
+.tv-med-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.024em;
+}
+
+:lang(zh-Hans) .tv-med-title {
+  letter-spacing: 0;
+}
+
+.tv-med-cancel {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+  cursor: default;
+}
+
+/* Body field. Quick state: bare line with the accent caret. Expanded with
+   machine content: the tinted block, mono. */
+.tv-med-body {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  outline: none;
+  resize: none;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+}
+
+.tv-med-body::placeholder {
+  color: var(--color-meta);
+}
+
+.tv-med-body.is-mono {
+  margin-top: 26px;
+  padding: 17px 16px;
+  border-radius: var(--tvm-radius-block);
+  background: var(--tvm-block);
+  color: var(--tvm-block-ink);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+
+/* Caps micro-labels (TYPE / TITLE / TRIGGER / FOLDER). */
+.tv-med-caps {
+  display: block;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+:lang(zh-Hans) .tv-med-caps {
+  font-family: var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+
+.tv-med-type-row {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.tv-med-type-tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 15px;
+  overflow-x: auto;
+}
+
+.tv-med-type-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-med-type-tab.is-active {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.tv-med-type-tab[aria-disabled] {
+  opacity: 0.5;
+}
+
+.tv-med-type-bar {
+  width: 100%;
+  height: 2px;
+  background: var(--color-accent);
+}
+
+.tv-med-type-tab:focus-visible {
+  outline: none;
+  border-radius: var(--radius-mark);
+  box-shadow: var(--focus-ring);
+}
+
+/* Hairline fields: caps label, then the value line. */
+.tv-med-field {
+  display: block;
+  margin-top: 22px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--tvm-hairline-field);
+}
+
+.tv-med-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 11px;
+  padding: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  line-height: 1.2;
+  letter-spacing: -0.014em;
+}
+
+.tv-med-input::placeholder {
+  color: var(--color-meta);
+}
+
+.tv-med-input.is-mono {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.tv-med-folder {
+  display: block;
+}
+
+.tv-med-folder-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 11px;
+}
+
+.tv-med-select {
+  flex: 1;
+  padding: 0;
+  border: none;
+  background: none;
+  outline: none;
+  appearance: none;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  letter-spacing: -0.014em;
+}
+
+.tv-med-chevron {
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.tv-med-field-meta {
+  display: block;
+  margin-top: 11px;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+}
+
+.tv-med-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-med-more-glyph {
+  color: var(--tvm-meta-soft);
+  font-weight: 300;
+  font-size: 13px;
+}
+
+.tv-med-more:focus-visible,
+.tv-med-cancel:focus-visible {
+  outline: none;
+  border-radius: var(--radius-mark);
+  box-shadow: var(--focus-ring);
+}
+
+/* Bottom bar: the Save button is the sheet's only filled control. */
+.tv-med-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 30px;
+}
+
+.tv-med-save {
+  height: 38px;
+  padding: 0 22px;
+  border: none;
+  border-radius: var(--tvm-radius-button);
+  background: var(--color-ink);
+  color: var(--tvm-on-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-med-save:disabled {
+  background: var(--tvm-hairline-field);
+  color: var(--color-meta);
+}
+
+.tv-med-save:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-med-error {
+  margin: 22px 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.tv-med-error-detail {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-secondary);
+}
+
+.tv-med-history {
+  margin-top: 22px;
+}
+
+.tv-med-history-meta {
+  margin: 10px 0 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tv-med-history-rows {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tv-med-history-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tvm-hairline);
+}
+
+.tv-med-history-row:last-child {
+  border-bottom: none;
+}
+
+.tv-med-history-version {
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tv-med-history-time {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+}
+
+/* AI section: a functional surface the design does not draw, styled in the
+   sheet's own language. */
+.tv-med-ai {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-9);
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tvm-hairline);
+}
+
+.tv-med-ai-label {
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.tv-med-ai-run,
+.tv-med-ai-quiet {
+  min-height: var(--space-chip-touch);
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-med-ai-run {
+  color: var(--color-secondary);
+}
+
+.tv-med-ai-run::after {
+  content: ' ✦';
+  color: var(--color-meta);
+  font-size: 11px;
+}
+
+.tv-med-ai-run:disabled {
+  color: var(--color-meta);
+}
+
+.tv-med-ai-quiet {
+  color: var(--color-secondary);
+}
+
+.tv-med-ai-run:focus-visible,
+.tv-med-ai-quiet:focus-visible,
+.tv-med-ai-field:focus-visible {
+  outline: none;
+  border-radius: var(--radius-mark);
+  box-shadow: var(--focus-ring);
+}
+
+.tv-med-ai-note {
+  margin: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tv-med-ai-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-6);
+  width: 100%;
+}
+
+.tv-med-ai-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+}
+
+.tv-med-ai-field {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-9);
+  min-height: var(--space-chip-touch);
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--tvm-hairline);
+  background: none;
+  cursor: default;
+  text-align: left;
+}
+
+.tv-med-ai-field:disabled {
+  border-bottom-color: transparent;
+}
+
+.tv-med-ai-field-label {
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.tv-med-ai-field-value {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.tv-med-ai-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+  width: 100%;
+}
+
+.tv-med-ai-output {
+  margin: 0;
+  width: 100%;
+  padding: var(--space-9) 0;
+  border-top: 1px solid var(--tvm-hairline);
+  border-bottom: 1px solid var(--tvm-hairline);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tv-med-ai-footnote {
+  margin: 0;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+}

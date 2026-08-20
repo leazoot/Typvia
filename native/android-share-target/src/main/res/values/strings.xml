@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The share-sheet entry reads "Typvia" (the card names the action itself:
+     "Save to Typvia"). -->
+<resources>
+    <string name="typvia_share_label">Typvia</string>
+</resources>

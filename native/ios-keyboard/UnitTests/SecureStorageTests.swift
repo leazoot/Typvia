@@ -1,4 +1,4 @@
-// SPIKE (TASK-013): iOS Keychain round trip + biometric availability probe,
+// SPIKE: iOS Keychain round trip + biometric availability probe,
 // executed inside the simulator via a hosted unit test.
 
 import LocalAuthentication

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged into the main app manifest (same APK, same UID: the Activity
+     writes the share-inbox file into the app's private data dir with no
+     cross-process grant; the host app ingests it). The module adds NO
+     permissions. android:exported="true" is required for a share target —
+     other apps' share sheets start it. android:process=":share" gives the
+     card its own process so a quick share never boots the WebView/Tauri
+     stack (mirrors the iOS extension-process shape and the IME's ":ime"
+     precedent); the handoff is file-only, so no in-process state is shared
+     with the main app. Text shares only: the single intent-filter accepts
+     ACTION_SEND text/plain and nothing else (images/files never resolve
+     here), the manifest-level equivalent of the iOS extension's
+     NSExtensionActivationSupportsText-only activation rule. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="dev.typvia.share.ShareTargetActivity"
+            android:label="@string/typvia_share_label"
+            android:theme="@style/TypviaShareCard"
+            android:process=":share"
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

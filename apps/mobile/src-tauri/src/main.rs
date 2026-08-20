@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    typvia_mobile_spike_lib::run();
+    typvia_mobile_lib::run();
 }

@@ -1,0 +1,14 @@
+include ':app'
+
+// Typvia IME library: ships the InputMethodService inside this
+// APK (same UID as the app -> direct KeyboardSnapshot read). Declared here,
+// not in tauri.settings.gradle, so it survives CLI regeneration.
+include ':typvia-ime'
+project(':typvia-ime').projectDir = new File(rootDir, '../../../../../native/android-ime')
+
+// Typvia share target: ships the ACTION_SEND card inside this
+// APK (same UID -> direct write into the share inbox the host drains).
+include ':typvia-share'
+project(':typvia-share').projectDir = new File(rootDir, '../../../../../native/android-share-target')
+
+apply from: 'tauri.settings.gradle'

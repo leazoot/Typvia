@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No settingsActivity yet: keyboard settings arrive with the Android
+     onboarding/settings work. Switching back to the previous
+     keyboard is offered through the system input-method switcher. -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:supportsSwitchingToNextInputMethod="true" />

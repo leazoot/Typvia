@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "default",
-  "description": "Baseline WebView capabilities for the spike window",
+  "description": "Main window baseline. Tauri 2 ACL is an allow-list: every WebView API a window uses must be granted here explicitly.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "deep-link:default"]
 }

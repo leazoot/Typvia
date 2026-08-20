@@ -1,0 +1,138 @@
+/* Platform difference layer: iOS WebKit reports the notch/home-bar insets
+   via env(); the Android WebView reports 0 while the activity is
+   edge-to-edge, so the host-measured system-bar insets (--tv-inset-*, set
+   by platform/safe-area.ts) take over via max(). */
+:root {
+  --tv-safe-top: max(env(safe-area-inset-top), var(--tv-inset-top, 0px));
+  --tv-safe-bottom: max(env(safe-area-inset-bottom), var(--tv-inset-bottom, 0px));
+}
+
+.tv-app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* The page owns the status-bar safe area; the tab bar owns the bottom one. */
+.tv-app-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: var(--tv-safe-top);
+}
+
+.tv-app-boot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: var(--tv-safe-top) var(--space-mobile-page-padding) var(--tv-safe-bottom);
+}
+
+.tv-app-boot p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+}
+
+/* Page scaffold: 26px gutters, content is
+   the interface — sections stack with their own headroom, no cards. */
+.tv-mobile-page {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 0 26px 26px;
+}
+
+.tv-mobile-strips {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tv-mobile-toast {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--space-tab-item) + var(--tv-safe-bottom) + var(--space-14));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Section caps label — "RECENT", "SNIPPETS", "最近" — recurring on every
+   screen; meta grey, mono-adjacent tracking, uppercase in English only. */
+.tv-mobile-label {
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+:lang(zh-Hans) .tv-mobile-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: none;
+}
+
+/* Shared empty / error state block: caret and text, never a spinner. */
+.tv-mobile-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-9);
+  padding: var(--space-26) 0;
+}
+
+.tv-mobile-state-figure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+}
+
+.tv-mobile-state-slot {
+  width: 44px;
+  height: 9px;
+  background: var(--tvm-hairline);
+  border-radius: var(--radius-mark);
+}
+
+.tv-mobile-state-title {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-mobile-row-size);
+  line-height: var(--type-mobile-row-leading);
+}
+
+.tv-mobile-state-text {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+}
+
+.tv-mobile-state-action {
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--tvm-radius-button);
+  background: none;
+  min-height: var(--space-chip-touch);
+  padding: 0 var(--space-14);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mobile-state-action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

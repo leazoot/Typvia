@@ -1,0 +1,172 @@
+/* Mobile metrics for the shared sync vocabulary. The class names are the ones
+   `@typvia/ui/sync` components emit (SasCompare); desktop gives them page
+   rhythm, this file gives them phone rhythm and touch targets. */
+
+.tv-sync-rail-label {
+  margin-bottom: var(--space-9);
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: var(--type-section-label-size);
+  font-weight: var(--type-section-label-weight);
+  letter-spacing: var(--type-section-label-tracking);
+  line-height: var(--type-section-label-leading);
+  text-transform: uppercase;
+}
+
+.tv-sync-conflict-title {
+  margin: 0 0 var(--space-6);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-mobile-row-size);
+  font-weight: var(--type-mobile-row-weight);
+  line-height: var(--type-mobile-row-leading);
+}
+
+.tv-sync-lead {
+  margin: 0 0 var(--space-11);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+/* The short authentication string: read character by character, so it is
+   mono, spaced, and large enough to compare across two phones. */
+.tv-sync-sas {
+  margin: 0 0 var(--space-11);
+  padding: var(--space-9) var(--space-11);
+  border-radius: var(--radius-row);
+  background: var(--tvm-block);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Mobile-only sync surfaces below. */
+
+.tv-msync-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-11);
+  margin-bottom: var(--space-18);
+  padding: var(--space-14);
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--radius-card);
+}
+
+.tv-msync-code-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 88px;
+  padding: var(--space-9);
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--radius-field);
+  background: var(--tvm-block);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--type-code-size);
+  line-height: var(--type-code-leading);
+  resize: none;
+}
+
+.tv-msync-code-text:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* One conflict version, stacked rather than side by side: two columns do not
+   survive a phone, and both bodies must stay fully readable. */
+.tv-msync-version {
+  margin: 0 0 var(--space-14);
+  padding: var(--space-14);
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--radius-card);
+}
+
+.tv-msync-version.is-source {
+  border-color: var(--color-accent-tint-border);
+  background: var(--color-accent-tint-bg);
+}
+
+.tv-msync-version-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-9);
+  margin-bottom: var(--space-6);
+}
+
+.tv-msync-version-name {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-mobile-row-size);
+  line-height: var(--type-mobile-row-leading);
+}
+
+.tv-msync-version-time,
+.tv-msync-version-shape {
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-leading);
+}
+
+.tv-msync-version-body {
+  max-height: 240px;
+  margin: var(--space-9) 0 var(--space-11);
+  overflow: auto;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--type-code-size);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tv-msync-version-locked {
+  margin: var(--space-9) 0 var(--space-11);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: 1.65;
+}
+
+.tv-msync-promise {
+  display: block;
+  margin-bottom: var(--space-18);
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-leading);
+}
+
+/* Inline confirmation region (the product has one modal, and it is not this). */
+.tv-msync-confirm {
+  margin: 0 0 var(--space-18);
+  padding: var(--space-14);
+  border: 1px solid var(--color-danger-tray-border);
+  border-radius: var(--radius-card);
+  background: var(--color-danger-tray);
+}
+
+.tv-msync-confirm-text {
+  margin: 0 0 var(--space-11);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: 1.65;
+}
+
+.tv-msync-notice {
+  display: block;
+  margin-bottom: var(--space-18);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: 1.65;
+}

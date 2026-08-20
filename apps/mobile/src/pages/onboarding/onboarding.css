@@ -1,0 +1,549 @@
+/* First-run onboarding. Full-viewport takeover: no tab bar, one idea per
+   screen, transitions are cuts (never animated). The flow keeps its steps;
+   every step speaks the same voice — eyebrow wordmark, light display
+   tagline, numbered hairline rows, ink CTA over a centred quiet exit. */
+
+.tv-monb {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+  overflow-y: auto;
+  padding-top: var(--tv-safe-top);
+}
+
+.tv-monb-head {
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 26px;
+}
+
+.tv-monb-step-count {
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tv-monb-escape {
+  min-height: 44px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-monb-body {
+  flex: 1;
+  min-height: 0;
+  /* Scroll inside the step: with the keyboard raised (Android test-line
+   * rehearsal) the body shrinks, and its content must stay reachable
+   * instead of spilling under the footer. */
+  overflow-y: auto;
+  padding: 26px 26px;
+}
+
+/* Step 3 hosts the real editor page, which owns its own scrolling. */
+.tv-monb-editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Step 1 — the opening: eyebrow, tagline, lead. */
+
+.tv-monb-welcome {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 20px;
+}
+
+.tv-monb-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tv-monb-eyebrow-bar {
+  width: 2px;
+  height: 11px;
+  background: var(--color-accent);
+}
+
+.tv-monb-eyebrow-name {
+  color: var(--tvm-label);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.tv-monb-tagline {
+  margin: 40px 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 34px;
+  font-weight: 300;
+  line-height: 1.22;
+  letter-spacing: -0.032em;
+}
+
+:lang(zh-Hans) .tv-monb-tagline {
+  font-size: 31px;
+  line-height: 1.34;
+  letter-spacing: 0.005em;
+}
+
+.tv-monb-welcome-lead {
+  margin: 22px 0 0;
+  max-width: 280px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.tv-monb-title {
+  /* Carries the gap the deleted Chinese subtitle line used to provide. */
+  margin: 0 0 26px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.024em;
+}
+
+:lang(zh-Hans) .tv-monb-title {
+  letter-spacing: 0;
+}
+
+.tv-monb-lead {
+  margin: 0 0 14px;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.tv-monb-error {
+  margin: 14px 0 0;
+  color: var(--color-error);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Footer: an optional accent-bar note, the ink CTA,
+ * a centred quiet exit. Opaque paper: with the keyboard raised the
+ * shortened body scrolls beneath it, and text must not bleed through. */
+.tv-monb-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  padding: 14px 26px calc(20px + var(--tv-safe-bottom));
+  background: var(--color-paper);
+}
+
+/* The privacy statement: a 2px accent bar beside two quiet lines. */
+.tv-monb-privacy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.tv-monb-privacy-bar {
+  flex: none;
+  width: 2px;
+  height: 24px;
+  background: var(--color-accent);
+}
+
+.tv-monb-privacy-text {
+  color: var(--tvm-label);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.tv-monb-primary {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--tvm-radius-button-lg);
+  background: var(--color-ink);
+  color: var(--tvm-on-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-monb-ghost {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--tvm-radius-button);
+  background: transparent;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The quiet exit under the CTA ("Not now" in the design). */
+.tv-monb-skip {
+  min-height: 44px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+}
+
+.tv-monb-foot-note {
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Step 2 — storage choice cards, stacked on a phone. */
+
+.tv-monb-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tv-monb-card {
+  padding: 18px;
+  background: var(--color-paper);
+  border: 1px solid var(--tvm-hairline-mid);
+  border-radius: var(--tvm-radius-button-lg);
+}
+
+.tv-monb-card.is-selected {
+  border-color: var(--color-accent);
+}
+
+.tv-monb-card-glyph {
+  display: block;
+  width: 11px;
+  height: 11px;
+  margin-bottom: 12px;
+  border: 1.5px solid var(--color-accent);
+  border-radius: 3px;
+}
+
+.tv-monb-card.is-muted .tv-monb-card-glyph {
+  border-color: var(--tvm-hairline-strong);
+}
+
+.tv-monb-card-title {
+  margin: 0 0 6px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  font-weight: 500;
+  letter-spacing: -0.014em;
+  line-height: 1.25;
+}
+
+:lang(zh-Hans) .tv-monb-card-title {
+  letter-spacing: 0;
+}
+
+.tv-monb-card-body {
+  margin: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.tv-monb-card-state {
+  margin: 12px 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.tv-monb-card.is-muted .tv-monb-card-state {
+  color: var(--color-secondary);
+}
+
+/* Step 4 — the numbered Settings path: mono 01/02/03 beside the
+ * instruction, hairlines between the rows. */
+
+.tv-monb-path {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  counter-reset: tv-monb-path;
+  display: flex;
+  flex-direction: column;
+}
+
+.tv-monb-path li {
+  counter-increment: tv-monb-path;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--tvm-hairline);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tv-monb-path li:first-child {
+  padding-top: 0;
+}
+
+.tv-monb-path li:last-child {
+  border-bottom: none;
+}
+
+.tv-monb-path li::before {
+  content: counter(tv-monb-path, decimal-leading-zero);
+  flex: none;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Android keyboard step — the switch rehearsal line. A real text line, not
+ * a drawn QWERTY: focusing it raises the user's actual keyboard so the real
+ * system switcher affordance can be practiced. Underline + accent caret,
+ * never an input box — the search-line language: no border, no icon. */
+
+.tv-monb-testline {
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 9px 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-ink);
+  caret-color: var(--color-accent);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--color-ink);
+  border-radius: 0;
+  outline: none;
+}
+
+.tv-monb-testline::placeholder {
+  color: var(--color-meta);
+}
+
+/* Step 5 — the Full Access ledger, as plain hairline rows. */
+
+.tv-monb-ledger-label {
+  margin: 0 0 4px;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+:lang(zh-Hans) .tv-monb-ledger-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: none;
+}
+
+.tv-monb-ledger {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+}
+
+.tv-monb-ledger-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--tvm-hairline);
+}
+
+.tv-monb-ledger-row:last-child {
+  border-bottom: none;
+}
+
+.tv-monb-ledger-title {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tv-monb-ledger-sub {
+  color: var(--tvm-label);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Step 6 — done. */
+
+.tv-monb-done-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  /* Carries the gap the deleted Chinese subtitle line used to provide. */
+  margin-bottom: 24px;
+}
+
+.tv-monb-done-bar {
+  width: 2px;
+  height: 24px;
+  background: var(--color-accent);
+}
+
+.tv-monb-done-head .tv-monb-title {
+  margin-bottom: 0;
+}
+
+.tv-monb-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tv-monb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--tvm-hairline);
+}
+
+.tv-monb-row:last-child {
+  border-bottom: none;
+}
+
+.tv-monb-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.tv-monb-dot.is-ok {
+  background: var(--color-success);
+}
+
+/* Unknown state is hollow: a filled color would claim knowledge we lack. */
+.tv-monb-dot.is-unknown {
+  border: 1.5px solid var(--tvm-hairline-strong);
+  background: none;
+}
+
+/* Security state gets a different shape, not just a colour (square outline). */
+.tv-monb-dot.is-secure {
+  border-radius: 2px;
+  border: 1.5px solid var(--color-accent);
+  background: none;
+}
+
+.tv-monb-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tv-monb-row-title {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tv-monb-row-sub {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tv-monb-row-later {
+  flex: none;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.tv-monb-finish-error {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 26px calc(12px + var(--tv-safe-bottom));
+  border-top: 1px solid var(--color-error-border);
+  color: var(--color-error);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.tv-monb-finish-error-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.tv-monb-finish-error-actions .tv-monb-ghost {
+  flex: 1;
+}
+
+.tv-monb-escape:focus-visible,
+.tv-monb-primary:focus-visible,
+.tv-monb-ghost:focus-visible,
+.tv-monb-skip:focus-visible,
+.tv-monb-testline:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

@@ -1,4 +1,4 @@
-// SPIKE (TASK-011): host app writes a KeyboardSnapshot-style JSON file into
+// SPIKE: host app writes a KeyboardSnapshot-style JSON file into
 // the App Group container, then focuses a text view so the custom keyboard
 // comes up and its insertions land somewhere visible.
 
@@ -7,8 +7,8 @@ import UIKit
 let appGroupId = "group.dev.typvia.spike"
 let snapshotName = "keyboard-snapshot.json"
 
-// Multiline content is the point: PRD requires the keyboard to insert
-// multiline snippets in one tap.
+// Multiline content is the point: the keyboard must insert multiline
+// snippets in one tap.
 let snapshotJson = """
 {
   "version": 1,

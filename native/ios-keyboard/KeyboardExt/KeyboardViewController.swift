@@ -1,4 +1,4 @@
-// SPIKE (TASK-011): keyboard extension reading the App Group snapshot and
+// SPIKE: keyboard extension reading the App Group snapshot and
 // inserting multiline text. The status line renders full-access state, read
 // result and memory footprint so a simulator screenshot is the evidence.
 

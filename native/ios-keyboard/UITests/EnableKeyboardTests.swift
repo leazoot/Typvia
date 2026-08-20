@@ -1,4 +1,4 @@
-// SPIKE (TASK-011): UI test that enables the TypviaKb keyboard in Settings,
+// SPIKE: UI test that enables the TypviaKb keyboard in Settings,
 // switches to it in the host app, and asserts the snapshot snippet got
 // inserted. Driving the UI from inside the simulator avoids host-side mouse
 // synthesis entirely.

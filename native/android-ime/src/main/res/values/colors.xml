@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keyboard panel palette, light (night overrides in values-night). The
+     panel is a warm-grey keyboard surface distinct from the host app's
+     paper. -->
+<resources>
+    <color name="tv_ime_panel">#FFF2F0EC</color>
+    <!-- Vault tab drops the surface one notch. -->
+    <color name="tv_ime_panel_vault">#FFEDEBE7</color>
+    <color name="tv_ime_ink">#FF17181B</color>
+    <!-- Row previews and the ABC affordance (between secondary and meta). -->
+    <color name="tv_ime_secondary">#FF8C8A85</color>
+    <!-- Placeholder text and inactive tab labels. -->
+    <color name="tv_ime_meta">#FFA5A29B</color>
+    <!-- Micro meta: wordmark, result count, LOCKED tag. -->
+    <color name="tv_ime_micro">#FFB0ADA6</color>
+    <!-- Ghost glyphs (the row's trailing return mark). -->
+    <color name="tv_ime_ghost">#FFC3C0B9</color>
+    <color name="tv_ime_accent">#FF4C6E8F</color>
+    <!-- Long-form reading text (template fill preview). -->
+    <color name="tv_ime_body">#FF3D4045</color>
+    <!-- Vault locked-state circle outline (ink at .2). -->
+    <color name="tv_ime_outline">#3317181B</color>
+    <!-- Hairlines are ink at fixed alphas, never solid greys. -->
+    <color name="tv_ime_hairline">#1217181B</color>
+    <color name="tv_ime_divider">#0F17181B</color>
+    <color name="tv_ime_stroke">#1F17181B</color>
+    <!-- Dimmed brand caret while the vault surface is up. -->
+    <color name="tv_ime_caret_dim">#3D17181B</color>
+</resources>

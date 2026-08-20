@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sheet presentation: translucent window with the design's 34% host dim
+     (rgba(20,21,22,.34); same as the iOS extension backdrop);
+     the sheet itself is drawn by ShareTargetActivity from ShareTheme
+     tokens. DeviceDefault parent keeps system dark/light and edge-to-edge
+     behavior without pulling AndroidX into the module. -->
+<resources>
+    <style name="TypviaShareCard" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.34</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

@@ -1,0 +1,111 @@
+/* Library. */
+.tv-mlib-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 26px;
+}
+
+.tv-mlib-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.026em;
+}
+
+:lang(zh-Hans) .tv-mlib-title {
+  font-size: 26px;
+  letter-spacing: 0;
+}
+
+.tv-mlib-count {
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tv-mlib-search {
+  padding-top: 26px;
+}
+
+/* Underline type tabs: active is ink + a 2px accent bar, never a fill. */
+.tv-mlib-tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  padding-top: 24px;
+}
+
+.tv-mlib-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: default;
+}
+
+.tv-mlib-tab.is-active {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+:lang(zh-Hans) .tv-mlib-tab {
+  font-size: 13px;
+}
+
+.tv-mlib-tab-bar {
+  width: 100%;
+  height: 2px;
+  background: var(--color-accent);
+}
+
+.tv-mlib-tab:focus-visible {
+  outline: none;
+  border-radius: var(--radius-mark);
+  box-shadow: var(--focus-ring);
+}
+
+.tv-mlib-group {
+  padding-top: 34px;
+}
+
+.tv-mlib-group ~ .tv-mlib-group {
+  padding-top: 30px;
+}
+
+/* Library rows are tighter than Home's and carry a usage count. */
+.tv-mlib-group .tv-strip,
+.tv-mlib .tv-strip {
+  padding: 15px 0;
+}
+
+.tv-mlib-group .tv-strip .tv-strip-title,
+.tv-mlib .tv-strip .tv-strip-title {
+  font-size: 16px;
+}
+
+.tv-mlib-group .tv-strip .tv-strip-preview,
+.tv-mlib .tv-strip .tv-strip-preview {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.tv-mlib-uses {
+  padding-top: 1px;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+}

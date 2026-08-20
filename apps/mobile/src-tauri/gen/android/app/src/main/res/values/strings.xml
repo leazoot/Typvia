@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">"Typvia"</string>
+    <string name="main_activity_title">"Typvia"</string>
+    <!-- Home-screen widget. System surfaces render the system locale: the
+         in-app locale preference cannot reach RemoteViews. -->
+    <string name="widget_wordmark" translatable="false">TYPVIA</string>
+    <string name="widget_empty">Open Typvia to save your first snippet</string>
+    <string name="widget_description">Your snippets, one tap from Home</string>
+</resources>

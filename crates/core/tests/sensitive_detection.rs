@@ -1,7 +1,7 @@
-//! Positive and negative cases for every PRD §12.10 detection pattern.
+//! Positive and negative cases for every detection pattern.
 //! Every credential-shaped value below is an obvious fake.
 
-use typvia_core::sensitive::{SensitiveKind, detect};
+use typvia_core::sensitive::{MASK, SensitiveKind, detect, detect_spans, mask_suspected_secrets};
 
 fn detects(text: &str, kind: SensitiveKind) -> bool {
     detect(text).contains(&kind)
@@ -191,6 +191,72 @@ fn multiple_patterns_report_in_stable_order() {
         detect(text),
         vec![SensitiveKind::AwsAccessKey, SensitiveKind::PasswordField]
     );
+}
+
+#[test]
+fn spans_cover_exactly_the_matched_bytes() {
+    let text = "key AKIAFAKEFAKEFAKEFAKE ok";
+    let spans = detect_spans(text);
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].kind, SensitiveKind::AwsAccessKey);
+    assert_eq!(&text[spans[0].start..spans[0].end], "AKIAFAKEFAKEFAKEFAKE");
+}
+
+#[test]
+fn spans_report_every_occurrence_sorted_by_offset() {
+    let text = "a AKIAFAKEFAKEFAKEFAKE b password: fakehunter2 c AKIAFAKEFAKEFAKEFAKE";
+    let spans = detect_spans(text);
+    assert_eq!(spans.len(), 3);
+    assert!(spans.windows(2).all(|w| w[0].start <= w[1].start));
+    assert_eq!(
+        spans
+            .iter()
+            .filter(|s| s.kind == SensitiveKind::AwsAccessKey)
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn spans_are_empty_for_plain_text() {
+    assert!(detect_spans("Lunch at noon, then the roadmap review. 会议记录。").is_empty());
+}
+
+#[test]
+fn masking_removes_matches_and_survives_a_rescan() {
+    let text = "deploy key AKIAFAKEFAKEFAKEFAKE and 密码:假密码123 for the demo box";
+    // Canary: prove the scanner sees the input before asserting removal.
+    assert!(!detect(text).is_empty());
+
+    let outcome = mask_suspected_secrets(text);
+    assert!(detect(&outcome.masked).is_empty());
+    assert!(!outcome.masked.contains("AKIAFAKEFAKEFAKEFAKE"));
+    assert!(!outcome.masked.contains("假密码123"));
+    assert!(outcome.masked.contains(MASK));
+    assert!(outcome.masked.starts_with("deploy key "));
+    assert!(outcome.masked.ends_with(" for the demo box"));
+    assert_eq!(
+        outcome.kinds,
+        vec![SensitiveKind::AwsAccessKey, SensitiveKind::PasswordField]
+    );
+}
+
+#[test]
+fn masking_clean_text_changes_nothing() {
+    let outcome = mask_suspected_secrets("An ordinary snippet about lunch plans.");
+    assert_eq!(outcome.masked, "An ordinary snippet about lunch plans.");
+    assert!(outcome.kinds.is_empty());
+}
+
+#[test]
+fn masking_handles_overlapping_kinds() {
+    // The assignment form is both an ApiKey match and (value) a candidate
+    // high-entropy token; overlapping ranges must not duplicate content.
+    let text = "api_key = fake-tXm9Qz4KpLw2Vc8Rb-N5FgH7JdY3TaWqEuZ6MxCoP";
+    assert!(!detect(text).is_empty());
+    let outcome = mask_suspected_secrets(text);
+    assert!(detect(&outcome.masked).is_empty());
+    assert!(!outcome.masked.contains("tXm9Qz4K"));
 }
 
 #[test]

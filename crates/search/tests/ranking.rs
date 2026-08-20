@@ -1,4 +1,4 @@
-//! Relative ordering of every ranking level (TASK-020 acceptance):
+//! Relative ordering of every ranking level:
 //! title exact > trigger > title prefix > tag > content, then recency,
 //! then usage frequency; plus query combination semantics.
 
@@ -39,6 +39,7 @@ fn snippet(title: &str, body: &str) -> Snippet {
         usage_count: 0,
         version: 1,
         deleted_at: None,
+        conflict_of: None,
     }
 }
 

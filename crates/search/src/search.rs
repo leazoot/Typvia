@@ -1,11 +1,11 @@
-//! Weighted search over the FTS index (PRD §12.2).
+//! Weighted search over the FTS index.
 //!
 //! Ranking is two-staged: FTS5 retrieves up to [`CANDIDATE_LIMIT`]
 //! bm25-ordered candidates (column weights favor title/trigger/tags), then
 //! Rust assigns each a [`MatchTier`] and orders by tier, last used, usage
-//! count. App relevance (PRD §12.2 #6) and semantic similarity (#9) are
-//! deferred to later batches: their rank slots sit between `Content` and the
-//! recency tiebreak and will extend the sort key here, not the FTS query.
+//! count. App relevance and semantic similarity are deferred: their rank
+//! slots sit between `Content` and the recency tiebreak and will extend the
+//! sort key here, not the FTS query.
 
 use rusqlite::{Connection, params};
 use typvia_core::model::SecurityLevel;
@@ -37,7 +37,7 @@ pub struct SearchHit {
     pub snippet_id: String,
     pub title: String,
     pub tier: MatchTier,
-    /// Security marker (PRD §12.2): the UI must present sensitive hits with
+    /// Security marker: the UI must present sensitive hits with
     /// their safety treatment and never assume a body is available.
     pub is_sensitive: bool,
 }

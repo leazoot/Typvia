@@ -1,5 +1,5 @@
 //! Snippet CRUD, batch operations, toggles, usage tracking, and the
-//! trigger-conflict / duplicate checks (PRD §12.1).
+//! trigger-conflict / duplicate checks.
 
 use rusqlite::types::ToSql;
 use rusqlite::{Connection, OptionalExtension, Row, params};
@@ -18,9 +18,9 @@ pub struct SnippetRepo<'c> {
 const SELECT_COLUMNS: &str = "id, workspace_id, title, content_plaintext, content_ciphertext, \
      type, description, folder_id, \"trigger\", trigger_mode, language, security_level, \
      is_favorite, is_pinned, is_enabled, platform_scope, created_at, updated_at, \
-     last_used_at, usage_count, version, deleted_at";
+     last_used_at, usage_count, version, deleted_at, conflict_of";
 
-/// Recycle-bin retention before automatic cleanup (PRD §12.16: 30 days).
+/// Recycle-bin retention before automatic cleanup (30 days).
 pub const TRASH_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 
 /// One Library list scope: a saved view or a single folder. Trashed rows are
@@ -82,8 +82,9 @@ impl<'c> SnippetRepo<'c> {
                 id, workspace_id, title, content_plaintext, content_ciphertext,
                 type, description, folder_id, \"trigger\", trigger_mode, language,
                 security_level, is_favorite, is_pinned, is_enabled, platform_scope,
-                created_at, updated_at, last_used_at, usage_count, version, deleted_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                created_at, updated_at, last_used_at, usage_count, version, deleted_at,
+                conflict_of
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             params![
                 snippet.id,
                 snippet.workspace_id,
@@ -107,6 +108,7 @@ impl<'c> SnippetRepo<'c> {
                 usage_to_db(snippet.usage_count),
                 snippet.version,
                 snippet.deleted_at,
+                snippet.conflict_of,
             ],
         )?;
         Ok(())
@@ -135,7 +137,7 @@ impl<'c> SnippetRepo<'c> {
                 \"trigger\" = ?9, trigger_mode = ?10, language = ?11, security_level = ?12,
                 is_favorite = ?13, is_pinned = ?14, is_enabled = ?15, platform_scope = ?16,
                 created_at = ?17, updated_at = ?18, last_used_at = ?19, usage_count = ?20,
-                version = ?21, deleted_at = ?22
+                version = ?21, deleted_at = ?22, conflict_of = ?23
              WHERE id = ?1",
             params![
                 snippet.id,
@@ -160,6 +162,7 @@ impl<'c> SnippetRepo<'c> {
                 usage_to_db(snippet.usage_count),
                 snippet.version,
                 snippet.deleted_at,
+                snippet.conflict_of,
             ],
         )?;
         if changed == 0 {
@@ -168,7 +171,7 @@ impl<'c> SnippetRepo<'c> {
         Ok(())
     }
 
-    /// Hard-deletes a snippet (recycle-bin soft delete arrives with TASK-018).
+    /// Hard-deletes a snippet.
     pub fn delete(&self, id: &str) -> Result<(), RepoError> {
         let changed = self
             .conn
@@ -191,6 +194,67 @@ impl<'c> SnippetRepo<'c> {
         collect_snippets(rows)
     }
 
+    /// Lists the live, enabled, normal-security snippets that carry a trigger —
+    /// exactly the set the Espanso adapter compiles. Sensitive snippets,
+    /// disabled snippets and recycle-bin rows are excluded at the query level
+    /// (the compiler re-checks the same invariants). Ordered deterministically
+    /// so the generated config is stable across regenerations.
+    pub fn list_triggered_active(&self) -> Result<Vec<Snippet>, RepoError> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NULL
+               AND is_enabled = 1
+               AND security_level = 'normal'
+               AND \"trigger\" IS NOT NULL
+             ORDER BY created_at, id"
+        ))?;
+        let rows = stmt.query_map([], row_to_snippet)?;
+        collect_snippets(rows)
+    }
+
+    /// Lists the live, enabled snippets of every security level — exactly
+    /// the keyboard-snapshot content set.
+    /// Sensitive rows come back as ciphertext, as stored. Ordered
+    /// deterministically so identical database state yields identical
+    /// snapshots.
+    pub fn list_snapshot_active(&self) -> Result<Vec<Snippet>, RepoError> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NULL AND is_enabled = 1
+             ORDER BY created_at, id"
+        ))?;
+        let rows = stmt.query_map([], row_to_snippet)?;
+        collect_snippets(rows)
+    }
+
+    /// Lists the live conflict copies awaiting the user's decision — the
+    /// rows a three-way merge parked with `conflict_of` pointing at the
+    /// snippet whose body they lost to. Oldest first, so the resolution
+    /// screen works through them in the order they arrived.
+    pub fn list_conflict_copies(&self) -> Result<Vec<Snippet>, RepoError> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NULL AND conflict_of IS NOT NULL
+             ORDER BY created_at, id"
+        ))?;
+        let rows = stmt.query_map([], row_to_snippet)?;
+        collect_snippets(rows)
+    }
+
+    /// Clears a conflict copy's `conflict_of` marker, promoting it to an
+    /// ordinary snippet. Used by the resolution write path; leaves every
+    /// other column untouched so no version is implied.
+    pub fn clear_conflict_of(&self, id: &str) -> Result<(), RepoError> {
+        let changed = self.conn.execute(
+            "UPDATE snippet SET conflict_of = NULL WHERE id = ?1",
+            params![id],
+        )?;
+        if changed == 0 {
+            return Err(RepoError::NotFound);
+        }
+        Ok(())
+    }
+
     /// Lists the live snippets directly inside a folder (`None` = unfiled).
     pub fn list_by_folder(
         &self,
@@ -209,7 +273,9 @@ impl<'c> SnippetRepo<'c> {
     }
 
     /// Lists live snippets in a Library scope, optionally narrowed to one
-    /// snippet type, bounded by limit/offset.
+    /// snippet type, bounded by limit/offset. Sensitive snippets appear only
+    /// when the type filter asks for them explicitly (the vault list) —
+    /// every other scope excludes them.
     pub fn list_scoped(
         &self,
         scope: ListScope<'_>,
@@ -217,11 +283,35 @@ impl<'c> SnippetRepo<'c> {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<Snippet>, RepoError> {
+        self.list_scoped_where(scope, snippet_type, limit, offset, false)
+    }
+
+    /// Recent list for the panel calling surface: same Recent semantics as
+    /// [`Self::list_scoped`], but sensitive rows stay listed — the panel is
+    /// where the vault verify-then-insert flow lives, unlike the Library
+    /// (that rule covers Library entry points only).
+    pub fn list_recent_including_sensitive(&self, limit: u32) -> Result<Vec<Snippet>, RepoError> {
+        self.list_scoped_where(ListScope::Recent, None, limit, 0, true)
+    }
+
+    fn list_scoped_where(
+        &self,
+        scope: ListScope<'_>,
+        snippet_type: Option<SnippetType>,
+        limit: u32,
+        offset: u32,
+        include_sensitive: bool,
+    ) -> Result<Vec<Snippet>, RepoError> {
         let type_text = snippet_type.map(|t| t.as_str());
         let folder = scope.folder_id();
         let mut sql = format!(
             "SELECT {SELECT_COLUMNS} FROM snippet
-             WHERE deleted_at IS NULL AND {}",
+             WHERE deleted_at IS NULL{} AND {}",
+            if include_sensitive {
+                ""
+            } else {
+                sensitive_exclusion(type_text)
+            },
             scope.where_clause()
         );
         if type_text.is_some() {
@@ -254,7 +344,9 @@ impl<'c> SnippetRepo<'c> {
         let type_text = snippet_type.map(|t| t.as_str());
         let folder = scope.folder_id();
         let mut sql = format!(
-            "SELECT COUNT(*) FROM snippet WHERE deleted_at IS NULL AND {}",
+            "SELECT COUNT(*) FROM snippet
+             WHERE deleted_at IS NULL{} AND {}",
+            sensitive_exclusion(type_text),
             scope.where_clause()
         );
         if type_text.is_some() {
@@ -337,6 +429,56 @@ impl<'c> SnippetRepo<'c> {
         collect_snippets(rows)
     }
 
+    /// Every sensitive snippet id, trashed rows included — the vault-reset
+    /// deletion set: once the vault key material is destroyed their
+    /// ciphertext is unrecoverable, so no row may stay behind.
+    pub fn list_sensitive_ids(&self) -> Result<Vec<String>, RepoError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM snippet WHERE security_level = 'sensitive' ORDER BY id")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut ids = Vec::new();
+        for id in rows {
+            ids.push(id?);
+        }
+        Ok(ids)
+    }
+
+    /// Active temporary snippets whose last edit is older than `ttl_ms` —
+    /// the expiry sweep's candidate set. Only the
+    /// `temporary` type is ever affected.
+    pub fn list_expired_temporary(
+        &self,
+        now: TimestampMs,
+        ttl_ms: i64,
+    ) -> Result<Vec<String>, RepoError> {
+        let cutoff = now.saturating_sub(ttl_ms);
+        let mut stmt = self.conn.prepare(
+            "SELECT id FROM snippet \
+             WHERE deleted_at IS NULL AND type = 'temporary' AND updated_at <= ?1 \
+             ORDER BY id",
+        )?;
+        let rows = stmt.query_map(params![cutoff], |row| row.get::<_, String>(0))?;
+        let mut ids = Vec::new();
+        for id in rows {
+            ids.push(id?);
+        }
+        Ok(ids)
+    }
+
+    /// Refreshes the edit clock without touching content — a restored
+    /// temporary snippet restarts its expiry window.
+    pub fn touch_updated_at(&self, id: &str, now: TimestampMs) -> Result<(), RepoError> {
+        let changed = self.conn.execute(
+            "UPDATE snippet SET updated_at = ?2 WHERE id = ?1",
+            params![id, now],
+        )?;
+        if changed == 0 {
+            return Err(RepoError::NotFound);
+        }
+        Ok(())
+    }
+
     /// Permanently deletes recycle-bin rows whose retention expired; returns
     /// how many rows were purged. Callers pass `now` and a retention window
     /// (default [`TRASH_RETENTION_MS`]).
@@ -383,60 +525,87 @@ impl<'c> SnippetRepo<'c> {
     /// Moves a batch of snippets into a folder (`None` = unfiled).
     /// Atomic: any missing snippet aborts the whole batch.
     pub fn batch_move(&self, ids: &[SnippetId], folder_id: Option<&str>) -> Result<(), RepoError> {
-        let tx = self.conn.unchecked_transaction()?;
-        for id in ids {
-            let changed = tx.execute(
-                "UPDATE snippet SET folder_id = ?2 WHERE id = ?1",
-                params![id, folder_id],
-            )?;
-            if changed == 0 {
-                return Err(RepoError::NotFound);
+        self.in_batch_transaction(|conn| {
+            for id in ids {
+                let changed = conn.execute(
+                    "UPDATE snippet SET folder_id = ?2 WHERE id = ?1",
+                    params![id, folder_id],
+                )?;
+                if changed == 0 {
+                    return Err(RepoError::NotFound);
+                }
             }
+            Ok(())
+        })
+    }
+
+    /// Runs a batch mutation atomically: inside a caller's transaction it
+    /// joins it (the caller owns atomicity, e.g. for the sync outbox hook);
+    /// otherwise it opens its own.
+    fn in_batch_transaction(
+        &self,
+        work: impl FnOnce(&Connection) -> Result<(), RepoError>,
+    ) -> Result<(), RepoError> {
+        if self.conn.is_autocommit() {
+            let tx = self.conn.unchecked_transaction()?;
+            work(&tx)?;
+            tx.commit()?;
+            Ok(())
+        } else {
+            work(self.conn)
         }
-        tx.commit()?;
-        Ok(())
     }
 
     /// Enables or disables a batch of snippets atomically.
     pub fn batch_set_enabled(&self, ids: &[SnippetId], value: bool) -> Result<(), RepoError> {
-        let tx = self.conn.unchecked_transaction()?;
-        for id in ids {
-            let changed = tx.execute(
-                "UPDATE snippet SET is_enabled = ?2 WHERE id = ?1",
-                params![id, value],
-            )?;
-            if changed == 0 {
-                return Err(RepoError::NotFound);
+        self.in_batch_transaction(|conn| {
+            for id in ids {
+                let changed = conn.execute(
+                    "UPDATE snippet SET is_enabled = ?2 WHERE id = ?1",
+                    params![id, value],
+                )?;
+                if changed == 0 {
+                    return Err(RepoError::NotFound);
+                }
             }
-        }
-        tx.commit()?;
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Attaches a tag to a batch of snippets; already-tagged pairs are kept.
-    pub fn batch_add_tag(&self, ids: &[SnippetId], tag_id: &str) -> Result<(), RepoError> {
-        let tx = self.conn.unchecked_transaction()?;
-        for id in ids {
-            tx.execute(
-                "INSERT OR IGNORE INTO snippet_tag (snippet_id, tag_id) VALUES (?1, ?2)",
-                params![id, tag_id],
-            )?;
-        }
-        tx.commit()?;
+    /// Attaches one tag to one snippet — a single idempotent statement, safe
+    /// inside a caller's transaction (used by the backup restore).
+    pub fn add_tag(&self, snippet_id: &str, tag_id: &str) -> Result<(), RepoError> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO snippet_tag (snippet_id, tag_id) VALUES (?1, ?2)",
+            params![snippet_id, tag_id],
+        )?;
         Ok(())
+    }
+
+    pub fn batch_add_tag(&self, ids: &[SnippetId], tag_id: &str) -> Result<(), RepoError> {
+        self.in_batch_transaction(|conn| {
+            for id in ids {
+                conn.execute(
+                    "INSERT OR IGNORE INTO snippet_tag (snippet_id, tag_id) VALUES (?1, ?2)",
+                    params![id, tag_id],
+                )?;
+            }
+            Ok(())
+        })
     }
 
     /// Detaches a tag from a batch of snippets.
     pub fn batch_remove_tag(&self, ids: &[SnippetId], tag_id: &str) -> Result<(), RepoError> {
-        let tx = self.conn.unchecked_transaction()?;
-        for id in ids {
-            tx.execute(
-                "DELETE FROM snippet_tag WHERE snippet_id = ?1 AND tag_id = ?2",
-                params![id, tag_id],
-            )?;
-        }
-        tx.commit()?;
-        Ok(())
+        self.in_batch_transaction(|conn| {
+            for id in ids {
+                conn.execute(
+                    "DELETE FROM snippet_tag WHERE snippet_id = ?1 AND tag_id = ?2",
+                    params![id, tag_id],
+                )?;
+            }
+            Ok(())
+        })
     }
 
     /// Tag ids attached to a snippet.
@@ -536,6 +705,17 @@ fn platforms_from_json(json: &str) -> Result<Vec<Platform>, RepoError> {
         .collect()
 }
 
+/// Library queries never see sensitive rows unless the caller asked for the
+/// sensitive type explicitly — that request is the vault's own list.
+/// Returns a constant SQL fragment; no external input involved.
+fn sensitive_exclusion(type_text: Option<&str>) -> &'static str {
+    if type_text == Some("sensitive") {
+        ""
+    } else {
+        " AND security_level != 'sensitive'"
+    }
+}
+
 type SnippetRowResult = Result<Snippet, RepoError>;
 
 fn row_to_snippet(row: &Row<'_>) -> rusqlite::Result<SnippetRowResult> {
@@ -568,6 +748,7 @@ fn row_to_snippet(row: &Row<'_>) -> rusqlite::Result<SnippetRowResult> {
         usage_count: usage_from_db(row.get("usage_count")?),
         version: row.get("version")?,
         deleted_at: row.get("deleted_at")?,
+        conflict_of: row.get("conflict_of")?,
     };
 
     Ok(finish_snippet(

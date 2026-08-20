@@ -1,4 +1,4 @@
-//! Folder CRUD with multi-level nesting and cycle protection (PRD §12.1).
+//! Folder CRUD with multi-level nesting and cycle protection.
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
@@ -95,6 +95,24 @@ impl<'c> FolderRepo<'c> {
              ORDER BY sort_order, name",
         )?;
         let rows = stmt.query_map(params![parent_id], row_to_folder)?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Lists every folder, parents before their children (depth order), so
+    /// the rows can be re-inserted in sequence under the parent FK. Serves
+    /// the whole-library backup; the folder tree is small by nature.
+    pub fn list_all_parents_first(&self) -> Result<Vec<Folder>, RepoError> {
+        let mut stmt = self.conn.prepare(
+            "WITH RECURSIVE ordered(id, depth) AS (
+                 SELECT id, 0 FROM folder WHERE parent_id IS NULL
+                 UNION ALL
+                 SELECT f.id, o.depth + 1 FROM folder f JOIN ordered o ON f.parent_id = o.id
+             )
+             SELECT f.id, f.parent_id, f.name, f.sort_order, f.created_at, f.updated_at
+             FROM folder f JOIN ordered o ON f.id = o.id
+             ORDER BY o.depth, f.sort_order, f.name",
+        )?;
+        let rows = stmt.query_map([], row_to_folder)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 

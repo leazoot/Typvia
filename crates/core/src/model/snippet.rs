@@ -1,4 +1,4 @@
-//! The `Snippet` entity (PRD §15.1).
+//! The `Snippet` entity.
 
 use super::enums::{Platform, SecurityLevel, SnippetType, TriggerMode};
 use super::validation::{ValidationError, require_non_blank};
@@ -6,7 +6,7 @@ use super::{FolderId, SnippetId, TimestampMs, WorkspaceId};
 
 /// Snippet body storage form.
 ///
-/// The PRD models this as the mutually exclusive column pair
+/// The storage schema models this as the mutually exclusive column pair
 /// `content_plaintext` / `content_ciphertext`; encoding the pair as an enum
 /// makes the "sensitive content is ciphertext-only" red line unrepresentable
 /// to violate at the type level.
@@ -16,7 +16,7 @@ pub enum SnippetContent {
     Plaintext(String),
     /// Application-layer encrypted body; required for
     /// `SecurityLevel::Sensitive`. Encryption details belong to the crypto
-    /// crate (docs/06_SECURITY_MODEL.md, TASK-023).
+    /// crate.
     Ciphertext(Vec<u8>),
 }
 
@@ -30,11 +30,11 @@ impl std::fmt::Debug for SnippetContent {
     }
 }
 
-/// A saved text snippet, the central entity of the product (PRD §15.1).
+/// A saved text snippet, the central entity of the product.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snippet {
     pub id: SnippetId,
-    /// Reserved by the PRD; v1.0 has a single implicit workspace.
+    /// Reserved for future use; v1.0 has a single implicit workspace.
     pub workspace_id: WorkspaceId,
     pub title: String,
     /// Maps to the `content_plaintext` / `content_ciphertext` column pair.
@@ -59,10 +59,12 @@ pub struct Snippet {
     pub usage_count: u64,
     /// Monotonic content version, starting at 1.
     pub version: u32,
-    /// Soft-delete marker (PRD §12.16 recycle bin); set while the snippet
-    /// sits in the recycle bin. Storage extension beyond the PRD §15.1 field
-    /// list, documented in docs/05_DATA_MODEL.md.
+    /// Soft-delete marker; set while the snippet sits in the recycle bin.
     pub deleted_at: Option<TimestampMs>,
+    /// Source snippet id when this row is the local-version conflict copy
+    /// of a concurrent body edit; travels in the sync payload so both
+    /// devices see the pending resolution.
+    pub conflict_of: Option<SnippetId>,
 }
 
 impl Snippet {
@@ -118,12 +120,22 @@ impl Snippet {
             return Err(ValidationError::new("version", "must start at 1"));
         }
 
+        if let Some(source) = &self.conflict_of {
+            require_non_blank("conflict_of", source)?;
+            if *source == self.id {
+                return Err(ValidationError::new(
+                    "conflict_of",
+                    "must not reference the snippet itself",
+                ));
+            }
+        }
+
         Ok(())
     }
 }
 
-/// One append-only history entry of a snippet's title and body
-/// (PRD §12.16). Restore never rewrites history: restoring an old version
+/// One append-only history entry of a snippet's title and body.
+/// Restore never rewrites history: restoring an old version
 /// appends its state as a new version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnippetVersion {
@@ -177,6 +189,7 @@ mod tests {
             usage_count: 0,
             version: 1,
             deleted_at: None,
+            conflict_of: None,
         }
     }
 
@@ -244,6 +257,17 @@ mod tests {
         let mut s = normal_snippet();
         s.version = 0;
         assert_eq!(s.validate().unwrap_err().field, "version");
+    }
+
+    #[test]
+    fn accepts_a_conflict_copy_and_rejects_a_self_reference() {
+        let mut s = normal_snippet();
+        s.conflict_of = Some("source".to_string());
+        assert_eq!(s.validate(), Ok(()));
+        s.conflict_of = Some(s.id.clone());
+        assert_eq!(s.validate().unwrap_err().field, "conflict_of");
+        s.conflict_of = Some("  ".to_string());
+        assert_eq!(s.validate().unwrap_err().field, "conflict_of");
     }
 
     #[test]

@@ -1,11 +1,10 @@
 //! Cryptographic primitives for Typvia: key derivation, encryption, and
 //! secure storage traits.
 //!
-//! Implements docs/06_SECURITY_MODEL.md (DEC-009): Argon2id derivation,
-//! the XChaCha20-Poly1305 envelope format, key wrapping with domain AAD
-//! labels, and the platform [`SecureStore`] abstraction. This crate knows
-//! nothing about business models (backend rules §crate 边界) — callers pass
-//! opaque ids and domain names.
+//! Provides Argon2id derivation, the XChaCha20-Poly1305 envelope format,
+//! key wrapping with domain AAD labels, and the platform [`SecureStore`]
+//! abstraction. This crate knows nothing about business models — callers
+//! pass opaque ids and domain names.
 //!
 //! Red lines enforced here and guarded by tests: decryption with a wrong
 //! key or mismatched AAD must fail; nonces are never reused; key material
@@ -19,12 +18,11 @@ mod store;
 
 pub use envelope::{ENVELOPE_VERSION, envelope_key_id, open, seal};
 pub use error::{CryptoError, SecureStoreError};
-pub use kdf::{KdfParams, derive_kek};
+pub use kdf::{KdfParams, SALT_LEN, derive_kek};
 pub use keys::{KEY_LEN, SymmetricKey};
 pub use store::SecureStore;
 
-/// AAD label binding a ciphertext to the master-key wrap purpose
-/// (docs/06_SECURITY_MODEL.md §5.2).
+/// AAD label binding a ciphertext to the master-key wrap purpose.
 pub fn aad_master_key() -> Vec<u8> {
     b"typvia.mk.v1".to_vec()
 }
@@ -36,14 +34,14 @@ pub fn aad_domain_key(domain: &str) -> Vec<u8> {
 }
 
 /// AAD label binding a record ciphertext to its record id, so ciphertexts
-/// cannot be swapped between records (§5.2).
+/// cannot be swapped between records.
 pub fn aad_record(record_id: &str) -> Vec<u8> {
     let mut aad = b"typvia.snippet.v1".to_vec();
     aad.extend_from_slice(record_id.as_bytes());
     aad
 }
 
-/// Encrypts `target` under `wrapping` (KEK→MK, MK→domain keys; §4). The
+/// Encrypts `target` under `wrapping` (KEK→MK, MK→domain keys). The
 /// AAD label states what is being wrapped, so a wrapped domain key cannot
 /// be presented as a wrapped master key.
 pub fn wrap_key(

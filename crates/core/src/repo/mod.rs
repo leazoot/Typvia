@@ -4,21 +4,43 @@
 //! hand in validated model values — every write validates again at the door
 //! so unvalidated data can never reach storage.
 
+mod ai_action_repo;
+mod ai_egress_log_repo;
+mod ai_provider_repo;
+mod app_meta_repo;
+mod app_rule_repo;
+mod device_repo;
+mod embedding_repo;
 mod folder_repo;
 mod snippet_repo;
+mod sync_outbox_repo;
+mod sync_state_repo;
 mod tag_repo;
+mod template_field_repo;
+mod vault_key_repo;
 mod version_repo;
 
 use std::fmt;
 
+pub use ai_action_repo::AiActionRepo;
+pub use ai_egress_log_repo::AiEgressLogRepo;
+pub use ai_provider_repo::AiProviderRepo;
+pub use app_meta_repo::AppMetaRepo;
+pub use app_rule_repo::AppRuleRepo;
+pub use device_repo::DeviceRepo;
+pub use embedding_repo::{EmbeddingRepo, PendingEmbedding, StoredEmbedding};
 pub use folder_repo::FolderRepo;
 pub use snippet_repo::{ListScope, SnippetRepo, TRASH_RETENTION_MS};
+pub use sync_outbox_repo::SyncOutboxRepo;
+pub use sync_state_repo::SyncStateRepo;
 pub use tag_repo::TagRepo;
-pub use version_repo::VersionRepo;
+pub use template_field_repo::TemplateFieldRepo;
+pub use vault_key_repo::VaultKeyRepo;
+pub use version_repo::{VERSION_KEEP_MAX, VERSION_KEEP_MIN, VERSION_MAX_AGE_MS, VersionRepo};
 
 use crate::model::{UnknownEnumValue, ValidationError};
 
-/// Generates a new UUID v4 text id (docs/05_DATA_MODEL.md §5.3).
+/// Generates a new UUID v4 text id.
 pub fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()
 }

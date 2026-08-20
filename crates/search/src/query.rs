@@ -2,8 +2,8 @@
 //!
 //! Every term matches as a phrase (CJK-split per the segment module), and
 //! the last term additionally matches by prefix so results narrow while the
-//! user is still typing. Pinyin and fuzzy expansion (OQ-R7, deferred) would
-//! plug in here — this is the single place query terms are produced.
+//! user is still typing. Deferred pinyin and fuzzy expansion would plug in
+//! here — this is the single place query terms are produced.
 
 use crate::segment::query_phrase;
 

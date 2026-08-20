@@ -1,18 +1,17 @@
-//! The `Device` entity (PRD §15.7).
+//! The `Device` entity.
 
 use super::enums::{Platform, TrustLevel};
 use super::validation::{ValidationError, require_non_blank};
 use super::{DeviceId, TimestampMs};
 
-/// A paired device participating in sync (PRD §15.7).
+/// A paired device participating in sync.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
     pub id: DeviceId,
     pub name: String,
     pub platform: Platform,
-    /// Device public key bytes; the key scheme is fixed by
-    /// docs/06_SECURITY_MODEL.md (TASK-023). Only public material is ever
-    /// stored here.
+    /// Device public key bytes; the key scheme is fixed by the crypto
+    /// layer. Only public material is ever stored here.
     pub public_key: Vec<u8>,
     pub trust_level: TrustLevel,
     pub last_seen_at: Option<TimestampMs>,

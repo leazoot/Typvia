@@ -1,4 +1,4 @@
-// SPIKE (TASK-010): one minimal "business" function (KeyboardSnapshot-style
+// SPIKE: one minimal "business" function (KeyboardSnapshot-style
 // JSON parsing) exposed over both candidate FFI paths so Swift and Kotlin
 // integration cost can be compared on identical semantics.
 

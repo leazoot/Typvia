@@ -1,0 +1,36 @@
+[package]
+name = "typvia-host-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared desktop/mobile IPC orchestration layer"
+
+[lints]
+workspace = true
+
+[dependencies]
+# The project's SQLite access library (bundled build, FTS5 included); the
+# use-case layer runs over the Connection the host owns and hands in.
+rusqlite = { version = "0.38", features = ["bundled"] }
+# IPC DTO (de)serialization at the WebView boundary; already in the tree.
+serde = { version = "1", features = ["derive"] }
+# Parses AI answers as untrusted JSON in the organize use case;
+# already in the tree (crates/ai, core snapshot).
+serde_json = "1"
+# The Rust core these use cases orchestrate (repositories, vault, import).
+typvia-core = { path = "../core" }
+# Search index maintenance + queries; composed here because the dependency
+# direction is search -> core, so only the host layer can wire writes to
+# the index.
+typvia-search = { path = "../search" }
+# Template parsing/rendering and authoring preview. Business
+# logic stays in Rust; hosts expose it over IPC through this layer.
+typvia-template = { path = "../template" }
+
+[dev-dependencies]
+# Isolated temp directory for the onboarding-marker round-trip test.
+# Maintained, MIT/Apache-2.0; already in the tree.
+tempfile = "3"
+# The SecureStore test double must return the trait's Zeroizing buffers;
+# already in the tree (core, crypto).
+zeroize = "1"

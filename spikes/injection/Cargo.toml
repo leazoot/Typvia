@@ -1,4 +1,4 @@
-# SPIKE (TASK-007): throwaway desktop text-injection validation. Not part of
+# SPIKE: throwaway desktop text-injection validation. Not part of
 # the root workspace; must not be promoted into formal modules.
 [package]
 name = "typvia-injection-spike"

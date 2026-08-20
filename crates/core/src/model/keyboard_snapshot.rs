@@ -1,10 +1,11 @@
-//! The `KeyboardSnapshot` read model (PRD §15.10, format per DEC-007 #4).
+//! The `KeyboardSnapshot` read model.
 //!
 //! The snapshot is a versioned JSON document exported by the main app and
 //! read-only for the iOS keyboard (App Group) and Android IME (private files
-//! dir). Plain-snippet search data lives inside `encrypted_index`; snapshot
-//! encryption and key handling are specified by docs/06_SECURITY_MODEL.md
-//! (TASK-023), so the payload stays opaque bytes here.
+//! dir). Normal snippets carry the plaintext fields the keyboard needs for
+//! offline search and insertion; sensitive snippets contribute nothing beyond
+//! their id and the stored content-ciphertext envelope, which extensions
+//! cannot decrypt.
 
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +23,41 @@ pub struct FolderMetadata {
     pub sort_order: i32,
 }
 
-/// Read-only snapshot consumed by keyboard/IME extensions (PRD §15.10).
+/// One snippet entry inside a snapshot.
+///
+/// Serialized untagged: the two variants have disjoint required key sets
+/// (`body` vs `encrypted_metadata`), so the JSON shape itself discriminates
+/// them and a sensitive entry carries no extra tag field.
+///
+/// Red line: a sensitive entry must never expose title, trigger, body, or any
+/// other plaintext clue — only the id and the opaque envelope bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SnapshotSnippet {
+    /// Normal-security snippet with the plaintext fields the keyboard needs.
+    Normal {
+        id: SnippetId,
+        title: String,
+        /// Controlled TEXT value of `SnippetType`; kept as text so readers
+        /// degrade explicitly on values they do not know.
+        snippet_type: String,
+        trigger: Option<String>,
+        /// Controlled TEXT value of `TriggerMode`; set together with
+        /// `trigger`.
+        trigger_mode: Option<String>,
+        folder_id: Option<FolderId>,
+        is_favorite: bool,
+        body: String,
+    },
+    /// Sensitive snippet: id plus the stored content-ciphertext envelope,
+    /// opaque to extensions (no vault key ever reaches them).
+    Sensitive {
+        id: SnippetId,
+        encrypted_metadata: Vec<u8>,
+    },
+}
+
+/// Read-only snapshot consumed by keyboard/IME extensions.
 ///
 /// Sensitive snippets contribute encrypted metadata only; nothing in this
 /// document may allow recovering sensitive content without vault unlock.
@@ -34,9 +69,9 @@ pub struct KeyboardSnapshot {
     pub generated_at: TimestampMs,
     /// Device that exported the snapshot.
     pub device_id: DeviceId,
-    /// Encrypted payload holding the plain-snippet search index and the
-    /// encrypted metadata of sensitive snippets (opaque until TASK-023).
-    pub encrypted_index: Vec<u8>,
+    /// Live, enabled snippets only; trashed and disabled rows never enter
+    /// a snapshot.
+    pub snippets: Vec<SnapshotSnippet>,
     /// Recently used snippet ids, most recent first.
     pub recent_ids: Vec<SnippetId>,
     /// Favorite snippet ids in display order.
@@ -69,12 +104,32 @@ impl KeyboardSnapshot {
 mod tests {
     use super::*;
 
+    fn normal_entry() -> SnapshotSnippet {
+        SnapshotSnippet::Normal {
+            id: "s1".to_string(),
+            title: "Docker logs".to_string(),
+            snippet_type: "command".to_string(),
+            trigger: Some(":dlog".to_string()),
+            trigger_mode: Some("delimiter".to_string()),
+            folder_id: Some("f1".to_string()),
+            is_favorite: true,
+            body: "docker logs -f app".to_string(),
+        }
+    }
+
+    fn sensitive_entry() -> SnapshotSnippet {
+        SnapshotSnippet::Sensitive {
+            id: "s9".to_string(),
+            encrypted_metadata: vec![0xC0, 0xDE],
+        }
+    }
+
     fn snapshot() -> KeyboardSnapshot {
         KeyboardSnapshot {
             snapshot_version: SNAPSHOT_VERSION,
             generated_at: 1_700_000_000_000,
             device_id: "d1".to_string(),
-            encrypted_index: vec![0xC0, 0xDE],
+            snippets: vec![normal_entry(), sensitive_entry()],
             recent_ids: vec!["s2".to_string(), "s1".to_string()],
             favorite_ids: vec!["s3".to_string()],
             folder_metadata: vec![FolderMetadata {
@@ -83,6 +138,17 @@ mod tests {
                 sort_order: 0,
             }],
         }
+    }
+
+    fn object_keys(value: &serde_json::Value) -> Vec<String> {
+        let mut keys: Vec<String> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::clone)
+            .collect();
+        keys.sort();
+        keys
     }
 
     #[test]
@@ -100,13 +166,46 @@ mod tests {
             "snapshot_version",
             "generated_at",
             "device_id",
-            "encrypted_index",
+            "snippets",
             "recent_ids",
             "favorite_ids",
             "folder_metadata",
         ] {
             assert!(json.contains(field), "missing field {field} in {json}");
         }
+    }
+
+    #[test]
+    fn a_normal_entry_serializes_exactly_the_plaintext_field_set() {
+        let value = serde_json::to_value(normal_entry()).unwrap();
+        let mut expected = vec![
+            "id",
+            "title",
+            "snippet_type",
+            "trigger",
+            "trigger_mode",
+            "folder_id",
+            "is_favorite",
+            "body",
+        ];
+        expected.sort_unstable();
+        assert_eq!(object_keys(&value), expected);
+    }
+
+    #[test]
+    fn a_sensitive_entry_serializes_only_id_and_encrypted_metadata() {
+        let value = serde_json::to_value(sensitive_entry()).unwrap();
+        assert_eq!(object_keys(&value), vec!["encrypted_metadata", "id"]);
+    }
+
+    #[test]
+    fn entry_variants_are_told_apart_by_shape_when_parsing() {
+        let normal: SnapshotSnippet =
+            serde_json::from_value(serde_json::to_value(normal_entry()).unwrap()).unwrap();
+        assert_eq!(normal, normal_entry());
+        let sensitive: SnapshotSnippet =
+            serde_json::from_value(serde_json::to_value(sensitive_entry()).unwrap()).unwrap();
+        assert_eq!(sensitive, sensitive_entry());
     }
 
     #[test]

@@ -1,6 +1,6 @@
-//! Crypto red-line tests (docs/06_SECURITY_MODEL.md §11, regression-
-//! mandatory): wrong keys must fail, nonces must not repeat, AAD binds
-//! ciphertexts to their purpose, the KDF is deterministic per salt.
+//! Crypto red-line tests (regression-mandatory): wrong keys must fail,
+//! nonces must not repeat, AAD binds ciphertexts to their purpose, the
+//! KDF is deterministic per salt.
 //! All passwords and payloads are obvious fakes.
 
 #![allow(clippy::unwrap_used)]

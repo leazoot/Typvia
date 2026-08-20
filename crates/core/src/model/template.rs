@@ -1,10 +1,10 @@
-//! The `TemplateField` entity (PRD §15.2, field types from §12.8).
+//! The `TemplateField` entity.
 
 use super::enums::TemplateFieldType;
 use super::validation::{ValidationError, require_non_blank};
 use super::{SnippetId, TemplateFieldId};
 
-/// A fillable field belonging to a template snippet (PRD §15.2).
+/// A fillable field belonging to a template snippet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateField {
     pub id: TemplateFieldId,

@@ -8,8 +8,8 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-# rusqlite per DEC-005; promoted from dev-dependency now that the search
-# module maintains the FTS5 index (TASK-019).
+# Promoted from dev-dependency now that the search module maintains the
+# FTS5 index.
 rusqlite = { version = "0.38", features = ["bundled"] }
 # Domain models and enum source of truth (dependency direction: search -> core).
 typvia-core = { path = "../core" }

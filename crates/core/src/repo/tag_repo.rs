@@ -1,4 +1,4 @@
-//! Tag CRUD (PRD §12.1); tag names are unique.
+//! Tag CRUD; tag names are unique.
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 

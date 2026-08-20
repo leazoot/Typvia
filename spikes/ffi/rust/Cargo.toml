@@ -1,6 +1,6 @@
-# SPIKE (TASK-010): FFI integration cost probe — UniFFI vs hand-written C ABI.
+# SPIKE: FFI integration cost probe — UniFFI vs hand-written C ABI.
 # Throwaway — excluded from the root workspace; not to be merged into formal
-# modules. The formal FFI layer lands with the decision recorded in DEC-006+.
+# modules. The formal FFI layer lands separately.
 [package]
 name = "ffi-spike"
 version = "0.1.0"

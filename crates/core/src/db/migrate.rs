@@ -40,6 +40,66 @@ const MIGRATIONS: &[Migration] = &[
         up: include_str!("../../migrations/0003_search_index_language.up.sql"),
         down: include_str!("../../migrations/0003_search_index_language.down.sql"),
     },
+    Migration {
+        version: 4,
+        name: "vault_key_header",
+        up: include_str!("../../migrations/0004_vault_key_header.up.sql"),
+        down: include_str!("../../migrations/0004_vault_key_header.down.sql"),
+    },
+    Migration {
+        version: 5,
+        name: "sync_orchestration",
+        up: include_str!("../../migrations/0005_sync_orchestration.up.sql"),
+        down: include_str!("../../migrations/0005_sync_orchestration.down.sql"),
+    },
+    Migration {
+        version: 6,
+        name: "conflict_marker",
+        up: include_str!("../../migrations/0006_conflict_marker.up.sql"),
+        down: include_str!("../../migrations/0006_conflict_marker.down.sql"),
+    },
+    Migration {
+        version: 7,
+        name: "key_update_cursor",
+        up: include_str!("../../migrations/0007_key_update_cursor.up.sql"),
+        down: include_str!("../../migrations/0007_key_update_cursor.down.sql"),
+    },
+    Migration {
+        version: 8,
+        name: "ai_providers",
+        up: include_str!("../../migrations/0008_ai_providers.up.sql"),
+        down: include_str!("../../migrations/0008_ai_providers.down.sql"),
+    },
+    Migration {
+        version: 9,
+        name: "ai_egress_log",
+        up: include_str!("../../migrations/0009_ai_egress_log.up.sql"),
+        down: include_str!("../../migrations/0009_ai_egress_log.down.sql"),
+    },
+    Migration {
+        version: 10,
+        name: "ai_action_params",
+        up: include_str!("../../migrations/0010_ai_action_params.up.sql"),
+        down: include_str!("../../migrations/0010_ai_action_params.down.sql"),
+    },
+    Migration {
+        version: 11,
+        name: "recovery_catchup_root",
+        up: include_str!("../../migrations/0011_recovery_catchup_root.up.sql"),
+        down: include_str!("../../migrations/0011_recovery_catchup_root.down.sql"),
+    },
+    Migration {
+        version: 12,
+        name: "webdav_transport",
+        up: include_str!("../../migrations/0012_webdav_transport.up.sql"),
+        down: include_str!("../../migrations/0012_webdav_transport.down.sql"),
+    },
+    Migration {
+        version: 13,
+        name: "snippet_embedding",
+        up: include_str!("../../migrations/0013_snippet_embedding.up.sql"),
+        down: include_str!("../../migrations/0013_snippet_embedding.down.sql"),
+    },
 ];
 
 /// Highest schema version known to this build.
@@ -135,10 +195,15 @@ mod tests {
             "ai_action",
             "app_rule",
             "device",
+            "domain_key",
             "folder",
+            "key_header",
             "snippet",
             "snippet_tag",
+            "sync_config",
+            "sync_pending_record",
             "sync_record",
+            "sync_shadow",
             "tag",
             "template_field",
         ] {
@@ -202,6 +267,281 @@ mod tests {
 
         migrate_to_latest(&mut conn).unwrap();
         assert!(fts_columns(&conn).contains(&"language".to_string()));
+    }
+
+    #[test]
+    fn vault_key_tables_exist_only_from_version_four() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let tables = table_names(&conn);
+        assert!(tables.contains(&"key_header".to_string()));
+        assert!(tables.contains(&"domain_key".to_string()));
+
+        migrate_to(&mut conn, 3).unwrap();
+        let tables = table_names(&conn);
+        assert!(!tables.contains(&"key_header".to_string()));
+        assert!(!tables.contains(&"domain_key".to_string()));
+
+        // Re-upgrading rebuilds them (idempotent up path).
+        migrate_to_latest(&mut conn).unwrap();
+        let tables = table_names(&conn);
+        assert!(tables.contains(&"key_header".to_string()));
+        assert!(tables.contains(&"domain_key".to_string()));
+    }
+
+    #[test]
+    fn sync_orchestration_state_exists_only_from_version_five() {
+        let record_columns = |conn: &Connection| -> Vec<String> {
+            let mut stmt = conn.prepare("PRAGMA table_info(sync_record)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        for column in ["key_id", "signature", "state", "server_seq"] {
+            assert!(record_columns(&conn).contains(&column.to_string()));
+        }
+        assert!(table_names(&conn).contains(&"sync_shadow".to_string()));
+        // The single config row exists right after migration.
+        let config_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sync_config", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(config_rows, 1);
+
+        migrate_to(&mut conn, 4).unwrap();
+        assert!(!record_columns(&conn).contains(&"state".to_string()));
+        let tables = table_names(&conn);
+        for dropped in ["sync_shadow", "sync_pending_record", "sync_config"] {
+            assert!(!tables.contains(&dropped.to_string()), "left {dropped}");
+        }
+
+        // Re-upgrading rebuilds everything (idempotent up path).
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(record_columns(&conn).contains(&"state".to_string()));
+        assert!(table_names(&conn).contains(&"sync_config".to_string()));
+    }
+
+    #[test]
+    fn conflict_marker_column_exists_only_from_version_six() {
+        let snippet_columns = |conn: &Connection| -> Vec<String> {
+            let mut stmt = conn.prepare("PRAGMA table_info(snippet)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(snippet_columns(&conn).contains(&"conflict_of".to_string()));
+
+        migrate_to(&mut conn, 5).unwrap();
+        assert!(!snippet_columns(&conn).contains(&"conflict_of".to_string()));
+
+        // Re-upgrading restores the column (idempotent up path).
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(snippet_columns(&conn).contains(&"conflict_of".to_string()));
+    }
+
+    #[test]
+    fn key_update_cursor_column_exists_only_from_version_seven() {
+        let config_columns = |conn: &Connection| -> Vec<String> {
+            let mut stmt = conn.prepare("PRAGMA table_info(sync_config)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(config_columns(&conn).contains(&"key_update_seq".to_string()));
+        // The single row keeps a usable cursor without any write.
+        let cursor: i64 = conn
+            .query_row(
+                "SELECT key_update_seq FROM sync_config WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cursor, 0);
+
+        migrate_to(&mut conn, 6).unwrap();
+        assert!(!config_columns(&conn).contains(&"key_update_seq".to_string()));
+
+        // Re-upgrading restores the column (idempotent up path).
+        migrate_to_latest(&mut conn).unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(config_columns(&conn).contains(&"key_update_seq".to_string()));
+    }
+
+    #[test]
+    fn ai_provider_table_exists_only_from_version_eight() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(table_names(&conn).contains(&"ai_provider".to_string()));
+
+        // Deliberately NO foreign key from ai_action.provider_id: actions
+        // sync between devices while providers are device-local, so a
+        // remotely-applied action may reference a provider this machine
+        // has not configured.
+        let insert_action = "INSERT INTO ai_action (id, name, prompt_template, provider_id, \
+             model, input_source, output_mode, permission_scope, created_at, updated_at) \
+             VALUES (?1, 'n', 'p', ?2, 'm', 'selection', 'replace', 'normal_only', 1, 1)";
+        conn.execute(
+            insert_action,
+            rusqlite::params!["a1", "not-configured-here"],
+        )
+        .unwrap();
+
+        // Red line: no column of ai_provider can hold key material.
+        let columns: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(ai_provider)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+        assert_eq!(
+            columns,
+            vec![
+                "id",
+                "name",
+                "kind",
+                "base_url",
+                "model",
+                "timeout_ms",
+                "created_at",
+                "updated_at"
+            ]
+        );
+
+        // Downgrade removes the table; existing actions are untouched.
+        migrate_to(&mut conn, 7).unwrap();
+        assert!(!table_names(&conn).contains(&"ai_provider".to_string()));
+        let survived: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ai_action", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(survived, 1);
+
+        // Re-upgrading is idempotent.
+        migrate_to_latest(&mut conn).unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(table_names(&conn).contains(&"ai_provider".to_string()));
+        let carried: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ai_action", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(carried, 1);
+    }
+
+    #[test]
+    fn ai_egress_log_table_exists_only_from_version_nine() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(table_names(&conn).contains(&"ai_egress_log".to_string()));
+
+        // Red line: the log structurally cannot hold prompt
+        // content, response content or key material — these metadata
+        // columns are all it has.
+        let columns: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(ai_egress_log)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+        assert_eq!(
+            columns,
+            vec![
+                "id",
+                "occurred_at",
+                "provider_id",
+                "request_class",
+                "request_bytes"
+            ]
+        );
+
+        // Deliberately NO foreign key onto ai_provider: the audit trail
+        // must survive provider deletion.
+        conn.execute(
+            "INSERT INTO ai_egress_log (occurred_at, provider_id, request_class, request_bytes) \
+             VALUES (1, 'deleted-provider', 'completion', 42)",
+            [],
+        )
+        .unwrap();
+
+        // Negative byte counts are rejected at the schema level.
+        let rejected = conn.execute(
+            "INSERT INTO ai_egress_log (occurred_at, provider_id, request_class, request_bytes) \
+             VALUES (1, 'p1', 'completion', -1)",
+            [],
+        );
+        assert!(rejected.is_err());
+
+        // Downgrade drops the log; re-upgrading is idempotent.
+        migrate_to(&mut conn, 8).unwrap();
+        assert!(!table_names(&conn).contains(&"ai_egress_log".to_string()));
+        migrate_to_latest(&mut conn).unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(table_names(&conn).contains(&"ai_egress_log".to_string()));
+    }
+
+    #[test]
+    fn ai_action_params_and_app_meta_exist_only_from_version_ten() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(table_names(&conn).contains(&"app_meta".to_string()));
+
+        // Rows written before the column existed read back the '{}' default.
+        migrate_to(&mut conn, 9).unwrap();
+        conn.execute(
+            "INSERT INTO ai_action (id, name, prompt_template, provider_id, model, \
+             input_source, output_mode, permission_scope, created_at, updated_at) \
+             VALUES ('a1', 'Translate', 'Translate.', '', '', 'selection', 'replace', \
+             'normal_only', 1, 1)",
+            [],
+        )
+        .unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let params: String = conn
+            .query_row("SELECT params FROM ai_action WHERE id = 'a1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(params, "{}");
+
+        // Downgrade removes the column and the marker table; the action
+        // row itself survives. Re-upgrading is idempotent.
+        migrate_to(&mut conn, 9).unwrap();
+        assert!(!table_names(&conn).contains(&"app_meta".to_string()));
+        let columns: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(ai_action)").unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+        assert!(!columns.contains(&"params".to_string()));
+        migrate_to_latest(&mut conn).unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let survived: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ai_action", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(survived, 1);
+    }
+
+    #[test]
+    fn deleting_a_conflict_source_clears_the_marker_on_the_copy() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let insert = "INSERT INTO snippet (id, workspace_id, title, content_plaintext, type, \
+             security_level, platform_scope, created_at, updated_at, version, conflict_of) \
+             VALUES (?1, 'w', 't', 'b', 'text', 'normal', '[]', 1, 1, 1, ?2)";
+        conn.execute(insert, rusqlite::params!["source", Option::<String>::None])
+            .unwrap();
+        conn.execute(insert, rusqlite::params!["copy", Some("source")])
+            .unwrap();
+        conn.execute("DELETE FROM snippet WHERE id = 'source'", [])
+            .unwrap();
+        let marker: Option<String> = conn
+            .query_row(
+                "SELECT conflict_of FROM snippet WHERE id = 'copy'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(marker, None);
     }
 
     #[test]

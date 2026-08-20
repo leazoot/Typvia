@@ -1,0 +1,33 @@
+[package]
+name = "typvia-ai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# AiProviderKind lives in core as the single source of truth for stored
+# TEXT enums; ai → core is the fixed dependency direction.
+typvia-core = { path = "../core" }
+# SecureStore trait: API keys live only in the platform secure store as
+# non-gated entries — only the vault master-key copy is biometric-gated.
+# Already in the tree.
+typvia-crypto = { path = "../crypto" }
+# OpenAI-compatible request/response bodies are JSON; serde/serde_json are
+# the tree-wide standard at this boundary (core, sync, mobile-ffi).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Blocking HTTP for the transport implementation, same choice and version
+# as the sync crate: small, maintained, MIT/Apache-2.0 (MPL-2.0 compatible),
+# rustls verification that this crate never exposes a way to disable. No new
+# capability enters the tree.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+# API keys and serialized prompt bodies wipe on drop.
+zeroize = "1"
+
+[dev-dependencies]
+# The API-key database red line runs against a real migrated core
+# database file (byte scan); version pinned to core's.
+rusqlite = "0.38"

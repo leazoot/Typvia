@@ -4,5 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[dependencies]
+# Template fields and their type enum are owned by core; dependency direction
+# template -> core matches the crate boundary rules.
+typvia-core = { path = "../core" }
+
 [lints]
 workspace = true

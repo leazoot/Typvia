@@ -6,9 +6,12 @@
 use rusqlite::Connection;
 use typvia_core::db::{migrate_to_latest, open_in_memory};
 use typvia_core::model::{
-    Folder, SecurityLevel, Snippet, SnippetContent, SnippetType, Tag, TriggerMode,
+    AppRule, AppRuleType, Folder, Platform, SecurityLevel, Snippet, SnippetContent, SnippetType,
+    Tag, TriggerMode,
 };
-use typvia_core::repo::{FolderRepo, ListScope, RepoError, SnippetRepo, TagRepo, new_id};
+use typvia_core::repo::{
+    AppRuleRepo, FolderRepo, ListScope, RepoError, SnippetRepo, TagRepo, new_id,
+};
 
 fn fresh_db() -> Connection {
     let mut conn = open_in_memory().unwrap();
@@ -39,6 +42,7 @@ fn snippet(title: &str, body: &str) -> Snippet {
         usage_count: 0,
         version: 1,
         deleted_at: None,
+        conflict_of: None,
     }
 }
 
@@ -581,4 +585,120 @@ fn count_by_folder_groups_live_rows_only() {
         counts, expected,
         "trashed and folderless rows are excluded; empty folders absent"
     );
+}
+
+#[test]
+fn list_triggered_active_returns_only_espanso_eligible_snippets() {
+    let conn = fresh_db();
+    let repo = SnippetRepo::new(&conn);
+
+    let mut eligible = snippet("Eligible", "body");
+    eligible.trigger = Some(":sig".to_string());
+    eligible.trigger_mode = Some(TriggerMode::Immediate);
+
+    let mut no_trigger = snippet("No trigger", "body");
+    no_trigger.trigger = None;
+
+    let mut disabled = snippet("Disabled", "body");
+    disabled.trigger = Some(":off".to_string());
+    disabled.trigger_mode = Some(TriggerMode::Immediate);
+    disabled.is_enabled = false;
+
+    let mut sensitive = snippet("Sensitive", "body");
+    sensitive.trigger = Some(":secret".to_string());
+    sensitive.trigger_mode = Some(TriggerMode::Immediate);
+    sensitive.security_level = SecurityLevel::Sensitive;
+    sensitive.content = SnippetContent::Ciphertext(vec![1, 2, 3]);
+    sensitive.snippet_type = SnippetType::Sensitive;
+
+    let mut trashed = snippet("Trashed", "body");
+    trashed.trigger = Some(":gone".to_string());
+    trashed.trigger_mode = Some(TriggerMode::Immediate);
+    trashed.deleted_at = Some(9_000);
+
+    for s in [&eligible, &no_trigger, &disabled, &sensitive, &trashed] {
+        repo.insert(s).unwrap();
+    }
+
+    let got = repo.list_triggered_active().unwrap();
+    let ids: Vec<&str> = got.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, vec![eligible.id.as_str()]);
+}
+
+// ---- app rules ---------------------------------------------------------
+
+fn app_rule(snippet_id: &str, rule_type: AppRuleType, app: &str) -> AppRule {
+    AppRule {
+        id: new_id(),
+        snippet_id: snippet_id.to_string(),
+        platform: Platform::Macos,
+        app_identifier: app.to_string(),
+        rule_type,
+        window_title_pattern: None,
+    }
+}
+
+#[test]
+fn app_rule_insert_get_update_delete_round_trips() {
+    let conn = fresh_db();
+    let s = snippet("Ruled", "body");
+    SnippetRepo::new(&conn).insert(&s).unwrap();
+    let repo = AppRuleRepo::new(&conn);
+    let mut rule = app_rule(&s.id, AppRuleType::ShowOnly, "com.apple.Terminal");
+
+    repo.insert(&rule).unwrap();
+    assert_eq!(repo.get(&rule.id).unwrap().unwrap(), rule);
+
+    rule.rule_type = AppRuleType::Disable;
+    rule.app_identifier = "com.apple.Safari".to_string();
+    repo.update(&rule).unwrap();
+    assert_eq!(repo.get(&rule.id).unwrap().unwrap(), rule);
+
+    repo.delete(&rule.id).unwrap();
+    assert_eq!(repo.get(&rule.id).unwrap(), None);
+    assert!(matches!(repo.delete(&rule.id), Err(RepoError::NotFound)));
+}
+
+#[test]
+fn app_rule_insert_rejects_missing_snippet_and_blank_identifier() {
+    let conn = fresh_db();
+    let repo = AppRuleRepo::new(&conn);
+    let orphan = app_rule("missing-snippet", AppRuleType::Disable, "com.apple.Safari");
+    assert!(matches!(repo.insert(&orphan), Err(RepoError::Conflict(_))));
+
+    let s = snippet("Ruled", "body");
+    SnippetRepo::new(&conn).insert(&s).unwrap();
+    let blank = app_rule(&s.id, AppRuleType::Disable, "   ");
+    assert!(matches!(repo.insert(&blank), Err(RepoError::Validation(_))));
+}
+
+#[test]
+fn app_rule_lists_by_snippet_and_platform_and_cascades_with_the_snippet() {
+    let conn = fresh_db();
+    let snippets = SnippetRepo::new(&conn);
+    let a = snippet("A", "body");
+    let b = snippet("B", "body");
+    snippets.insert(&a).unwrap();
+    snippets.insert(&b).unwrap();
+    let repo = AppRuleRepo::new(&conn);
+    let rule_a = app_rule(&a.id, AppRuleType::ShowOnly, "com.apple.Terminal");
+    let mut rule_b = app_rule(&b.id, AppRuleType::Disable, "com.apple.Safari");
+    rule_b.platform = Platform::Windows;
+    repo.insert(&rule_a).unwrap();
+    repo.insert(&rule_b).unwrap();
+
+    assert_eq!(repo.list_for_snippet(&a.id).unwrap(), vec![rule_a.clone()]);
+    // Platform listing pages and filters.
+    assert_eq!(
+        repo.list_for_platform(Platform::Macos, 10, 0).unwrap(),
+        vec![rule_a]
+    );
+    assert_eq!(
+        repo.list_for_platform(Platform::Macos, 10, 1).unwrap(),
+        vec![]
+    );
+
+    // Deleting the snippet cascades its rules away (FK ON DELETE CASCADE).
+    snippets.delete(&a.id).unwrap();
+    assert_eq!(repo.list_for_snippet(&a.id).unwrap(), vec![]);
 }

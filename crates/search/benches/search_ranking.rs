@@ -2,7 +2,7 @@
 // so the no-expect rule for runtime paths does not apply here.
 #![allow(clippy::expect_used)]
 
-//! End-to-end search latency over the real schema (TASK-020, PRD §19).
+//! End-to-end search latency over the real schema.
 //!
 //! Unlike the fts5_search spike baseline (bare FTS table), this measures the
 //! full path: query parsing, FTS candidate retrieval over the migrated
@@ -110,6 +110,7 @@ fn build_db(n: usize) -> Connection {
             usage_count: rng.next() % 500,
             version: 1,
             deleted_at: None,
+            conflict_of: None,
         };
         // A sparse population of triggers, like real vaults.
         if i % 50 == 0 {

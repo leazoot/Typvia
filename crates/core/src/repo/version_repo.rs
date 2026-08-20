@@ -1,14 +1,27 @@
-//! Append-only snippet version history (PRD §12.16).
+//! Append-only snippet version history.
 //!
 //! Every entry captures a past title/body state. Restore writes forward:
 //! the restored state becomes a new snippet version and a new history entry,
-//! so no existing version is ever lost. Retention is "keep everything" until
-//! OQ-R5 is decided; `prune_versions` is the reserved cleanup interface.
+//! so no existing version is ever lost to a restore. Retention bounds
+//! history per snippet: at most [`VERSION_KEEP_MAX`]
+//! entries, and entries older than [`VERSION_MAX_AGE_MS`] are thinned down to
+//! the newest [`VERSION_KEEP_MIN`]. `apply_retention` runs in the same
+//! transaction as each version append.
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use super::RepoError;
 use crate::model::{SnippetContent, SnippetVersion, TimestampMs};
+
+/// Hard per-snippet cap on history entries.
+pub const VERSION_KEEP_MAX: u32 = 50;
+
+/// Entries older than the age cap are never thinned below this floor, so a
+/// long-untouched snippet keeps a usable recent history.
+pub const VERSION_KEEP_MIN: u32 = 10;
+
+/// Age cap for history entries (the design's "thinned (older than a year)").
+pub const VERSION_MAX_AGE_MS: i64 = 365 * 24 * 60 * 60 * 1000;
 
 /// Version-history repository over a single connection.
 pub struct VersionRepo<'c> {
@@ -101,7 +114,8 @@ impl<'c> VersionRepo<'c> {
     /// Restores an old version by writing it forward: the snippet's title,
     /// body, and version advance to `max(version) + 1`, and the restored
     /// state is appended as that new history entry. Existing entries are
-    /// untouched. Atomic.
+    /// untouched except by the retention pass, which runs in the
+    /// same transaction as every version append. Atomic.
     pub fn restore_version(
         &self,
         snippet_id: &str,
@@ -109,7 +123,14 @@ impl<'c> VersionRepo<'c> {
         new_entry_id: &str,
         restored_at: TimestampMs,
     ) -> Result<u32, RepoError> {
-        let tx = self.conn.unchecked_transaction()?;
+        // Joins a caller's transaction when one is open (the sync outbox
+        // hook wraps restores); otherwise runs in its own.
+        let own_tx = if self.conn.is_autocommit() {
+            Some(self.conn.unchecked_transaction()?)
+        } else {
+            None
+        };
+        let tx = self.conn;
         let old = self.get(snippet_id, version)?.ok_or(RepoError::NotFound)?;
         let next = self.latest_version(snippet_id)?.saturating_add(1);
 
@@ -148,13 +169,37 @@ impl<'c> VersionRepo<'c> {
                 restored_at
             ],
         )?;
-        tx.commit()?;
+        self.apply_retention(snippet_id, restored_at)?;
+        if let Some(own_tx) = own_tx {
+            own_tx.commit()?;
+        }
         Ok(next)
     }
 
-    /// Reserved cleanup interface (OQ-R5): deletes all but the newest
-    /// `keep_latest` entries of a snippet. Not called by any policy yet —
-    /// current behavior is keep-everything.
+    /// Applies the retention policy to one snippet's history: keeps
+    /// at most [`VERSION_KEEP_MAX`] entries, then removes entries older than
+    /// [`VERSION_MAX_AGE_MS`] while never going below the newest
+    /// [`VERSION_KEEP_MIN`]. Runs inside the caller's transaction (both
+    /// statements are bounded single deletes). Returns entries removed.
+    pub fn apply_retention(&self, snippet_id: &str, now: TimestampMs) -> Result<usize, RepoError> {
+        let over_cap = self.prune_versions(snippet_id, VERSION_KEEP_MAX)?;
+        let aged_out = self.conn.execute(
+            "DELETE FROM snippet_version
+             WHERE snippet_id = ?1 AND created_at < ?2 AND version <= (
+                 SELECT MAX(version) FROM snippet_version WHERE snippet_id = ?1
+             ) - ?3",
+            params![
+                snippet_id,
+                now.saturating_sub(VERSION_MAX_AGE_MS),
+                VERSION_KEEP_MIN
+            ],
+        )?;
+        Ok(over_cap + aged_out)
+    }
+
+    /// Deletes all but the newest `keep_latest` entries of a snippet. The
+    /// retention policy calls this via `apply_retention`; the vault convert
+    /// flow calls it directly to purge plaintext history.
     pub fn prune_versions(&self, snippet_id: &str, keep_latest: u32) -> Result<usize, RepoError> {
         let removed = self.conn.execute(
             "DELETE FROM snippet_version

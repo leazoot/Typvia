@@ -1,5 +1,5 @@
-//! Regex rules for the fixed-format PRD §12.10 patterns. The high-entropy
-//! detector lives in `entropy`; everything else is matched here.
+//! Regex rules for the fixed-format sensitive-content patterns. The
+//! high-entropy detector lives in `entropy`; everything else is matched here.
 
 use std::sync::LazyLock;
 
@@ -71,6 +71,42 @@ static PASSWORD_FIELD: LazyLock<Regex> =
 // `\b` does not delimit CJK, so the Chinese label gets its own pattern
 // (full-width and ASCII separators both occur in pasted notes).
 static PASSWORD_FIELD_CN: LazyLock<Regex> = LazyLock::new(|| compiled(r"密码\s*[::=]\s*\S+"));
+
+/// Byte ranges every pattern of `kind` matches in `text` (for masking).
+/// Kinds whose match needs two cooperating patterns (`DbConnectionString`
+/// key-value form) report only the credential-bearing part — the host half
+/// is not a secret.
+pub(crate) fn find_spans(kind: SensitiveKind, text: &str, spans: &mut Vec<(usize, usize)>) {
+    let mut push_all = |re: &Regex| {
+        spans.extend(re.find_iter(text).map(|m| (m.start(), m.end())));
+    };
+    match kind {
+        SensitiveKind::PemPrivateKey => push_all(&PEM_PRIVATE_KEY),
+        SensitiveKind::Jwt => push_all(&JWT),
+        SensitiveKind::BearerToken => push_all(&BEARER_TOKEN),
+        SensitiveKind::AwsAccessKey => push_all(&AWS_ACCESS_KEY),
+        SensitiveKind::GithubToken => push_all(&GITHUB_TOKEN),
+        SensitiveKind::ApiKey => {
+            push_all(&API_KEY_PREFIXED);
+            push_all(&API_KEY_ASSIGNMENT);
+        }
+        SensitiveKind::DbConnectionString => {
+            push_all(&DB_URL_WITH_CREDENTIALS);
+            if DB_KV_HOST.is_match(text) {
+                push_all(&DB_KV_PASSWORD);
+            }
+        }
+        SensitiveKind::Cookie => {
+            push_all(&COOKIE_HEADER);
+            push_all(&COOKIE_SESSION_PAIR);
+        }
+        SensitiveKind::PasswordField => {
+            push_all(&PASSWORD_FIELD);
+            push_all(&PASSWORD_FIELD_CN);
+        }
+        SensitiveKind::HighEntropyString => {}
+    }
+}
 
 pub(crate) fn matches(kind: SensitiveKind, text: &str) -> bool {
     match kind {

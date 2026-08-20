@@ -1,0 +1,25 @@
+[package]
+name = "typvia-semantic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local semantic-search kernel: int8 vector scan and the embedder abstraction"
+
+[lints]
+workspace = true
+
+[dependencies]
+# BERT-family local inference for the e5 embedder backend: a pure Rust
+# runtime, so there are no per-platform C++ dynamic libraries to distribute.
+# Hugging Face-maintained, Apache-2.0.
+candle-core = "0.9"
+candle-nn = "0.9"
+candle-transformers = "0.9"
+# Loads the model's tokenizer.json (same ecosystem, Apache-2.0).
+tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
+# Parses the model's config.json; already in the tree.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

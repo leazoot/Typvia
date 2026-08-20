@@ -119,8 +119,8 @@ fn row_to_source(row: &Row<'_>) -> rusqlite::Result<SourceRow> {
 }
 
 fn insert_fts_row(conn: &Connection, row: &SourceRow) -> Result<(), SearchError> {
-    // Sensitive snippets contribute only title, tags and description
-    // (docs/PRD.md §12.2); all other columns stay empty for them.
+    // Sensitive snippets contribute only title, tags and description;
+    // all other columns stay empty for them.
     let (content, folder_name, trigger, language) = if row.is_sensitive {
         (None, None, None, None)
     } else {

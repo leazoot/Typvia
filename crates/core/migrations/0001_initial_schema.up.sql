@@ -1,4 +1,4 @@
--- Initial schema covering every PRD §15 persisted entity.
+-- Initial schema covering every persisted entity.
 -- KeyboardSnapshot is an exported JSON document, not a table.
 
 CREATE TABLE folder (
@@ -124,9 +124,9 @@ CREATE TABLE ai_action (
     updated_at INTEGER NOT NULL
 );
 
--- Full-text index over snippet search fields (FR-2). Sensitive snippets
+-- Full-text index over snippet search fields. Sensitive snippets
 -- contribute title/tags/description only; population and the red-line tests
--- guarding it belong to the search crate (TASK-019/021).
+-- guarding it belong to the search crate.
 CREATE VIRTUAL TABLE snippet_fts USING fts5(
     snippet_id UNINDEXED,
     title,

@@ -1,4 +1,4 @@
-//! Argon2id master-password derivation (docs/06_SECURITY_MODEL.md §3.1).
+//! Argon2id master-password derivation.
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::OsRng;
@@ -14,8 +14,8 @@ const V1_M_COST_KIB: u32 = 64 * 1024;
 const V1_T_COST: u32 = 3;
 const V1_P_COST: u32 = 1;
 
-/// Versioned Argon2id parameters, persisted alongside the key header
-/// (§5.3) so old headers keep verifying after future tuning.
+/// Versioned Argon2id parameters, persisted alongside the key header so
+/// old headers keep verifying after future tuning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KdfParams {
     pub version: u8,

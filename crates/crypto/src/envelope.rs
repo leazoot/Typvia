@@ -1,11 +1,11 @@
-//! The versioned ciphertext envelope (docs/06_SECURITY_MODEL.md §5.2):
+//! The versioned ciphertext envelope:
 //!
 //! ```text
 //! version(1B, =0x01) || key_id(4B LE) || nonce(24B) || AEAD(ct || tag)
 //! ```
 //!
 //! Every seal draws a fresh 24-byte nonce from the OS CSPRNG — nonces are
-//! never reused or derived (§5.1 red line). The AAD binds a ciphertext to
+//! never reused or derived. The AAD binds a ciphertext to
 //! its purpose and record id, so envelopes cannot be swapped.
 
 use chacha20poly1305::aead::{Aead, OsRng, Payload};
@@ -25,7 +25,7 @@ const HEADER_LEN: usize = 1 + KEY_ID_LEN + NONCE_LEN;
 const MIN_ENVELOPE_LEN: usize = HEADER_LEN + TAG_LEN;
 
 /// Encrypts `plaintext` under `key`, stamping the envelope with `key_id`
-/// (which key generation can open it; rotation, §4.1) and binding it to
+/// (which key generation can open it, for rotation) and binding it to
 /// `aad`.
 pub fn seal(
     key: &SymmetricKey,

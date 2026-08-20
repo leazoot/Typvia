@@ -1,4 +1,4 @@
-// SPIKE (TASK-007): macOS text injection validation.
+// SPIKE: macOS text injection validation.
 //
 // Path A (clipboard): save current clipboard -> write payload -> verify ->
 // restore original clipboard, with latency numbers.

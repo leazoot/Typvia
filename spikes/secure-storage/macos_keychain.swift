@@ -1,4 +1,4 @@
-// SPIKE (TASK-013): macOS Keychain store/retrieve round trip plus biometric
+// SPIKE: macOS Keychain store/retrieve round trip plus biometric
 // availability probe. Key material is an obvious fake — never real secrets.
 
 import Foundation

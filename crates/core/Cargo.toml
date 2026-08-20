@@ -8,16 +8,35 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-# SQLite access library fixed by DEC-005 (bundled build, FTS5 included).
+# SQLite access library for the crate (bundled build, FTS5 included).
 rusqlite = { version = "0.38", features = ["bundled"] }
-# KeyboardSnapshot is a versioned JSON document (DEC-007 #4); serde is the
+# KeyboardSnapshot is a versioned JSON document; serde is the
 # maintained standard for that boundary (MIT/Apache-2.0, MPL-2.0 compatible).
 serde = { version = "1", features = ["derive"] }
 # JSON codec for the snapshot document and JSON TEXT columns
-# (platform_scope, options; docs/05_DATA_MODEL.md §5.5).
+# (platform_scope, options).
 serde_json = "1"
-# UUID v4 text primary keys (docs/05_DATA_MODEL.md §5.3); uses OS CSPRNG.
+# UUID v4 text primary keys; uses OS CSPRNG.
 uuid = { version = "1", features = ["v4"] }
-# Offline sensitive-pattern detection (PRD §12.10) needs real pattern
+# Offline sensitive-pattern detection needs real pattern
 # matching; rust-lang maintained, MIT/Apache-2.0, no equivalent in the tree.
 regex = "1"
+# Generic CSV import parses foreign, possibly malicious files;
+# RFC 4180 quoting/escapes/embedded newlines belong to the maintained
+# standard parser, not a hand-rolled state machine (Unlicense/MIT,
+# MPL-2.0 compatible; no CSV capability exists in the tree).
+csv = "1"
+# Encrypted backup files carry ciphertext inside a JSON document;
+# base64 is the standard text encoding for those bytes. Already in the
+# dependency tree transitively; RustCrypto-adjacent maintained crate
+# (MIT/Apache-2.0).
+base64 = "0.22"
+# Vault key-header persistence stores the KDF parameters that
+# crypto owns; core -> crypto is the allowed dependency direction.
+# No crypto is performed in core.
+typvia-crypto = { path = "../crypto" }
+# The vault decrypt path returns decrypted snippet content wrapped in
+# `zeroize::Zeroizing` so the plaintext is wiped on drop, keeping the
+# plaintext lifetime minimal. Named in the public `VaultSession` API, so it
+# is a normal dependency. Already in the tree via crates/crypto.
+zeroize = "1"

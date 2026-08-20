@@ -1,12 +1,15 @@
 //! Recycle bin (soft delete, 30-day cleanup, restore) and append-only
-//! version history including forward-writing restore (PRD §12.16).
+//! version history including forward-writing restore.
 
 #![allow(clippy::unwrap_used)]
 
 use rusqlite::Connection;
 use typvia_core::db::{migrate_to_latest, open_in_memory};
 use typvia_core::model::{SecurityLevel, Snippet, SnippetContent, SnippetType, SnippetVersion};
-use typvia_core::repo::{RepoError, SnippetRepo, TRASH_RETENTION_MS, VersionRepo, new_id};
+use typvia_core::repo::{
+    RepoError, SnippetRepo, TRASH_RETENTION_MS, VERSION_KEEP_MAX, VERSION_MAX_AGE_MS, VersionRepo,
+    new_id,
+};
 
 fn fresh_db() -> Connection {
     let mut conn = open_in_memory().unwrap();
@@ -37,6 +40,7 @@ fn snippet(title: &str, body: &str) -> Snippet {
         usage_count: 0,
         version: 1,
         deleted_at: None,
+        conflict_of: None,
     }
 }
 
@@ -282,4 +286,136 @@ fn prune_versions_keeps_only_the_newest_entries() {
         .map(|v| v.version)
         .collect();
     assert_eq!(remaining, vec![5, 4]);
+}
+
+#[test]
+fn retention_caps_history_at_the_version_count_limit() {
+    let conn = fresh_db();
+    let snippets = SnippetRepo::new(&conn);
+    let versions = VersionRepo::new(&conn);
+    let s = snippet("Busy", "body");
+    snippets.insert(&s).unwrap();
+    let total = VERSION_KEEP_MAX + 5;
+    for v in 1..=total {
+        versions
+            .append(&version_of(&s, v, &format!("v{v}"), i64::from(v)))
+            .unwrap();
+    }
+
+    let removed = versions.apply_retention(&s.id, i64::from(total)).unwrap();
+
+    assert_eq!(removed, 5);
+    let history = versions.list(&s.id, 100, 0).unwrap();
+    assert_eq!(history.len(), VERSION_KEEP_MAX as usize);
+    assert_eq!(history[0].version, total, "newest entry kept");
+    assert_eq!(
+        history.last().unwrap().version,
+        total - VERSION_KEEP_MAX + 1,
+        "oldest surviving entry is exactly at the cap boundary"
+    );
+}
+
+#[test]
+fn restore_applies_the_retention_policy_in_the_same_transaction() {
+    let conn = fresh_db();
+    let snippets = SnippetRepo::new(&conn);
+    let versions = VersionRepo::new(&conn);
+    let s = snippet("Busy", "body");
+    snippets.insert(&s).unwrap();
+    for v in 1..=VERSION_KEEP_MAX {
+        versions
+            .append(&version_of(&s, v, &format!("v{v}"), i64::from(v)))
+            .unwrap();
+    }
+
+    // A restore appends one entry, so the count cap must hold afterwards.
+    let new_version = versions
+        .restore_version(&s.id, 2, &new_id(), i64::from(VERSION_KEEP_MAX) + 1)
+        .unwrap();
+
+    assert_eq!(new_version, VERSION_KEEP_MAX + 1);
+    let history = versions.list(&s.id, 100, 0).unwrap();
+    assert_eq!(history.len(), VERSION_KEEP_MAX as usize);
+    assert_eq!(history[0].version, new_version);
+    assert_eq!(
+        history[0].content,
+        SnippetContent::Plaintext("v2".to_string())
+    );
+}
+
+#[test]
+fn retention_thins_entries_older_than_a_year_down_to_the_floor() {
+    let conn = fresh_db();
+    let snippets = SnippetRepo::new(&conn);
+    let versions = VersionRepo::new(&conn);
+    let s = snippet("Aged", "body");
+    snippets.insert(&s).unwrap();
+    // 20 entries, all written far in the past (older than the age cap).
+    for v in 1..=20 {
+        versions
+            .append(&version_of(&s, v, &format!("v{v}"), i64::from(v)))
+            .unwrap();
+    }
+
+    let now = VERSION_MAX_AGE_MS + 1_000_000;
+    let removed = versions.apply_retention(&s.id, now).unwrap();
+
+    assert_eq!(removed, 10, "aged entries removed down to the floor");
+    let remaining: Vec<u32> = versions
+        .list(&s.id, 100, 0)
+        .unwrap()
+        .iter()
+        .map(|v| v.version)
+        .collect();
+    assert_eq!(
+        remaining,
+        (11..=20).rev().collect::<Vec<u32>>(),
+        "the newest VERSION_KEEP_MIN entries survive the age cap"
+    );
+}
+
+#[test]
+fn retention_leaves_recent_history_under_the_cap_untouched() {
+    let conn = fresh_db();
+    let snippets = SnippetRepo::new(&conn);
+    let versions = VersionRepo::new(&conn);
+    let s = snippet("Fresh", "body");
+    snippets.insert(&s).unwrap();
+    for v in 1..=3 {
+        versions
+            .append(&version_of(&s, v, &format!("v{v}"), 1_000 + i64::from(v)))
+            .unwrap();
+    }
+
+    let removed = versions.apply_retention(&s.id, 10_000).unwrap();
+
+    assert_eq!(removed, 0);
+    assert_eq!(versions.list(&s.id, 10, 0).unwrap().len(), 3);
+}
+
+#[test]
+fn history_listing_pages_newest_first_with_limit_and_offset() {
+    let conn = fresh_db();
+    let snippets = SnippetRepo::new(&conn);
+    let versions = VersionRepo::new(&conn);
+    let s = snippet("Paged", "body");
+    snippets.insert(&s).unwrap();
+    for v in 1..=7 {
+        versions
+            .append(&version_of(&s, v, &format!("v{v}"), i64::from(v) * 100))
+            .unwrap();
+    }
+
+    let page = |limit, offset| -> Vec<u32> {
+        versions
+            .list(&s.id, limit, offset)
+            .unwrap()
+            .iter()
+            .map(|v| v.version)
+            .collect()
+    };
+    assert_eq!(page(3, 0), vec![7, 6, 5]);
+    assert_eq!(page(3, 3), vec![4, 3, 2]);
+    assert_eq!(page(3, 6), vec![1], "last page is short, not padded");
+    assert_eq!(page(3, 7), Vec::<u32>::new(), "past the end is empty");
 }

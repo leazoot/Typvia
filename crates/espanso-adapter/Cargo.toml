@@ -4,5 +4,28 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[dependencies]
+# Snippet model is the compiler input. Dependency direction espanso-adapter →
+# core is the architecture-mandated one; this is a code-level dependency on
+# Typvia's own crate, not on espanso, so the GPL isolation stays intact.
+typvia-core = { path = "../core" }
+# YAML parser for importing the user's existing Espanso match files.
+# yaml-rust2 is the maintained successor to yaml-rust (serde_yaml is archived);
+# pure Rust, MIT/Apache-2.0. Used only to read foreign match files — Typvia's
+# own config is emitted by our own writer, not serialized through a library.
+yaml-rust2 = "0.10"
+
+# Engine lifecycle: kill(2) for terminating the managed daemon and
+# probing pid liveness — std::process::Child cannot signal a pid recorded by a
+# previous (crashed) run. Unix only; MIT/Apache-2.0; already in the tree
+# transitively (rusqlite, tauri).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+# Isolated temp directories for the atomic-write tests. Maintained,
+# MIT/Apache-2.0, compatible with MPL-2.0.
+tempfile = "3"
+
 [lints]
 workspace = true

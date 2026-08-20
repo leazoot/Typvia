@@ -1,4 +1,4 @@
--- PRD §12.2 lists code language among the searchable fields; the initial FTS
+-- Code language is one of the searchable fields, but the initial FTS
 -- table missed that column. FTS5 virtual tables cannot be ALTERed, so the
 -- table is recreated. No data is lost: index population first ships with the
 -- search crate at this same schema version, so the table is empty before it.

@@ -3,7 +3,7 @@
 //!
 //! Red line: sensitive snippets contribute only title, tags and description
 //! to the index — never body, and the ciphertext column is never even read
-//! here (docs/PRD.md §12.2, .claude/rules/database.md).
+//! here.
 
 mod error;
 mod index;

@@ -1,6 +1,6 @@
-//! Index consistency after snippet CRUD (TASK-019 acceptance): every
-//! searchable field is matchable, updates/deletes/trash keep the index in
-//! step, CJK substrings match, and rebuild restores the whole index.
+//! Index consistency after snippet CRUD: every searchable field is
+//! matchable, updates/deletes/trash keep the index in step, CJK substrings
+//! match, and rebuild restores the whole index.
 
 #![allow(clippy::unwrap_used)]
 
@@ -44,6 +44,7 @@ fn snippet(title: &str, body: &str) -> Snippet {
         usage_count: 0,
         version: 1,
         deleted_at: None,
+        conflict_of: None,
     }
 }
 
@@ -274,10 +275,10 @@ fn rebuild_reindexes_live_rows_and_drops_stale_entries() {
     assert!(matches(&conn, "Trashedone").is_empty());
 }
 
-/// Rebuild timing at the 50k target scale (PRD §19 dataset size). Run
-/// manually: `cargo test -p typvia-search --release -- --ignored --nocapture`.
+/// Rebuild timing at the 50k target dataset scale. Run manually:
+/// `cargo test -p typvia-search --release -- --ignored --nocapture`.
 #[test]
-#[ignore = "timing measurement, run manually; number recorded in docs/12_PROGRESS.md"]
+#[ignore = "timing measurement, run manually"]
 fn rebuild_50k_snippets_timing() {
     let conn = fresh_db();
     let snippets = SnippetRepo::new(&conn);

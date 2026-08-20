@@ -1,4 +1,4 @@
-// SPIKE (TASK-010): Kotlin calling Rust over both FFI paths.
+// SPIKE: Kotlin calling Rust over both FFI paths.
 
 import com.sun.jna.Library
 import com.sun.jna.Native

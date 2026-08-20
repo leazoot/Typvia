@@ -7,8 +7,8 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq)]
 pub enum CryptoError {
     /// Authentication failed: wrong key, mismatched AAD, or tampered
-    /// ciphertext. Deliberately not distinguished further (§12: unlock
-    /// errors must not leak which part was wrong).
+    /// ciphertext. Deliberately not distinguished further: unlock errors
+    /// must not leak which part was wrong.
     DecryptionFailed,
     /// The envelope is structurally invalid (too short, malformed).
     InvalidEnvelope,

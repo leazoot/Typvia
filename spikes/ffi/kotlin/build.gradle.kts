@@ -1,6 +1,6 @@
-// SPIKE (TASK-010): Kotlin/JVM harness for the UniFFI + JNA binding path.
+// SPIKE: Kotlin/JVM harness for the UniFFI + JNA binding path.
 // JVM stands in for Android here — the generated Kotlin binding is identical;
-// the Android-target .so cross-build was already proven by TASK-009.
+// the Android-target .so cross-build was already proven separately.
 plugins {
     kotlin("jvm") version "2.1.20"
     application

@@ -1,10 +1,10 @@
-//! The `SyncRecord` entity (PRD §15.8).
+//! The `SyncRecord` entity.
 
 use super::enums::SyncEntityType;
 use super::validation::ValidationError;
 use super::{DeviceId, SyncRecordId, TimestampMs};
 
-/// One encrypted change-set entry exchanged with the sync server (PRD §15.8).
+/// One encrypted change-set entry exchanged with the sync server.
 ///
 /// The server stores these blind: `ciphertext` is opaque and deletions are
 /// tombstones (`deleted_at` set) so removal itself can replicate.

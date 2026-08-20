@@ -1,9 +1,9 @@
-//! Organizational entities: `Folder`, `Tag`, `SnippetTag` (PRD §15.3–§15.5).
+//! Organizational entities: `Folder`, `Tag`, `SnippetTag`.
 
 use super::validation::{ValidationError, require_non_blank};
 use super::{FolderId, SnippetId, TagId, TimestampMs};
 
-/// A folder in the snippet tree; folders nest via `parent_id` (PRD §15.3).
+/// A folder in the snippet tree; folders nest via `parent_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Folder {
     pub id: FolderId,
@@ -31,7 +31,7 @@ impl Folder {
     }
 }
 
-/// A flat label attachable to snippets (PRD §15.4).
+/// A flat label attachable to snippets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tag {
     pub id: TagId,
@@ -46,7 +46,7 @@ impl Tag {
     }
 }
 
-/// Snippet-to-tag association (PRD §15.5); the pair is the identity.
+/// Snippet-to-tag association; the pair is the identity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SnippetTag {
     pub snippet_id: SnippetId,

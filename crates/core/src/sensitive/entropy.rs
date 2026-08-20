@@ -28,6 +28,27 @@ pub(crate) fn contains_high_entropy_token(text: &str) -> bool {
         .any(is_high_entropy_token)
 }
 
+/// Byte ranges of every high-entropy token in `text` (for masking).
+pub(crate) fn high_entropy_spans(text: &str) -> Vec<(usize, usize)> {
+    let mut spans = Vec::new();
+    let mut start: Option<usize> = None;
+    for (idx, c) in text.char_indices() {
+        if is_token_char(c) {
+            start.get_or_insert(idx);
+        } else if let Some(s) = start.take()
+            && is_high_entropy_token(&text[s..idx])
+        {
+            spans.push((s, idx));
+        }
+    }
+    if let Some(s) = start
+        && is_high_entropy_token(&text[s..])
+    {
+        spans.push((s, text.len()));
+    }
+    spans
+}
+
 fn is_token_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '=' | '_' | '-')
 }

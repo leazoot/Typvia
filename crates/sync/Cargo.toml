@@ -6,3 +6,51 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Device identity primitives fixed by the security model: Ed25519
+# signing/identity via ed25519-dalek, X25519 pairing
+# exchange via x25519-dalek — the dalek family is actively maintained and
+# BSD-3-Clause licensed (MPL-2.0 compatible); no signing capability exists
+# in the tree. `rand_core` enables OsRng key generation, `zeroize` wipes
+# secret material on drop.
+ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
+x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+# SHA-256 for the device fingerprint; RustCrypto, already in the
+# dependency tree transitively.
+sha2 = "0.10"
+# OS CSPRNG handle: keys come only from OsRng.
+rand_core = { version = "0.6", features = ["getrandom"] }
+zeroize = "1"
+# Change-set payload documents are JSON; serde/serde_json are the
+# tree-wide standard for that boundary (already
+# used by core and mobile-ffi). Used here only to validate document syntax
+# and `payload_version` without retaining decrypted content.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Device rows and the repo layer; sync → core is the fixed dependency
+# direction between crates.
+typvia-core = { path = "../core" }
+# SecureStore trait for private-key persistence (crypto is below core in
+# the dependency order, so this stays within the fixed direction).
+typvia-crypto = { path = "../crypto" }
+# The local-device use case runs against the core-owned SQLite connection
+# type; version pinned to core's.
+rusqlite = "0.38"
+# HTTP client for the SyncTransport v1 implementation. Chosen over
+# reqwest/hyper because the core sync model is synchronous and ureq is a
+# small, maintained, blocking client (MIT/Apache-2.0, MPL-2.0 compatible)
+# with rustls verification that this crate never exposes a way to
+# disable.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+# Byte fields of the server JSON wire format are base64 (Go []byte JSON
+# convention); base64 is already in the tree via core.
+base64 = "0.22"
+# Pairing key exchange derivation: HKDF-SHA-256 is the derivation fixed by
+# the security model (hkdf + sha2, RustCrypto family, MIT/Apache-2.0); no
+# existing dependency provides HKDF.
+hkdf = "0.12"
+# The sealed key bundle is `eph_pub || nonce || AEAD(ct)` — not the record
+# envelope — so the AEAD is used directly here. Same RustCrypto crate
+# and version the crypto crate already pins (no new capability in the tree).
+chacha20poly1305 = "0.10"

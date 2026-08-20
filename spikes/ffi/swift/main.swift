@@ -1,4 +1,4 @@
-// SPIKE (TASK-010): Swift calling Rust over both FFI paths.
+// SPIKE: Swift calling Rust over both FFI paths.
 
 let json = #"{"snippets":[{"title":"Standup notes"},{"title":"SQL header"}]}"#
 

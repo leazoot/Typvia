@@ -2,7 +2,7 @@
 // so the no-expect rule for runtime paths does not apply here.
 #![allow(clippy::expect_used)]
 
-//! FTS5 search performance baseline (TASK-006, PRD §19).
+//! FTS5 search performance baseline.
 //!
 //! Targets: query latency < 50ms at 10k snippets, < 150ms at 50k snippets.
 //! The dataset is synthetic but deterministic, mixing English prose, code-like

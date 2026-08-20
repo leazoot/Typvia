@@ -1,0 +1,36 @@
+[package]
+name = "typvia-mobile-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "typvia_mobile_ffi"
+# staticlib links into the iOS keyboard extension; cdylib feeds library-mode
+# bindgen on the host; rlib keeps `cargo test` working.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+# The bindgen CLI (clap et al.) compiles only when bindings are generated
+# (`--features uniffi/cli`); iOS library builds stay free of it.
+required-features = ["uniffi/cli"]
+
+[lints]
+workspace = true
+
+[dependencies]
+# Snapshot read model and validation come from core (mobile-ffi → core is the
+# allowed dependency direction; core stays platform-free).
+typvia-core = { path = "../core" }
+# Keyboard template fill: variable extraction and substitution
+# stay single-sourced in the shared template engine (mobile-ffi sits beside
+# host-service as an adapter layer over core + template).
+typvia-template = { path = "../template" }
+# Snapshot documents are versioned JSON; same codec core uses.
+serde_json = "1"
+# The FFI layer: typed Swift/Kotlin bindings via proc-macro export +
+# library-mode bindgen, no UDL. Mozilla-maintained and MPL-2.0 (same license
+# as this project).
+uniffi = "0.30"

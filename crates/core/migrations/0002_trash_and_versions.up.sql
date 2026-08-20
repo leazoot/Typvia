@@ -1,4 +1,4 @@
--- Recycle bin (soft delete) and snippet version history (PRD §12.16).
+-- Recycle bin (soft delete) and snippet version history.
 
 -- Soft-delete marker; NULL = live, set = in the recycle bin.
 ALTER TABLE snippet ADD COLUMN deleted_at INTEGER;

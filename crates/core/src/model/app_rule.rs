@@ -1,12 +1,12 @@
-//! The `AppRule` entity (PRD §15.6, behaviors from §12.14).
+//! The `AppRule` entity.
 
 use super::enums::{AppRuleType, Platform};
 use super::validation::{ValidationError, require_non_blank};
 use super::{AppRuleId, SnippetId};
 
-/// A per-snippet application rule for desktop platforms (PRD §15.6).
+/// A per-snippet application rule for desktop platforms.
 ///
-/// Mobile v1.0 does no app-level matching (FR-14); rules therefore target
+/// Mobile v1.0 does no app-level matching; rules therefore target
 /// desktop platforms, but the model does not restrict `platform` so future
 /// scope changes stay a data change.
 #[derive(Debug, Clone, PartialEq, Eq)]

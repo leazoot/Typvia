@@ -1,4 +1,4 @@
-//! Sensitive index isolation red line (TASK-021, regression-mandatory).
+//! Sensitive index isolation red line (regression-mandatory).
 //!
 //! Proves at the byte level that a sensitive snippet's body never reaches
 //! FTS storage: the plaintext feature string is unmatchable through FTS,
@@ -21,8 +21,8 @@ use typvia_search::{SearchIndex, Searcher};
 /// these tests: what lands in the database is [`fake_ciphertext`] bytes.
 const SECRET_MARKER: &str = "XKCD9931_FAKE_SECRET_FEATURE";
 
-/// Stands in for real encryption (crypto arrives with TASK-024): flips the
-/// bits so the stored bytes share no substring with the plaintext.
+/// Stands in for real encryption: flips the bits so the stored bytes share
+/// no substring with the plaintext.
 fn fake_ciphertext(plaintext: &str) -> Vec<u8> {
     plaintext.bytes().map(|b| b ^ 0xFF).collect()
 }
@@ -121,6 +121,7 @@ fn sensitive_snippet(title: &str, body_plaintext: &str) -> Snippet {
         usage_count: 0,
         version: 1,
         deleted_at: None,
+        conflict_of: None,
     }
 }
 

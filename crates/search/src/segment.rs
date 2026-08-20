@@ -39,7 +39,7 @@ pub fn index_text(text: &str) -> String {
 
 /// Builds one FTS5 phrase token for a user query term: the term is quoted so
 /// FTS5 operators inside user input stay literal, and CJK runs are split the
-/// same way as at index time. The query parser (TASK-020) composes these.
+/// same way as at index time. The query parser composes these.
 pub fn query_phrase(term: &str) -> String {
     let escaped = index_text(term).replace('"', "\"\"");
     format!("\"{escaped}\"")

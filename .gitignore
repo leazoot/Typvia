@@ -10,6 +10,9 @@ dist/
 # Environment and local overrides
 .env
 .env.*
+!.env.example
+!*/.env.example
+!**/.env.example
 *.local
 
 # OS
@@ -18,27 +21,46 @@ Thumbs.db
 
 # Editors
 .idea/
+.vscode/
 *.swp
 
 # Local reference clone of Espanso (GPL-3.0). It must never be committed:
-# Typvia is MPL-2.0 and keeps Espanso at arm's length (docs/11_DECISIONS.md DEC-001).
+# Typvia is MPL-2.0 and keeps Espanso at arm's length.
 /espanso/
 
-# Tauri generated artifacts
+# Tauri generated artifacts. The formal mobile app's generated Xcode project
+# is tracked (un-ignored below): it carries signing, entitlements, App Group
+# and extension-target configuration that cannot be regenerated. Its build
+# products stay ignored.
 **/src-tauri/gen/
+!apps/mobile/src-tauri/gen/
+apps/mobile/src-tauri/gen/apple/build/
+apps/mobile/src-tauri/gen/apple/DerivedData/
+apps/mobile/src-tauri/gen/apple/Externals/
+apps/mobile/src-tauri/gen/apple/*.xcodeproj/xcuserdata/
+# Android Gradle project sources are tracked; build products and the
+# machine-local SDK path stay out (gen/android also ships nested .gitignore
+# files covering the CLI-regenerated tauri.* build inputs).
+apps/mobile/src-tauri/gen/android/.gradle/
+apps/mobile/src-tauri/gen/android/build/
+apps/mobile/src-tauri/gen/android/app/build/
+apps/mobile/src-tauri/gen/android/buildSrc/build/
+apps/mobile/src-tauri/gen/android/local.properties
 
-# FFI spike (TASK-010) build products and regenerable bindings
+# FFI spike build products and regenerable bindings
 spikes/ffi/kotlin/.gradle/
 spikes/ffi/kotlin/build/
 spikes/ffi/*/generated/
 spikes/ffi/swift/ffi-spike-swift
 
-# iOS keyboard spike (TASK-011) generated project and build products
+# iOS keyboard spike generated project and build products
 native/ios-keyboard/TypviaKbSpike.xcodeproj/
 native/ios-keyboard/build/
 
-# Android IME spike (TASK-012) build products and local SDK path
-native/android-ime/.gradle/
-native/android-ime/app/build/
-native/android-ime/local.properties
-native/android-ime/build/
+# Native module build products. Gradle writes absolute host paths into its
+# merger and manifest reports, so these must never reach the repository.
+native/*/.gradle/
+native/*/build/
+
+apps/desktop/src-tauri/binaries/
+vendor/

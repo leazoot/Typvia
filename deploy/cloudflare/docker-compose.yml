@@ -1,0 +1,32 @@
+# Typvia sync server behind a Cloudflare Tunnel.
+# The server listens on the compose-internal network only — no host port is
+# published; cloudflared is the sole way in, and Cloudflare's edge
+# terminates TLS. See guide.md for the tunnel setup steps.
+services:
+  typvia-sync:
+    build:
+      context: ../..
+      dockerfile: deploy/cloudflare/Dockerfile
+    restart: unless-stopped
+    environment:
+      TYPVIA_SYNC_LISTEN: 0.0.0.0:8787
+      TYPVIA_SYNC_DB: /data/typvia-sync.db
+    volumes:
+      - sync-data:/data
+    networks: [tunnel]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      # Set in .env (never commit a real token): TUNNEL_TOKEN=...
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+    networks: [tunnel]
+    depends_on: [typvia-sync]
+
+volumes:
+  sync-data:
+
+networks:
+  tunnel:

@@ -1,0 +1,22 @@
+# Typvia sync server from a published image — the file a deployment host needs.
+#
+# Nothing else is required on that host: no source tree, no Go, no build. Pull
+# this one file, set TYPVIA_IMAGE, start. Upgrades are `pull` + `up -d`.
+#
+# Bound to loopback on purpose. Typvia clients accept https, or http only on a
+# loopback address, and never skip certificate verification — so reach it
+# either through a TLS reverse proxy on this host, or through a Cloudflare
+# Tunnel (see ../cloudflare/guide.md), never by binding this to 0.0.0.0.
+name: typvia-sync
+
+services:
+  typvia-sync:
+    image: ${TYPVIA_IMAGE:?set TYPVIA_IMAGE, e.g. ghcr.io/<owner>/typvia-sync:latest}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8787:8787'
+    volumes:
+      - sync-data:/data
+
+volumes:
+  sync-data:

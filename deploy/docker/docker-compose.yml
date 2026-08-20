@@ -1,0 +1,25 @@
+# Typvia sync server, standalone — the shortest path to a running server.
+#
+# Same image as deploy/cloudflare/ (one Dockerfile, no second copy): static
+# build, distroless, non-root, ciphertext and metadata only.
+#
+# Bound to loopback on purpose. Typvia clients accept https, or http only on a
+# loopback address, and never skip certificate verification — so this form is
+# for trying it out on this machine, or for a host where you terminate TLS in
+# your own reverse proxy. To reach it from another device without opening a
+# port at all, use deploy/cloudflare/ instead.
+name: typvia-sync
+
+services:
+  typvia-sync:
+    build:
+      context: ../..
+      dockerfile: deploy/cloudflare/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8787:8787'
+    volumes:
+      - sync-data:/data
+
+volumes:
+  sync-data:

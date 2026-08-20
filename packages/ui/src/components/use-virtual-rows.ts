@@ -23,7 +23,7 @@ interface VirtualRows {
 /**
  * Fixed-height list windowing. Rows are 52px by design contract precisely so
  * the Library virtualises to 50k items with plain arithmetic — no dynamic
- * measurement, hence no virtual-list dependency (DEC-011). Rendered rows are
+ * measurement, hence no virtual-list dependency. Rendered rows are
  * absolutely positioned at `index * rowHeight` inside a spacer of
  * `totalHeight`.
  */

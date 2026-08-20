@@ -1,8 +1,8 @@
 /**
  * Top-level application routes shared by the router and navigation.
  *
- * Labels are the bilingual pairs from the design handoff (EN main label,
- * CN subtitle — design rule "双语文案"); paths are app-internal.
+ * Each route carries its English and Chinese wording so the active locale can
+ * be rendered on its own; paths are app-internal.
  */
 export interface AppRoute {
   readonly path: string;

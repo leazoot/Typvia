@@ -11,29 +11,67 @@ description = "Typvia desktop application shell (Tauri host)"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# Application shell frozen by DEC-007 (tauri 2.x): window management and the
-# IPC host the frontend talks to. No optional features until a task needs one.
-tauri = { version = "2", features = [] }
+# Application shell (tauri 2.x): window management and the IPC host the
+# frontend talks to. macos-private-api: a transparent WKWebView background —
+# needed for the panel's rounded card, e3 shadow and scrim — requires the
+# private setBackgroundColor API per Tauri's docs; noted caveat: private API
+# use is not App Store eligible, which is accepted because distribution is a
+# direct .dmg.
+tauri = { version = "2", features = ["macos-private-api"] }
 # IPC DTO (de)serialization at the WebView boundary; already in the tree.
 serde = { version = "1", features = ["derive"] }
 # The Rust core this host exposes over IPC (commands parse, call, map errors).
 typvia-core = { path = "../../../crates/core" }
-# Same version/features as core (DEC-005): the host owns the Connection it
+# Same version/features as core: the host owns the Connection it
 # hands to repositories, so it needs the type itself.
 rusqlite = { version = "0.38", features = ["bundled"] }
 # Search index maintenance + queries; composed here because the dependency
 # direction is search -> core, so only the host can wire writes to the index.
 typvia-search = { path = "../../../crates/search" }
-# Wipes injection plaintext buffers after use (PRD §12.9.2 "注入后清理临时内存");
-# already in the tree via crates/crypto.
+# Wipes injection plaintext buffers after use; already in the tree via
+# crates/crypto.
 zeroize = "1"
-# Registers the global summon shortcut ⌘⇧V for the command panel (PRD §12.3).
+# Registers the global summon shortcut ⌘⇧V for the command panel.
 # Official Tauri plugin, MIT/Apache-2.0; no third-party hotkey stack needed.
 tauri-plugin-global-shortcut = "2"
+# Espanso integration: detection/status and config compilation. The host owns
+# the CLI process boundary and wires the compiler to the snippet store (GPL
+# isolation: separate process + config file only, no espanso linkage).
+typvia-espanso-adapter = { path = "../../../crates/espanso-adapter" }
+# Template parsing/rendering and authoring preview. Business logic
+# stays in Rust; the Builder calls variables/preview/save via the host.
+typvia-template = { path = "../../../crates/template" }
+# The SecureStore trait: the host implements the macOS Keychain backend for
+# it. Trait + error types only; the
+# unlock state machine lives in core (which re-exports the trait).
+typvia-crypto = { path = "../../../crates/crypto" }
+# Shared desktop/mobile IPC orchestration layer: the use cases, wire
+# DTOs and stable error codes this host exposes over IPC.
+typvia-host-service = { path = "../../../crates/host-service" }
+# E2EE sync client. host-service must not depend on it, so the engine is
+# assembled here in the desktop host, alongside the
+# other host-owned integrations (injector, espanso CLI, secure store).
+typvia-sync = { path = "../../../crates/sync" }
+# AI provider adapter with the mandatory egress gate/log. host-service must
+# not depend on it, so the provider + egress sink are assembled here in the
+# desktop host.
+typvia-ai = { path = "../../../crates/ai" }
+# Native-messaging host manifest assembly (browser integration).
+# Already in the tree (tauri, host-service). MIT/Apache-2.0.
+serde_json = "1"
+# Local semantic-search kernel + candle embedder; assembled here because
+# host-service's dependency face is frozen.
+typvia-semantic = { path = "../../../crates/semantic" }
+# Model download (the feature's only network face). Same blocking HTTP
+# client the tree already uses (crates/ai, crates/sync). MIT/Apache-2.0.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+# SHA-256 pinning of downloaded model files (checksum before use).
+# RustCrypto, already in the tree via crates/crypto.
+sha2 = "0.10"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Reads the frontmost app when the panel is summoned and re-activates it on
-# hide (TASK-038 "记录原前台应用" + focus return). AppKit's NSWorkspace /
+# hide, so focus returns where it came from. AppKit's NSWorkspace /
 # NSRunningApplication have no cross-platform wrapper; objc2 is the maintained
 # Rust binding (MIT/Apache-2.0), same family as the core-graphics deps below.
 objc2 = "0.6"
@@ -41,13 +79,40 @@ objc2-app-kit = { version = "0.3", features = [
     "NSWorkspace",
     "NSRunningApplication",
 ] }
-# Clipboard save/write/restore for the paste-injection path (DEC-007).
-# Maintained (1Password), MIT/Apache-2.0; validated in the TASK-007 spike.
+# Sleep / screen-lock notifications for the vault auto-lock: the
+# NSNotificationCenter block observer and NSDistributedNotificationCenter
+# ("com.apple.screenIsLocked"). Both crates are already in the tree as
+# transitive deps of objc2-app-kit; this only turns on the generated APIs.
+objc2-foundation = { version = "0.3", features = [
+    "NSNotification",
+    "NSOperation",
+    "NSString",
+    "NSDistributedNotificationCenter",
+    "block2",
+] }
+block2 = "0.6"
+# Clipboard save/write/restore for the paste-injection path.
+# Maintained (1Password), MIT/Apache-2.0; validated in the injection spike.
 # Text-only usage, so default features (image support) stay off.
 arboard = { version = "3", default-features = false }
 # CGEvent keystroke synthesis: synthesized ⌘V plus Private-source unicode
 # typing. Servo-maintained bindings, MIT/Apache-2.0; validated in the spike.
 core-graphics = "0.25"
+# Keychain query construction (CFDictionary/CFData/CFString) for the macOS
+# SecureStore backend. Already in the tree via core-graphics; the
+# Security.framework functions themselves are declared inline. MIT/Apache-2.0.
+core-foundation = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+# HKCU native-messaging host registration (browser integration):
+# Windows uses registry values instead of well-known manifest paths.
+# Maintained, MIT; the platform has no std registry API.
+winreg = "0.55"
+
+[dev-dependencies]
+# Isolated temp directory for the espanso config-regeneration test (writes a
+# real file to assert the sensitive red line). Maintained, MIT/Apache-2.0.
+tempfile = "3"
 
 [lints]
 workspace = true

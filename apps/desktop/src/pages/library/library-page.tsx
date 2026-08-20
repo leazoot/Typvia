@@ -2,7 +2,9 @@ import {
   batchMoveSnippets,
   batchTagSnippets,
   batchTrashSnippets,
+  copySnippet,
   createFolder,
+  createSnippet,
   createTag,
   deleteFolder,
   deleteTag,
@@ -10,43 +12,48 @@ import {
   listFolderChildren,
   listTags,
   renameTag,
-  searchLibrary,
+  searchLibraryDeep,
+  snippetConvertToSensitive,
+  trashSnippet,
   updateFolder,
+  updateSnippet,
 } from '@typvia/shared';
 import type { Folder, LibraryCounts, Snippet, Tag } from '@typvia/shared';
-import {
-  Caret,
-  ListTray,
-  SearchLine,
-  SelectionPlate,
-  SnippetRow,
-  SnippetRowSkeleton,
-  designTokens,
-  useVirtualRows,
-} from '@typvia/ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { TypeMark, markForType, useTr, useVirtualRows } from '@typvia/ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { markFor, LibraryPreview } from './preview';
+import { useEspanso } from '../../espanso/espanso-context';
+import {
+  Action,
+  CopyAction,
+  Glyph,
+  OverflowMenu,
+  Row,
+  TriggerToken,
+  useContextMenu,
+  type MenuEntry,
+} from '../../workspace/kit';
 import { LibraryRail, type FolderEntry } from './rail';
 import { useSnippetPages, type LibraryScope } from './use-snippet-pages';
 import './library.css';
 
-const ROW_HEIGHT = designTokens.space.rowHeightDesktop;
+const ROW_HEIGHT = 52;
+/** Height the peeked row borrows from the list while it is open. */
+const PEEK_HEIGHT = 176;
+const SEARCH_LIMIT = 500;
 
-/** The rail views repeated as horizontal chips under the 1160 breakpoint. */
-const BASE_SCOPE_CHIPS: Array<{ label: string; scope: LibraryScope }> = [
-  { label: 'All', scope: { view: 'all', folderId: null } },
-  { label: 'Recent', scope: { view: 'recent', folderId: null } },
-  { label: 'Starred', scope: { view: 'starred', folderId: null } },
+/** The three views that stay visible; the rest live in the filter popover. */
+const TABS: Array<{ en: string; zh: string; view: LibraryScope['view'] }> = [
+  { en: 'All', zh: '全部', view: 'all' },
+  { en: 'Recent', zh: '最近', view: 'recent' },
+  { en: 'Starred', zh: '星标', view: 'starred' },
 ];
 
-/** The type-filter chips (design 1b). `null` = all types. */
-const TYPE_CHIPS: Array<{ label: string; value: string | null }> = [
-  { label: 'All types', value: null },
-  { label: 'Command', value: 'command' },
-  { label: 'Template', value: 'template' },
-  { label: 'Secret', value: 'sensitive' },
-  { label: 'AI action', value: 'ai_action' },
+const TYPES: Array<{ en: string; zh: string; value: string | null }> = [
+  { en: 'All types', zh: '全部类型', value: null },
+  { en: 'Command', zh: '命令', value: 'command' },
+  { en: 'Template', zh: '模板', value: 'template' },
+  { en: 'AI action', zh: 'AI 动作', value: 'ai_action' },
 ];
 
 /** Query handed over from the Home search line via router state. */
@@ -76,48 +83,51 @@ async function fetchFolderTree(): Promise<FolderEntry[]> {
 }
 
 /**
- * Library (design Phase 2 · 1b): rail → search line → filter chips → 52px
- * virtualised rows on the sunken tray → read-only preview. Live search
- * filtering, keyboard selection and batch mutations arrive with
- * TASK-031/032; this screen owns layout, scoping, virtual scrolling,
- * selection and batch-selection state.
+ * Library — browsing one's own text, not administering
+ * records. The header carries a title, a search line and two folded tools;
+ * a row opens in place; selection, deletion and organisation only appear
+ * once the user reaches for them.
  */
 export function LibraryPage() {
+  const tr = useTr();
   const navigate = useNavigate();
   const location = useLocation();
+  // Trashing removes triggers from the espanso config: regenerate.
+  const { notifyMutation } = useEspanso();
+
   const [scope, setScope] = useState<LibraryScope>({ view: 'all', folderId: null });
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [query, setQuery] = useState(() => initialQueryFrom(location.state));
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [batchIds, setBatchIds] = useState<ReadonlySet<string>>(new Set());
+  const [results, setResults] = useState<Snippet[] | null>(null);
+  const [peekIndex, setPeekIndex] = useState<number | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [anchor, setAnchor] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [organiseOpen, setOrganiseOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [batchMenu, setBatchMenu] = useState<'none' | 'move' | 'tag'>('none');
   const [counts, setCounts] = useState<LibraryCounts | null>(null);
   const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
-  // null = browsing the scope; an array = live search results for `query`.
-  const [results, setResults] = useState<Snippet[] | null>(null);
-  const [searchMs, setSearchMs] = useState<number | null>(null);
-  const searchGeneration = useRef(0);
 
   const viewportRef = useRef<HTMLDivElement>(null);
+  const filterWrap = useRef<HTMLSpanElement>(null);
+  const searchGeneration = useRef(0);
+  const context = useContextMenu(tr('Snippet actions', '片段操作'));
   const { total, rowAt, ensureRange, failed, retry } = useSnippetPages(scope, typeFilter);
 
-  // Every keystroke replaces the results instantly — no debounce, no
-  // transition (design 1b). A generation stamp drops stale responses.
+  // Every keystroke replaces the results instantly — no debounce.
   useEffect(() => {
     searchGeneration.current += 1;
     const generation = searchGeneration.current;
+    setPeekIndex(null);
     if (query.trim() === '') {
       setResults(null);
-      setSearchMs(null);
       return;
     }
-    const started = performance.now();
-    searchLibrary(query, 500)
+    searchLibraryDeep(query, SEARCH_LIMIT)
       .then((rows) => {
-        if (searchGeneration.current !== generation) return;
-        setResults(rows);
-        setSearchMs(performance.now() - started);
-        setSelectedIndex(rows.length > 0 ? 0 : null);
+        if (searchGeneration.current === generation) setResults(rows);
       })
       .catch(() => {
         if (searchGeneration.current === generation) setResults([]);
@@ -132,24 +142,30 @@ export function LibraryPage() {
   }, [results, typeFilter]);
 
   const rowCount = searchRows === null ? total : searchRows.length;
-  const rowSource = (index: number): Snippet | undefined =>
-    searchRows === null ? rowAt(index) : searchRows[index];
+  const rowSource = useCallback(
+    (index: number): Snippet | undefined =>
+      searchRows === null ? rowAt(index) : searchRows[index],
+    [searchRows, rowAt],
+  );
 
   const { first, last, totalHeight } = useVirtualRows({
     count: rowCount,
     rowHeight: ROW_HEIGHT,
     viewportRef,
   });
+  // The open peek pushes the rows below it down, so a few extra rows are
+  // rendered past the measured window.
+  const lastRendered = Math.min(rowCount - 1, last + 3);
 
   useEffect(() => {
-    if (searchRows === null) ensureRange(first, last);
-  }, [ensureRange, first, last, searchRows]);
+    if (searchRows === null) ensureRange(first, lastRendered);
+  }, [ensureRange, first, lastRendered, searchRows]);
 
-  const refreshMeta = () => {
+  const refreshMeta = useCallback(() => {
     libraryCounts()
       .then(setCounts)
       .catch(() => {
-        // The list area reports load failures; the rail just stays uncounted.
+        // The list area reports load failures; the header just stays uncounted.
       });
     fetchFolderTree()
       .then(setFolders)
@@ -161,15 +177,26 @@ export function LibraryPage() {
       .catch(() => {
         setTags([]);
       });
-  };
+  }, []);
+  useEffect(refreshMeta, [refreshMeta]);
 
-  useEffect(refreshMeta, []);
-
-  /** Re-reads rows and rail numbers after any mutation. */
-  const refreshAll = () => {
+  const refreshAll = useCallback(() => {
     retry();
     refreshMeta();
+  }, [retry, refreshMeta]);
+
+  const run = (operation: Promise<unknown>) => {
+    operation.then(refreshAll).catch(refreshAll);
   };
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const away = (event: MouseEvent) => {
+      if (filterWrap.current?.contains(event.target as Node) !== true) setFilterOpen(false);
+    };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, [filterOpen]);
 
   const folderNames = useMemo(
     () => new Map(folders.map(({ folder }) => [folder.id, folder.name])),
@@ -178,52 +205,115 @@ export function LibraryPage() {
 
   const selectScope = (next: LibraryScope) => {
     setScope(next);
-    setSelectedIndex(null);
-    setBatchIds(new Set());
+    setPeekIndex(null);
+    setSelected(new Set());
     if (viewportRef.current !== null) viewportRef.current.scrollTop = 0;
-  };
-
-  const toggleBatch = (snippet: Snippet, included: boolean) => {
-    setBatchIds((previous) => {
-      const next = new Set(previous);
-      if (included) next.add(snippet.id);
-      else next.delete(snippet.id);
-      return next;
-    });
-  };
-
-  const selectedSnippet = selectedIndex === null ? null : (rowSource(selectedIndex) ?? null);
-
-  /** ↑↓ move the selection (viewport follows); ↵ opens the selected row. */
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
-    if (event.key === 'Enter') {
-      if (selectedSnippet !== null) {
-        event.preventDefault();
-        void navigate(`/editor/${selectedSnippet.id}`);
-      }
-      return;
-    }
-    if (rowCount === 0) return;
-    event.preventDefault();
-    const next =
-      event.key === 'ArrowDown'
-        ? Math.min((selectedIndex ?? -1) + 1, rowCount - 1)
-        : Math.max((selectedIndex ?? 1) - 1, 0);
-    setSelectedIndex(next);
-    const viewport = viewportRef.current;
-    if (viewport !== null) {
-      const rowTop = next * ROW_HEIGHT;
-      if (rowTop < viewport.scrollTop) viewport.scrollTop = rowTop;
-      else if (rowTop + ROW_HEIGHT > viewport.scrollTop + viewport.clientHeight)
-        viewport.scrollTop = rowTop + ROW_HEIGHT - viewport.clientHeight;
-    }
   };
 
   const clearFilters = () => {
     setQuery('');
     setTypeFilter(null);
-    setSelectedIndex(null);
+    selectScope({ view: 'all', folderId: null });
+  };
+
+  const activeFilters =
+    (typeFilter === null ? 0 : 1) + (scope.view === 'all' || scope.view === 'folder' ? 0 : 1);
+
+  // ---- selection --------------------------------------------------------
+
+  const toggleSelected = (id: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectRange = (from: number, to: number) => {
+    const [start, end] = from <= to ? [from, to] : [to, from];
+    setSelected((current) => {
+      const next = new Set(current);
+      for (let index = start; index <= end; index += 1) {
+        const snippet = rowSource(index);
+        if (snippet !== undefined) next.add(snippet.id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelected(new Set());
+    setBatchMenu('none');
+    setConfirmDelete(false);
+  };
+
+  const batchDone = () => {
+    clearSelection();
+    setPeekIndex(null);
+    refreshAll();
+  };
+  const runBatch = (operation: Promise<void>) => {
+    operation.then(batchDone).catch(batchDone);
+  };
+
+  // ---- single-row actions ----------------------------------------------
+
+  const duplicate = (snippet: Snippet) => {
+    run(
+      createSnippet({
+        title: tr(`${snippet.title} copy`, `${snippet.title} 副本`),
+        body: snippet.body ?? '',
+        snippetType: snippet.snippetType,
+        description: snippet.description,
+        folderId: snippet.folderId,
+        // A trigger is unique, so the copy starts without one.
+        trigger: null,
+        triggerMode: snippet.triggerMode,
+        language: snippet.language,
+      }),
+    );
+  };
+
+  const toggleFavorite = (snippet: Snippet) => {
+    run(
+      updateSnippet({
+        id: snippet.id,
+        title: snippet.title,
+        body: snippet.body ?? '',
+        snippetType: snippet.snippetType,
+        description: snippet.description,
+        folderId: snippet.folderId,
+        trigger: snippet.trigger,
+        triggerMode: snippet.triggerMode,
+        language: snippet.language,
+        isFavorite: !snippet.isFavorite,
+        isPinned: snippet.isPinned,
+        isEnabled: snippet.isEnabled,
+      }),
+    );
+  };
+
+  const menuFor = (snippet: Snippet): MenuEntry[] => {
+    const items: MenuEntry[] = [
+      { label: tr('Duplicate', '创建副本'), onSelect: () => duplicate(snippet) },
+      {
+        label: snippet.isFavorite ? tr('Remove star', '取消星标') : tr('Star', '加星标'),
+        onSelect: () => toggleFavorite(snippet),
+      },
+    ];
+    if (snippet.securityLevel !== 'sensitive') {
+      items.push('divider', {
+        label: tr('Move to Vault', '移入保险库'),
+        onSelect: () => run(snippetConvertToSensitive(snippet.id).then(notifyMutation)),
+      });
+    }
+    items.push('divider', {
+      label: tr('Move to Trash', '移到回收站'),
+      danger: true,
+      onSelect: () => run(trashSnippet(snippet.id).then(notifyMutation)),
+    });
+    return items;
   };
 
   // ---- folder / tag management (rail callbacks) -------------------------
@@ -237,9 +327,8 @@ export function LibraryPage() {
     return map;
   }, [folders]);
 
-  /** Live snippet count of a folder plus all of its descendants. */
   const subtreeCount = (folderId: string): number => {
-    const direct = new Map(counts?.folders.map((f) => [f.folderId, f.count]));
+    const direct = new Map(counts?.folders.map((folder) => [folder.folderId, folder.count]));
     let sum = 0;
     const queue = [folderId];
     while (queue.length > 0) {
@@ -249,10 +338,6 @@ export function LibraryPage() {
       for (const child of childrenOf.get(current) ?? []) queue.push(child.folder.id);
     }
     return sum;
-  };
-
-  const run = (operation: Promise<unknown>) => {
-    operation.then(refreshAll).catch(refreshAll);
   };
 
   const handleReorderFolder = (folder: Folder, direction: -1 | 1) => {
@@ -266,7 +351,6 @@ export function LibraryPage() {
     if (moved === undefined || other === undefined) return;
     reordered[index] = other;
     reordered[swapWith] = moved;
-    // Persist a clean sequential order so future swaps stay stable.
     run(
       Promise.all(
         reordered.map((sibling, position) =>
@@ -283,44 +367,89 @@ export function LibraryPage() {
     );
   };
 
-  // ---- batch bar --------------------------------------------------------
+  // ---- rows -------------------------------------------------------------
 
-  const [batchMenu, setBatchMenu] = useState<'none' | 'move' | 'tag' | 'confirm-delete'>('none');
-  const batchDone = () => {
-    setBatchIds(new Set());
-    setBatchMenu('none');
-    setSelectedIndex(null);
-    refreshAll();
-  };
-  const runBatch = (operation: Promise<void>) => {
-    operation.then(batchDone).catch(batchDone);
-  };
+  const offsetFor = (index: number) =>
+    index * ROW_HEIGHT + (peekIndex !== null && index > peekIndex ? PEEK_HEIGHT : 0);
 
-  const rows = [];
-  if (rowCount > 0) {
-    for (let index = first; index <= last; index += 1) {
+  const peeked = peekIndex === null ? undefined : rowSource(peekIndex);
+
+  const slots = [];
+  if (rowCount > 0 && !failed) {
+    for (let index = first; index <= lastRendered; index += 1) {
       const snippet = rowSource(index);
-      rows.push(
-        <div key={index} className="tv-lib-row-slot" style={{ top: index * ROW_HEIGHT }}>
+      const rowIndex = index;
+      slots.push(
+        <div
+          key={index}
+          className="tvl-slot"
+          style={{ transform: `translateY(${offsetFor(index)}px)` }}
+        >
           {snippet === undefined ? (
-            <SnippetRowSkeleton />
+            <div className="tvw-row tvl-row" aria-hidden="true">
+              <span className="tvw-grow" />
+            </div>
           ) : (
-            <SnippetRow
-              mark={markFor(snippet.snippetType)}
-              title={snippet.title}
-              cn={snippet.description ?? ''}
-              preview={snippet.body ?? ''}
-              trigger={snippet.trigger ?? ''}
-              folder={folderNames.get(snippet.folderId ?? '') ?? ''}
-              selected={selectedIndex === index}
-              onClick={() => {
-                setSelectedIndex(index);
+            <Row
+              className={`tvl-row ${selected.has(snippet.id) ? 'is-selected' : ''} ${
+                peekIndex === rowIndex ? 'is-open' : ''
+              }`}
+              label={snippet.title}
+              onOpen={(modifiers) => {
+                // ⌘-click selects, ⇧-click extends; a plain click peeks.
+                if (modifiers.meta || (modifiers.shift && anchor !== null)) {
+                  setPeekIndex(null);
+                  if (modifiers.shift && anchor !== null) selectRange(anchor, rowIndex);
+                  else toggleSelected(snippet.id);
+                  setAnchor(rowIndex);
+                  return;
+                }
+                setAnchor(rowIndex);
+                setPeekIndex((current) => (current === rowIndex ? null : rowIndex));
               }}
-              checked={batchIds.has(snippet.id)}
-              onCheckedChange={(checked) => {
-                toggleBatch(snippet, checked);
-              }}
-            />
+              onContextMenu={(event) => context.open(event, menuFor(snippet))}
+            >
+              <TypeMark code={markForType(snippet.snippetType)} />
+              <span className="tvw-grow">
+                <span className="tvw-row-title">{snippet.title}</span>
+                <span aria-hidden="true" className="tvw-row-preview">
+                  {snippet.body ?? tr('Secret', '密文')}
+                </span>
+              </span>
+              <span className="tvl-tail">
+                <span className="tvw-row-rest">
+                  {snippet.isFavorite && (
+                    <span className="tvl-star" role="img" aria-label={tr('Starred', '已加星标')}>
+                      ★
+                    </span>
+                  )}
+                  {snippet.trigger !== null && <TriggerToken trigger={snippet.trigger} />}
+                  <span className="tvl-uses">{`${String(snippet.usageCount)}×`}</span>
+                </span>
+                <span className="tvw-hover-actions tvl-actions">
+                  {snippet.body !== null && (
+                    <CopyAction
+                      label={tr('Copy', '复制')}
+                      doneLabel={tr('Copied', '已复制')}
+                      onCopy={() => copySnippet(snippet.id).then(refreshAll)}
+                    />
+                  )}
+                  <Action
+                    label={tr('Edit', '编辑')}
+                    onRun={() =>
+                      void navigate(
+                        snippet.securityLevel === 'sensitive' ? '/vault' : `/editor/${snippet.id}`,
+                      )
+                    }
+                  />
+                  <Action
+                    label={snippet.isFavorite ? '★' : '☆'}
+                    onRun={() => toggleFavorite(snippet)}
+                  />
+                  <OverflowMenu label={tr('More actions', '更多操作')} items={menuFor(snippet)} />
+                </span>
+              </span>
+            </Row>
           )}
         </div>,
       );
@@ -328,295 +457,411 @@ export function LibraryPage() {
   }
 
   return (
-    // Keyboard list navigation works from anywhere on the page, including
-    // while typing in the search line (design: type to filter; ↑↓ ↵).
-    <main className="tv-lib" onKeyDown={handleKeyDown}>
-      <LibraryRail
-        counts={counts}
-        folders={folders}
-        tags={tags}
-        scope={scope}
-        onScopeChange={selectScope}
-        onCreateFolder={(name, parentId) => {
-          run(createFolder({ name, parentId, sortOrder: folders.length }));
-        }}
-        onRenameFolder={(folder, name) => {
-          run(
-            updateFolder({
-              id: folder.id,
-              name,
-              parentId: folder.parentId,
-              sortOrder: folder.sortOrder,
-            }),
-          );
-        }}
-        onDeleteFolder={(folder) => {
-          if (scope.folderId === folder.id) setScope({ view: 'all', folderId: null });
-          run(deleteFolder(folder.id));
-        }}
-        onReorderFolder={handleReorderFolder}
-        subtreeCount={subtreeCount}
-        onCreateTag={(name) => {
-          run(createTag(name));
-        }}
-        onRenameTag={(tag, name) => {
-          run(renameTag(tag.id, name));
-        }}
-        onDeleteTag={(tag) => {
-          run(deleteTag(tag.id));
-        }}
-      />
-      <section className="tv-lib-main">
-        <div className="tv-lib-head">
-          <SearchLine
-            scale="library"
-            value={query}
-            onChange={setQuery}
-            placeholder="Search titles, content, triggers, tags…"
-            label="Search snippets"
-            trailing={
-              <span aria-live="polite" role="status">
-                {searchRows === null
-                  ? total.toLocaleString('en-US')
-                  : `${String(searchRows.length)} results`}
-              </span>
-            }
+    <div
+      className="tvl"
+      onKeyDown={(event) => {
+        // ↑↓ walk the rendered rows from anywhere on the page, including the
+        // search line; ↵ on a row peeks it (hover is never the only way).
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        const rows = [...(viewportRef.current?.querySelectorAll<HTMLElement>('.tvl-row') ?? [])];
+        if (rows.length === 0) return;
+        event.preventDefault();
+        const current = rows.indexOf(document.activeElement as HTMLElement);
+        const next =
+          event.key === 'ArrowDown'
+            ? Math.min(current + 1, rows.length - 1)
+            : Math.max(current - 1, 0);
+        rows[current === -1 ? 0 : next]?.focus();
+      }}
+    >
+      <div className="tvl-head">
+        <h1>{tr('Library', '片段库')}</h1>
+        <span className="tvl-count">
+          {searchRows === null
+            ? total.toLocaleString('en-US')
+            : tr(`${String(rowCount)} results`, `${String(rowCount)} 条结果`)}
+        </span>
+      </div>
+
+      <div className="tvl-search">
+        <Glyph name="search" />
+        <input
+          type="text"
+          value={query}
+          aria-label={tr('Search snippets', '搜索片段')}
+          placeholder={tr(
+            'Search titles, content, triggers, tags…',
+            '搜索标题、内容、触发词、标签…',
+          )}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <span ref={filterWrap} className="tvw-menu-wrap tvl-tools">
+          <button
+            type="button"
+            className="tvw-chip"
+            aria-expanded={filterOpen}
+            onClick={() => setFilterOpen((open) => !open)}
+          >
+            {tr('Filter', '筛选')}
+            {activeFilters > 0 && <span className="tvl-filter-count">{activeFilters}</span>}
+          </button>
+          <OverflowMenu
+            label={tr('View options', '视图选项')}
+            items={[
+              {
+                label: organiseOpen
+                  ? tr('Hide folders & tags', '收起文件夹与标签')
+                  : tr('Folders & tags', '文件夹与标签'),
+                onSelect: () => setOrganiseOpen((open) => !open),
+              },
+              { label: tr('New snippet', '新建片段'), onSelect: () => void navigate('/editor') },
+            ]}
           />
-          <div className="tv-lib-scopes">
-            {[
-              ...BASE_SCOPE_CHIPS,
-              ...folders
-                .filter(({ depth }) => depth === 0)
-                .map(({ folder }): { label: string; scope: LibraryScope } => ({
-                  label: folder.name,
-                  scope: { view: 'folder', folderId: folder.id },
-                })),
-            ].map(({ label, scope: chipScope }) => (
-              <button
-                key={label}
-                type="button"
-                className="tv-lib-chip"
-                data-active={
-                  scope.view === chipScope.view && scope.folderId === chipScope.folderId
-                    ? true
-                    : undefined
-                }
-                onClick={() => {
-                  selectScope(chipScope);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="tv-lib-chips">
-            {TYPE_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                className="tv-lib-chip"
-                data-active={typeFilter === chip.value ? true : undefined}
-                onClick={() => {
-                  setTypeFilter(chip.value);
-                  setSelectedIndex(null);
-                  if (viewportRef.current !== null) viewportRef.current.scrollTop = 0;
-                }}
-              >
-                {chip.label}
-              </button>
-            ))}
-            <span className="tv-lib-chip-divider" />
-            <span className="tv-lib-sort">Sort: last updated</span>
-          </div>
+          {filterOpen && (
+            <span className="tvw-pop tvl-pop" aria-label={tr('Filter', '筛选')}>
+              <span className="tvw-pop-label">{tr('Type', '类型')}</span>
+              <span className="tvl-pop-group">
+                {TYPES.map((type) => (
+                  <button
+                    key={type.en}
+                    type="button"
+                    className="tvl-choice"
+                    aria-pressed={typeFilter === type.value}
+                    onClick={() => {
+                      setTypeFilter(type.value);
+                      setPeekIndex(null);
+                    }}
+                  >
+                    {tr(type.en, type.zh)}
+                  </button>
+                ))}
+              </span>
+              <span className="tvw-pop-label">{tr('View', '视图')}</span>
+              <span className="tvl-pop-group">
+                {(
+                  [
+                    { en: 'All', zh: '全部', view: 'all' as const },
+                    { en: 'Unsorted', zh: '未分类', view: 'unsorted' as const },
+                  ] satisfies Array<{ en: string; zh: string; view: LibraryScope['view'] }>
+                ).map((view) => (
+                  <button
+                    key={view.en}
+                    type="button"
+                    className="tvl-choice"
+                    aria-pressed={scope.view === view.view}
+                    onClick={() => selectScope({ view: view.view, folderId: null })}
+                  >
+                    {tr(view.en, view.zh)}
+                  </button>
+                ))}
+              </span>
+              {folders.length > 0 && (
+                <>
+                  <span className="tvw-pop-label">{tr('Folder', '文件夹')}</span>
+                  <span className="tvl-pop-group">
+                    {folders.map(({ folder }) => (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        className="tvl-choice"
+                        aria-pressed={scope.folderId === folder.id}
+                        onClick={() => selectScope({ view: 'folder', folderId: folder.id })}
+                      >
+                        {folder.name}
+                      </button>
+                    ))}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
+        </span>
+      </div>
+
+      <div className="tvl-bar">
+        <div className="tvl-tabs" role="tablist" aria-label={tr('Views', '视图')}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.en}
+              type="button"
+              role="tab"
+              className="tvl-tab"
+              aria-selected={scope.view === tab.view}
+              onClick={() => selectScope({ view: tab.view, folderId: null })}
+            >
+              {tr(tab.en, tab.zh)}
+            </button>
+          ))}
         </div>
-        <ListTray className="tv-lib-list">
-          <div ref={viewportRef} className="tv-lib-viewport" data-testid="library-viewport">
-            {failed ? (
-              <div className="tv-lib-state">
-                <div className="tv-lib-state-title">Your snippets are safe on this device.</div>
-                <div className="tv-lib-state-text">This view failed to load just now.</div>
-                <button type="button" className="tv-lib-state-action" onClick={retry}>
-                  Retry
-                </button>
-              </div>
-            ) : searchRows !== null && rowCount === 0 ? (
-              <div className="tv-lib-state tv-lib-state-center">
-                <div className="tv-lib-state-figure">
-                  <span className="tv-lib-state-bar" />
-                  <Caret height={17} />
-                </div>
-                <div className="tv-lib-state-title">No snippet matches that</div>
-                <div className="tv-lib-state-text">
-                  Save what you typed as a new snippet, or clear the filters.
-                </div>
-                <div className="tv-lib-state-actions">
+        <div className="tvl-active">
+          {typeFilter !== null && (
+            <button
+              type="button"
+              className="tvl-active-chip"
+              aria-label={tr('Remove type filter', '清除类型筛选')}
+              onClick={() => setTypeFilter(null)}
+            >
+              {tr(
+                TYPES.find((type) => type.value === typeFilter)?.en ?? typeFilter,
+                TYPES.find((type) => type.value === typeFilter)?.zh ?? typeFilter,
+              )}
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
+          {scope.folderId !== null && (
+            <button
+              type="button"
+              className="tvl-active-chip"
+              aria-label={tr('Remove folder filter', '清除文件夹筛选')}
+              onClick={() => selectScope({ view: 'all', folderId: null })}
+            >
+              {folderNames.get(scope.folderId) ?? tr('Folder', '文件夹')}
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {organiseOpen && (
+        <section className="tvl-organise" aria-label={tr('Folders & tags', '文件夹与标签')}>
+          <div className="tvl-organise-head">
+            <span className="tvw-label">{tr('Folders & tags', '文件夹与标签')}</span>
+            <Action label={tr('Done', '完成')} onRun={() => setOrganiseOpen(false)} />
+          </div>
+          <LibraryRail
+            counts={counts}
+            folders={folders}
+            tags={tags}
+            scope={scope}
+            onScopeChange={selectScope}
+            onCreateFolder={(name, parentId) => {
+              run(createFolder({ name, parentId, sortOrder: folders.length }));
+            }}
+            onRenameFolder={(folder, name) => {
+              run(
+                updateFolder({
+                  id: folder.id,
+                  name,
+                  parentId: folder.parentId,
+                  sortOrder: folder.sortOrder,
+                }),
+              );
+            }}
+            onDeleteFolder={(folder) => {
+              if (scope.folderId === folder.id) selectScope({ view: 'all', folderId: null });
+              run(deleteFolder(folder.id));
+            }}
+            onReorderFolder={handleReorderFolder}
+            subtreeCount={subtreeCount}
+            onCreateTag={(name) => {
+              run(createTag(name));
+            }}
+            onRenameTag={(tag, name) => {
+              run(renameTag(tag.id, name));
+            }}
+            onDeleteTag={(tag) => {
+              run(deleteTag(tag.id));
+            }}
+          />
+        </section>
+      )}
+
+      <div ref={viewportRef} className="tvl-list" data-testid="library-viewport">
+        {failed ? (
+          <div className="tvw-empty tvl-state">
+            <strong>
+              {tr('Your snippets are safe on this Mac.', '你的片段仍安全地保存在本机。')}
+            </strong>
+            {tr('This view failed to load just now.', '只是此视图刚才加载失败。')}
+            <div style={{ marginTop: 10 }}>
+              <button type="button" className="tvw-chip" onClick={retry}>
+                {tr('Retry', '重试')}
+              </button>
+            </div>
+          </div>
+        ) : rowCount === 0 ? (
+          <div className="tvw-empty tvl-state">
+            {searchRows !== null ? (
+              <>
+                <strong>{tr('No snippet matches that', '没有匹配的片段')}</strong>
+                {tr(
+                  'Save what you typed as a new snippet, or clear the filters.',
+                  '可以把刚输入的内容保存为新片段,或清除筛选条件。',
+                )}
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   <button
                     type="button"
-                    className="tv-lib-state-primary"
+                    className="tvw-chip"
                     onClick={() => void navigate('/editor', { state: { draftTitle: query } })}
                   >
-                    Save as snippet
+                    {tr('Save as snippet', '保存为片段')}
                   </button>
-                  <button type="button" className="tv-lib-state-action" onClick={clearFilters}>
-                    Clear filters
+                  <button type="button" className="tvw-chip" onClick={clearFilters}>
+                    {tr('Clear filters', '清除筛选')}
                   </button>
                 </div>
-              </div>
-            ) : rowCount === 0 ? (
-              <div className="tv-lib-state">
-                <div className="tv-lib-state-figure">
-                  <span className="tv-lib-state-slot" />
-                  <Caret height={16} />
-                </div>
-                <div className="tv-lib-state-title">
-                  {scope.folderId !== null
-                    ? `${folderNames.get(scope.folderId) ?? 'This folder'} is empty`
-                    : 'Nothing here yet'}
-                </div>
-                <div className="tv-lib-state-text">
-                  {scope.folderId !== null
-                    ? 'Move snippets here from any list.'
-                    : 'Snippets you save will appear here as rows.'}
-                </div>
-              </div>
+              </>
             ) : (
-              <div className="tv-lib-spacer" style={{ height: totalHeight }}>
-                <SelectionPlate index={selectedIndex} />
-                {rows}
+              <>
+                <strong>
+                  {scope.folderId !== null
+                    ? tr('This folder is empty', '这个文件夹是空的')
+                    : tr('Nothing here yet', '这里还没有内容')}
+                </strong>
+                {scope.folderId !== null
+                  ? tr('Move snippets here from any list.', '可以从任意列表把片段移到这里。')
+                  : tr(
+                      'Snippets you save will appear here as rows.',
+                      '保存的片段会以行的形式显示在这里。',
+                    )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div
+            className="tvl-spacer"
+            style={{ height: totalHeight + (peekIndex === null ? 0 : PEEK_HEIGHT) }}
+          >
+            {slots}
+            {peeked !== undefined && peekIndex !== null && (
+              <div
+                className="tvl-peek"
+                role="region"
+                aria-label={tr('Details', '详情')}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${String((peekIndex + 1) * ROW_HEIGHT)}px)`,
+                }}
+              >
+                <div className="tvl-peek-body">
+                  {peeked.body ?? tr('Kept in the Vault.', '保存在保险库中。')}
+                </div>
+                <dl className="tvl-peek-meta">
+                  <div>
+                    <dt>{tr('Trigger', '触发词')}</dt>
+                    <dd>{peeked.trigger ?? tr('none', '无')}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr('Folder', '文件夹')}</dt>
+                    <dd>{folderNames.get(peeked.folderId ?? '') ?? tr('Unsorted', '未分类')}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr('Used', '使用次数')}</dt>
+                    <dd>
+                      {tr(
+                        peeked.usageCount === 1 ? '1 time' : `${String(peeked.usageCount)} times`,
+                        `${String(peeked.usageCount)} 次`,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr('Version', '版本')}</dt>
+                    <dd>{peeked.version}</dd>
+                  </div>
+                </dl>
+                <div className="tvl-peek-actions">
+                  <Action
+                    label={tr('Edit', '编辑')}
+                    cta
+                    onRun={() =>
+                      void navigate(
+                        peeked.securityLevel === 'sensitive' ? '/vault' : `/editor/${peeked.id}`,
+                      )
+                    }
+                  />
+                </div>
               </div>
             )}
           </div>
-        </ListTray>
-        <footer className="tv-lib-foot">
-          {batchIds.size > 0 &&
-            (batchMenu === 'confirm-delete' ? (
-              <>
-                <span className="tv-lib-foot-selected">
-                  Delete {batchIds.size} snippet{batchIds.size === 1 ? '' : 's'}?
-                </span>
-                <button
-                  type="button"
-                  className="tv-lib-foot-action tv-lib-foot-danger"
-                  onClick={() => {
-                    runBatch(batchTrashSnippets([...batchIds]));
-                  }}
-                >
-                  Delete {batchIds.size} snippet{batchIds.size === 1 ? '' : 's'}
-                </button>
-                <button
-                  type="button"
-                  className="tv-lib-foot-action"
-                  onClick={() => {
-                    setBatchMenu('none');
-                  }}
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="tv-lib-foot-selected">{batchIds.size} selected</span>
-                <span className="tv-lib-foot-divider" />
-                <span className="tv-lib-foot-menu-anchor">
-                  <button
-                    type="button"
-                    className="tv-lib-foot-action"
-                    onClick={() => {
-                      setBatchMenu(batchMenu === 'move' ? 'none' : 'move');
-                    }}
-                  >
-                    Move to folder
-                  </button>
-                  {batchMenu === 'move' && (
-                    <div className="tv-lib-popover" role="listbox" aria-label="Move to folder">
+        )}
+      </div>
+
+      {selected.size > 0 && (
+        <div className="tvw-selbar" role="group" aria-label={tr('Selection', '已选片段')}>
+          {confirmDelete ? (
+            <>
+              <span className="tvw-selbar-count">
+                {tr(
+                  `Delete ${String(selected.size)} snippet${selected.size === 1 ? '' : 's'}?`,
+                  `删除 ${String(selected.size)} 个片段?`,
+                )}
+              </span>
+              <Action
+                label={tr(
+                  `Delete ${String(selected.size)} snippet${selected.size === 1 ? '' : 's'}`,
+                  `删除 ${String(selected.size)} 个片段`,
+                )}
+                onRun={() => runBatch(batchTrashSnippets([...selected]).then(notifyMutation))}
+              />
+              <Action label={tr('Cancel', '取消')} onRun={() => setConfirmDelete(false)} />
+            </>
+          ) : (
+            <>
+              <span className="tvw-selbar-count">
+                {tr(`${String(selected.size)} selected`, `已选 ${String(selected.size)} 项`)}
+              </span>
+              <span className="tvw-menu-wrap">
+                <Action
+                  label={tr('Move', '移动')}
+                  onRun={() => setBatchMenu(batchMenu === 'move' ? 'none' : 'move')}
+                />
+                {batchMenu === 'move' && (
+                  <span className="tvw-menu" role="menu" aria-label={tr('Move', '移动')}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => runBatch(batchMoveSnippets([...selected], null))}
+                    >
+                      {tr('Unsorted', '未分类')}
+                    </button>
+                    {folders.map(({ folder }) => (
                       <button
+                        key={folder.id}
                         type="button"
-                        className="tv-lib-popover-item"
-                        onClick={() => {
-                          runBatch(batchMoveSnippets([...batchIds], null));
-                        }}
+                        role="menuitem"
+                        onClick={() => runBatch(batchMoveSnippets([...selected], folder.id))}
                       >
-                        Unsorted
+                        {folder.name}
                       </button>
-                      {folders.map(({ folder, depth }) => (
+                    ))}
+                  </span>
+                )}
+              </span>
+              <span className="tvw-menu-wrap">
+                <Action
+                  label={tr('Tag', '标签')}
+                  onRun={() => setBatchMenu(batchMenu === 'tag' ? 'none' : 'tag')}
+                />
+                {batchMenu === 'tag' && (
+                  <span className="tvw-menu" role="menu" aria-label={tr('Tag', '标签')}>
+                    {tags.length === 0 ? (
+                      <button type="button" role="menuitem" onClick={() => setBatchMenu('none')}>
+                        {tr('No tags yet', '还没有标签')}
+                      </button>
+                    ) : (
+                      tags.map((tag) => (
                         <button
-                          key={folder.id}
+                          key={tag.id}
                           type="button"
-                          className="tv-lib-popover-item"
-                          style={{ paddingLeft: 12 + depth * 12 }}
-                          onClick={() => {
-                            runBatch(batchMoveSnippets([...batchIds], folder.id));
-                          }}
+                          role="menuitem"
+                          onClick={() => runBatch(batchTagSnippets([...selected], tag.id))}
                         >
-                          {folder.name}
+                          {tag.name}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </span>
-                <span className="tv-lib-foot-menu-anchor">
-                  <button
-                    type="button"
-                    className="tv-lib-foot-action"
-                    onClick={() => {
-                      setBatchMenu(batchMenu === 'tag' ? 'none' : 'tag');
-                    }}
-                  >
-                    Add tag
-                  </button>
-                  {batchMenu === 'tag' && (
-                    <div className="tv-lib-popover" role="listbox" aria-label="Add tag">
-                      {tags.length === 0 ? (
-                        <span className="tv-lib-popover-empty">
-                          No tags yet — create one in the rail.
-                        </span>
-                      ) : (
-                        tags.map((tag) => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            className="tv-lib-popover-item"
-                            onClick={() => {
-                              runBatch(batchTagSnippets([...batchIds], tag.id));
-                            }}
-                          >
-                            {tag.name}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  className="tv-lib-foot-action tv-lib-foot-danger"
-                  onClick={() => {
-                    setBatchMenu('confirm-delete');
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ))}
-          <span className="tv-lib-foot-count">
-            {searchRows === null || searchMs === null
-              ? `Local library · ${total.toLocaleString('en-US')} items`
-              : `Local search across ${total.toLocaleString('en-US')} items · ${searchMs.toFixed(1)} ms`}
-          </span>
-        </footer>
-      </section>
-      <LibraryPreview
-        snippet={selectedSnippet}
-        folderName={
-          selectedSnippet === null
-            ? null
-            : (folderNames.get(selectedSnippet.folderId ?? '') ?? null)
-        }
-        onClose={() => {
-          setSelectedIndex(null);
-        }}
-        onCopied={refreshAll}
-      />
-    </main>
+                      ))
+                    )}
+                  </span>
+                )}
+              </span>
+              <Action label={tr('Delete', '删除')} onRun={() => setConfirmDelete(true)} />
+              <Action label={tr('Done', '完成')} onRun={clearSelection} />
+            </>
+          )}
+        </div>
+      )}
+      {context.node}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 //! UTF-16 chunking for CGEvent string posts. A single keyboard event carries
-//! roughly 20 UTF-16 units (docs/spikes/injection.md), so typed text is split
+//! roughly 20 UTF-16 units, so typed text is split
 //! into bounded chunks without ever cutting a surrogate pair.
 
 /// Splits `text` into substrings of at most `max_units` UTF-16 code units,

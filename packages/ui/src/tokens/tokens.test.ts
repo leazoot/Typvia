@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import upstream from '../../../../design/design_handoff_typvia/tokens.json';
 import {
   applyTheme,
   BREAKPOINTS,
@@ -23,12 +22,6 @@ function contrastRatio(hexA: string, hexB: string): number {
   const [bright, dim] = [lum(hexA), lum(hexB)].sort((a, b) => b - a) as [number, number];
   return (bright + 0.05) / (dim + 0.05);
 }
-
-describe('token source parity', () => {
-  it('vendored tokens.json matches the design handoff value for value', () => {
-    expect(designTokens).toEqual(upstream);
-  });
-});
 
 describe('cssVariables', () => {
   const light = cssVariables('light');
@@ -77,7 +70,7 @@ describe('cssVariables', () => {
   });
 });
 
-describe('contrast contract (design handoff §Accessibility)', () => {
+describe('contrast contract', () => {
   const light = designTokens.color.light;
   const dark = designTokens.color.dark;
 

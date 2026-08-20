@@ -6,12 +6,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as SharedModule from '@typvia/shared';
 import { App } from './App';
 
+const onboardingStatusMock = vi.fn<() => Promise<{ completed: boolean }>>();
+onboardingStatusMock.mockResolvedValue({ completed: true });
+
 // IPC is mocked at the typed wrapper layer (frontend testing rule) so the
 // real Library screen can mount without a Tauri host.
 vi.mock('@typvia/shared', async (importOriginal) => {
   const actual = await importOriginal<typeof SharedModule>();
   return {
     ...actual,
+    onboardingStatus: () => onboardingStatusMock(),
+    onboardingComplete: () => Promise.resolve(),
     libraryCounts: () =>
       Promise.resolve({ total: 0, recent: 0, starred: 0, unsorted: 0, trash: 0, folders: [] }),
     countSnippets: () => Promise.resolve(0),
@@ -21,32 +26,65 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     detectSensitive: () => Promise.resolve([]),
     listTrash: () => Promise.resolve([]),
     purgeExpiredTrash: () => Promise.resolve(0),
+    vaultStatus: () =>
+      Promise.resolve({
+        initialized: true,
+        unlocked: true,
+        unlockedAt: 1000,
+        lastActivityAt: 1000,
+        idleTimeoutMs: 300000,
+      }),
+    vaultList: () => Promise.resolve([]),
   };
 });
 
 afterEach(cleanup);
 
 describe('app shell routing', () => {
-  it('renders a navigation item for every top-level route', () => {
+  it('renders the three navigation destinations, rooms behind the switcher', async () => {
     render(
       <MemoryRouter>
         <App />
       </MemoryRouter>,
     );
-    for (const route of APP_ROUTES) {
-      expect(screen.getByRole('button', { name: route.labelEn })).toBeDefined();
+    await screen.findByRole('button', { name: 'Home' });
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeDefined();
+    const workspace = screen.getByRole('button', { name: 'Workspace' });
+    expect(workspace.getAttribute('aria-expanded')).toBe('false');
+    // The rooms stay folded until the switcher is opened.
+    expect(screen.queryByRole('button', { name: /Vault/ })).toBeNull();
+    fireEvent.click(workspace);
+    for (const label of [/Library/, /Vault/, /AI Actions/, /Trash/]) {
+      expect(screen.getByRole('menuitem', { name: label })).toBeDefined();
     }
+    // The editor is not a nav destination: it opens from a
+    // snippet row, the Library's New button, or ⌘N.
+    expect(screen.queryByRole('menuitem', { name: /Snippet editor/ })).toBeNull();
+    // Sync lives under Settings, not in the top navigation.
+    expect(screen.queryByRole('menuitem', { name: /Sync & devices/ })).toBeNull();
   });
 
-  it('navigates when a nav item is clicked and marks it current', () => {
+  it('offers first-run onboarding until its marker exists', async () => {
+    onboardingStatusMock.mockResolvedValueOnce({ completed: false });
     render(
       <MemoryRouter>
         <App />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Vault' }));
-    expect(screen.getByRole('heading', { level: 1, name: 'Vault' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Vault' }).getAttribute('aria-current')).toBe('page');
+    expect(await screen.findByRole('button', { name: 'Skip setup' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Workspace' })).toBeNull();
+  });
+
+  it('navigates when a room is picked and the switcher takes its name', async () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Workspace' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Vault/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Vault' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Vault' })).toBeDefined();
   });
 
   it('reaches the real Library screen at /library', async () => {
@@ -74,7 +112,7 @@ describe('app shell routing', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByLabelText('Search snippets')).toBeDefined();
-    expect(screen.getByText('Start typing · 直接开始输入')).toBeDefined();
+    expect(screen.getByText('What are you looking for?')).toBeDefined();
   });
 
   it('reaches the real Trash screen at /trash', async () => {
@@ -83,7 +121,20 @@ describe('app shell routing', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Trash is empty')).toBeDefined();
+    expect(await screen.findByText('The trash is clean.')).toBeDefined();
+  });
+
+  it('reaches the real Vault screen at /vault', async () => {
+    render(
+      <MemoryRouter initialEntries={['/vault']}>
+        <App />
+      </MemoryRouter>,
+    );
+    // The unlocked vault renders its page heading and the titles-only note.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Vault' })).toBeDefined();
+    expect(
+      await screen.findByText('Titles only — secret contents never enter the search index.'),
+    ).toBeDefined();
   });
 
   it.each(
@@ -92,15 +143,19 @@ describe('app shell routing', () => {
         route.path !== '/library' &&
         route.path !== '/editor' &&
         route.path !== '/' &&
-        route.path !== '/trash',
+        route.path !== '/trash' &&
+        route.path !== '/vault' &&
+        route.path !== '/sync' &&
+        // Settings is a real page with its own heading ("Preferences") and
+        // suite (settings-page.test.tsx), not a placeholder.
+        route.path !== '/settings',
     ).map((route) => [route.labelEn, route]),
-  )('reaches the %s placeholder page at its route', (_label, route) => {
+  )('reaches the %s placeholder page at its route', async (_label, route) => {
     render(
       <MemoryRouter initialEntries={[route.path]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByRole('heading', { level: 1, name: route.labelEn })).toBeDefined();
-    expect(screen.getByText(route.labelCn)).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 1, name: route.labelEn })).toBeDefined();
   });
 });

@@ -1,6 +1,5 @@
-//! Desktop text-injection engine (DEC-007: clipboard paste is the primary
-//! path, Private-source keystroke synthesis the auxiliary one; validated in
-//! docs/spikes/injection.md).
+//! Desktop text-injection engine: clipboard paste is the primary path,
+//! Private-source keystroke synthesis the auxiliary one.
 //!
 //! Security posture: on the paste path the plaintext necessarily transits
 //! the system pasteboard; the previous clipboard text is restored on every
@@ -25,7 +24,7 @@ pub enum InjectionMethod {
 }
 
 impl Default for InjectionMethod {
-    /// DEC-007 froze paste as the primary path.
+    /// Paste is the primary path.
     fn default() -> Self {
         Self::Paste
     }
@@ -72,10 +71,22 @@ pub trait Injector: Send {
 
     /// Puts `text` on the clipboard (also the no-permission fallback).
     fn copy(&mut self, text: &str) -> Result<(), InjectorError>;
+
+    /// Puts `text` on the clipboard and remembers it, so a later
+    /// [`Injector::clear_guarded`] can wipe it *only if the user has not copied
+    /// something else since*. This is the sensitive-copy path: the
+    /// secret sits on the clipboard for a bounded countdown, then auto-clears.
+    fn copy_guarded(&mut self, text: &str) -> Result<(), InjectorError>;
+
+    /// Clears the clipboard iff it still holds the last
+    /// [`Injector::copy_guarded`] value, then forgets it. Returns whether it
+    /// cleared. A no-op returning `false` when nothing is guarded or the
+    /// clipboard has changed — a copy the user made in between is left alone.
+    fn clear_guarded(&mut self) -> Result<bool, InjectorError>;
 }
 
-/// The injector for the current platform. Windows lands in its own batch
-/// (TASK-014 recorded risk); until then non-macOS hosts get `Unsupported`.
+/// The injector for the current platform. Windows lands in a later batch;
+/// until then non-macOS hosts get `Unsupported`.
 pub fn platform_injector() -> Result<Box<dyn Injector>, InjectorError> {
     #[cfg(target_os = "macos")]
     {
@@ -104,6 +115,15 @@ impl Injector for NullInjector {
     fn copy(&mut self, _text: &str) -> Result<(), InjectorError> {
         Err(InjectorError::Unsupported)
     }
+
+    fn copy_guarded(&mut self, _text: &str) -> Result<(), InjectorError> {
+        Err(InjectorError::Unsupported)
+    }
+
+    fn clear_guarded(&mut self) -> Result<bool, InjectorError> {
+        // Nothing was ever guarded on an unsupported host.
+        Ok(false)
+    }
 }
 
 /// The platform injector, or a [`NullInjector`] if one can't be built. Used
@@ -118,7 +138,7 @@ mod tests {
 
     #[test]
     fn default_method_is_paste() {
-        // DEC-007 froze clipboard paste as the primary path; keystrokes are
+        // Clipboard paste is the primary path; keystrokes are
         // opt-in for paste-hostile targets.
         assert_eq!(InjectionMethod::default(), InjectionMethod::Paste);
     }

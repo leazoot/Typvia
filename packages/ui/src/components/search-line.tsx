@@ -1,15 +1,8 @@
 import type { ReactNode } from 'react';
-import { Caret } from './caret';
 import './search-line.css';
 
 /** The three desktop scales; each maps to its type-scale role in tokens.json. */
 export type SearchLineScale = 'hero' | 'library' | 'panel';
-
-const CARET_HEIGHT: Record<SearchLineScale, number> = {
-  hero: 40,
-  library: 24,
-  panel: 17,
-};
 
 interface SearchLineProps {
   scale: SearchLineScale;
@@ -23,10 +16,9 @@ interface SearchLineProps {
 }
 
 /**
- * The search line — the product's signature. A 1.5px ink underline plus a
- * 2px accent caret; never a box, never a magnifier glyph. The blinking bar
- * shows while the line is empty; once text exists the native caret
- * (accent-coloured) takes over.
+ * The search line — the product's signature. A quiet hairline underline;
+ * never a box, never a magnifier glyph. The native input caret
+ * (accent-coloured) is the only cursor — no decorative bar doubles it.
  */
 export function SearchLine({
   scale,
@@ -38,7 +30,6 @@ export function SearchLine({
 }: SearchLineProps) {
   return (
     <div className={`tv-search-line tv-search-line-${scale}`}>
-      {value === '' && <Caret height={CARET_HEIGHT[scale]} />}
       <input
         type="text"
         aria-label={label}

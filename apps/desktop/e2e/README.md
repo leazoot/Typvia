@@ -7,15 +7,16 @@ driver can reach — global shortcuts and cross-application text injection.
 
 `tauri-driver` supports Windows and Linux only; macOS WKWebView has no
 WebDriver. And the flows here (summon via a **global** shortcut, inject into a
-**third-party** app) live outside the WebView DOM on every platform. See
-`docs/11_DECISIONS.md` **DEC-012** (closes OQ-P1). WebDriver stays on the table
-for pure DOM flows and Linux CI, if those arise.
+**third-party** app) live outside the WebView DOM on every platform. WebDriver
+stays on the table for pure DOM flows and Linux CI, if those arise.
 
 ## Scenarios
 
-| Script            | Scenario                                                                                                                               |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `panel_insert.sh` | ⌘⇧V summon → search → ↵ → text delivered into TextEdit, original clipboard restored, panel hidden with focus returned, usage recorded. |
+| Script              | Scenario                                                                                                                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `panel_insert.sh`   | ⌘⇧V summon → search → ↵ → text delivered into TextEdit, original clipboard restored, panel hidden with focus returned, usage recorded.                                                  |
+| `espanso_expand.sh` | Writes a Typvia-format espanso config → running espanso hot-reloads it → typing the trigger in TextEdit expands it to the sentinel. Requires espanso authorized. Self-cleans.           |
+| `template_fill.sh`  | ⌘⇧V summon → search a template → ↵ enters fill mode → type a field value → ↵ → the rendered text (`{{module}}` replaced) is delivered into TextEdit and usage is recorded. Self-cleans. |
 
 ## Running
 
@@ -30,8 +31,8 @@ Requirements (why this is opt-in, like the injector live tests):
   (System Settings → Privacy & Security → Accessibility) — needed to synthesize
   the global shortcut and keystrokes.
 - Runs the app via `pnpm dev` (`tauri dev`); the packaged binary currently
-  renders blank under the production CSP (a separate packaging concern noted in
-  `docs/12_PROGRESS.md`).
+  renders blank under the production CSP, which is a separate packaging
+  concern.
 
 The script seeds one snippet through the real schema, drives the run, asserts
 delivery/clipboard/focus/usage, and cleans up the seed and processes. It is not

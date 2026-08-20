@@ -1,40 +1,49 @@
 import { getSnippet, listFolderChildren } from '@typvia/shared';
 import type { Snippet } from '@typvia/shared';
-import { TypeMark } from '@typvia/ui';
-import { useEffect, useState } from 'react';
+import { TypeMark, markForType, useTr, type Tr } from '@typvia/ui';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { markFor } from '../library/preview';
+import { useEspanso } from '../../espanso/espanso-context';
 import type { FolderEntry } from '../library/rail';
 import { EditorBody } from './editor-body';
 import { EditorRail } from './editor-rail';
 import { EditorTabs } from './editor-tabs';
+import { Organize } from './organize';
 import { TestInsert } from './test-insert';
 import { useEditorDraft, type SaveStatus } from './use-editor-draft';
 import './editor.css';
 
-const TYPE_WORDS: Record<string, string> = {
-  text: 'Text',
-  markdown: 'Markdown',
-  code: 'Code',
-  command: 'Command',
-  prompt: 'Prompt',
-  template: 'Template',
-  ai_action: 'AI action',
-  link: 'Link',
+const TYPE_WORDS: Record<string, readonly [string, string]> = {
+  text: ['Text', '文本'],
+  markdown: ['Markdown', 'Markdown'],
+  code: ['Code', '代码'],
+  command: ['Command', '命令'],
+  prompt: ['Prompt', '提示词'],
+  template: ['Template', '模板'],
+  ai_action: ['AI action', 'AI 操作'],
+  link: ['Link', '链接'],
 };
 
-function statusText(status: SaveStatus, version: number | null, savedAt: number | null): string {
-  if (status === 'saving') return 'Saving…';
-  if (status === 'error') return 'Not saved';
-  if (status === 'draft' || version === null) return 'Draft';
+function statusText(
+  status: SaveStatus,
+  version: number | null,
+  savedAt: number | null,
+  tr: Tr,
+): string {
+  if (status === 'saving') return tr('Saving…', '保存中…');
+  if (status === 'error') return tr('Not saved', '未保存');
+  if (status === 'draft' || version === null) return tr('Draft', '草稿');
   const age = savedAt === null ? null : Date.now() - savedAt;
   const when =
     age === null || age < 60_000
-      ? 'just now'
+      ? tr('just now', '刚刚')
       : age < 3_600_000
-        ? `${String(Math.floor(age / 60_000))} min ago`
-        : 'earlier';
-  return `Saved · v${String(version)} · ${when}`;
+        ? tr(
+            `${String(Math.floor(age / 60_000))} min ago`,
+            `${String(Math.floor(age / 60_000))} 分钟前`,
+          )
+        : tr('earlier', '更早');
+  return tr(`Saved · v${String(version)} · ${when}`, `已保存 · v${String(version)} · ${when}`);
 }
 
 async function fetchFolderTree(): Promise<FolderEntry[]> {
@@ -51,14 +60,11 @@ async function fetchFolderTree(): Promise<FolderEntry[]> {
 }
 
 /** Router-state title carried from the Library's "Save as snippet" action. */
-function draftTitleFrom(state: unknown): string {
-  if (
-    typeof state === 'object' &&
-    state !== null &&
-    'draftTitle' in state &&
-    typeof state.draftTitle === 'string'
-  ) {
-    return state.draftTitle;
+/** Reads a seeded draft value handed over by another screen's navigation. */
+function draftValueFrom(state: unknown, key: 'draftTitle' | 'draftTrigger'): string {
+  if (typeof state === 'object' && state !== null && key in state) {
+    const value = (state as Record<string, unknown>)[key];
+    if (typeof value === 'string') return value;
   }
   return '';
 }
@@ -66,26 +72,55 @@ function draftTitleFrom(state: unknown): string {
 interface LoadedEditorProps {
   initial: Snippet | null;
   initialTitle: string;
+  initialTrigger: string | null;
   folders: FolderEntry[];
 }
 
-function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
+function LoadedEditor({ initial, initialTitle, initialTrigger, folders }: LoadedEditorProps) {
+  const tr = useTr();
   const navigate = useNavigate();
   const { draft, patch, status, errorMessage, version, savedAt, sensitiveKinds, savePulse } =
-    useEditorDraft(initial, initialTitle);
+    useEditorDraft(initial, initialTitle, initialTrigger);
+
+  // A saved snippet may add or change a trigger, so keep the espanso config in
+  // sync (debounced, and only when the integration is on). Seeded with the
+  // initial save time so opening an existing snippet does not trigger a sync.
+  const { notifyMutation } = useEspanso();
+  const lastSyncedAt = useRef<number | null>(savedAt);
+  useEffect(() => {
+    if (status === 'saved' && savedAt !== null && savedAt !== lastSyncedAt.current) {
+      lastSyncedAt.current = savedAt;
+      notifyMutation();
+    }
+  }, [status, savedAt, notifyMutation]);
+
+  // Replays the 140ms settle on each save by restarting the CSS animation
+  // in place. Never remount for this (e.g. a savePulse key): the quiet
+  // auto-save fires mid-typing, and a remount steals the caret and scroll
+  // position from under the user.
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (savePulse === 0) return;
+    const node = bodyScrollRef.current;
+    if (node === null) return;
+    node.removeAttribute('data-saved');
+    // Style flush between remove and re-add restarts the animation.
+    void node.offsetWidth;
+    node.setAttribute('data-saved', '');
+  }, [savePulse]);
 
   const folderName = folders.find(({ folder }) => folder.id === draft.folderId)?.folder.name;
 
   return (
     <main className="tv-ed">
       <div className="tv-ed-top">
-        <nav aria-label="Breadcrumb" className="tv-ed-crumbs">
+        <nav aria-label={tr('Breadcrumb', '面包屑导航')} className="tv-ed-crumbs">
           <button
             type="button"
             className="tv-ed-crumb-link"
             onClick={() => void navigate('/library')}
           >
-            Library
+            {tr('Library', '片段库')}
           </button>
           <span aria-hidden="true" className="tv-ed-crumb-sep">
             /
@@ -99,14 +134,14 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
             </>
           )}
           <span className="tv-ed-crumb tv-ed-crumb-current">
-            {draft.title === '' ? 'New snippet' : draft.title}
+            {draft.title === '' ? tr('New snippet', '新片段') : draft.title}
           </span>
         </nav>
         <div className="tv-ed-top-right">
           <TestInsert snippetId={draft.id} ready={status === 'saved' && draft.body.trim() !== ''} />
           <div className="tv-ed-status" data-status={status}>
             <span aria-hidden="true" className="tv-ed-status-dot" />
-            <span role="status">{statusText(status, version, savedAt)}</span>
+            <span role="status">{statusText(status, version, savedAt, tr)}</span>
           </div>
         </div>
       </div>
@@ -115,8 +150,10 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
         <section className="tv-ed-main">
           <div className="tv-ed-head">
             <div className="tv-ed-head-meta">
-              <TypeMark code={markFor(draft.snippetType)} />
-              <span className="tv-ed-head-kind">{TYPE_WORDS[draft.snippetType] ?? 'Text'}</span>
+              <TypeMark code={markForType(draft.snippetType)} />
+              <span className="tv-ed-head-kind">
+                {tr(...(TYPE_WORDS[draft.snippetType] ?? TYPE_WORDS.text ?? ['Text', '文本']))}
+              </span>
               {draft.trigger !== null && (
                 <span className="tv-ed-head-trigger">{draft.trigger}</span>
               )}
@@ -124,8 +161,8 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
             <input
               type="text"
               className="tv-ed-title"
-              aria-label="Snippet title"
-              placeholder="Untitled snippet"
+              aria-label={tr('Snippet title', '片段标题')}
+              placeholder={tr('Untitled snippet', '未命名片段')}
               value={draft.title}
               onChange={(event) => {
                 patch({ title: event.target.value });
@@ -134,9 +171,8 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
             <input
               type="text"
               className="tv-ed-desc"
-              aria-label="Description"
-              placeholder="描述(可选)"
-              lang="zh-Hans"
+              aria-label={tr('Description', '描述')}
+              placeholder={tr('Description (optional)', '描述(可选)')}
               value={draft.description ?? ''}
               onChange={(event) => {
                 const value = event.target.value;
@@ -144,12 +180,7 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
               }}
             />
           </div>
-          {/* key restarts the 140ms settle on every successful save */}
-          <div
-            key={savePulse}
-            className="tv-ed-body-scroll"
-            data-saved={savePulse > 0 || undefined}
-          >
+          <div ref={bodyScrollRef} className="tv-ed-body-scroll">
             <EditorBody
               value={draft.body}
               onChange={(value) => {
@@ -157,29 +188,33 @@ function LoadedEditor({ initial, initialTitle, folders }: LoadedEditorProps) {
               }}
             />
           </div>
+          <Organize draft={draft} onApply={patch} />
           <EditorTabs
             draft={draft}
             onPatch={patch}
             folders={folders}
             sensitiveKinds={sensitiveKinds}
             errorMessage={errorMessage}
+            saved={status === 'saved'}
           />
         </section>
-        <EditorRail draft={draft} />
+        <EditorRail draft={draft} version={version} />
       </div>
     </main>
   );
 }
 
 /**
- * Snippet editor (design Phase 2 · 1c): content first — the body reads at
+ * Snippet editor: content first — the body reads at
  * 14.5px/2.05 in the widest column; properties live in a bottom band;
  * the right rail answers "what will this produce and where can I call it".
  * Auto-saves quietly (no toast); the sensitive scan advises on save.
  */
 export function EditorPage() {
+  const tr = useTr();
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [initial, setInitial] = useState<Snippet | null>(null);
   const [ready, setReady] = useState(id === undefined);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -208,16 +243,38 @@ export function EditorPage() {
   if (loadFailed) {
     return (
       <main className="tv-ed tv-ed-missing">
-        <p>Your library is intact — this snippet just isn't available.</p>
-        <p lang="zh-Hans">片段库完好,只是该片段暂不可用。</p>
+        <p>
+          {tr(
+            "Your library is intact — this snippet just isn't available.",
+            '片段库完好,只是该片段暂不可用。',
+          )}
+        </p>
       </main>
     );
   }
   if (!ready) return <main className="tv-ed" aria-busy="true" />;
+  // Sensitive snippets never open in this editor (the backend refuses the
+  // save; the vault flow owns viewing and editing them).
+  if (initial !== null && initial.securityLevel === 'sensitive') {
+    return (
+      <main className="tv-ed tv-ed-missing">
+        <p>
+          {tr(
+            'Still safely encrypted — secret snippets are viewed and edited in the Vault.',
+            '内容仍安全地加密着——密钥片段在保险库中查看与编辑。',
+          )}
+        </p>
+        <button type="button" className="tv-ed-crumb-link" onClick={() => void navigate('/vault')}>
+          {tr('Open Vault', '前往保险库')}
+        </button>
+      </main>
+    );
+  }
   return (
     <LoadedEditor
       initial={initial}
-      initialTitle={draftTitleFrom(location.state)}
+      initialTitle={draftValueFrom(location.state, 'draftTitle')}
+      initialTrigger={draftValueFrom(location.state, 'draftTrigger') || null}
       folders={folders}
     />
   );

@@ -1,5 +1,5 @@
 //! Interactive live verification of the injection engine against TextEdit,
-//! mirroring the TASK-007 spike protocol on the formal API. It synthesizes
+//! mirroring the injection spike protocol on the formal API. It synthesizes
 //! keystrokes into a real GUI session, so it is excluded from the default
 //! test run and executed manually for acceptance:
 //!
@@ -120,7 +120,7 @@ fn injects_both_paths_into_textedit_and_restores_clipboard() {
     post_key(KEY_N, Some(CMD));
     sleep(Duration::from_millis(1000));
 
-    // Paste path (DEC-007 primary): delivery + clipboard restore. This is the
+    // Paste path (the primary one): delivery + clipboard restore. This is the
     // robust path and is asserted hard. The sentinel is placed immediately
     // before injection: the guarantee is that the clipboard as found at inject
     // time is restored.
@@ -143,7 +143,7 @@ fn injects_both_paths_into_textedit_and_restores_clipboard() {
 
     // Keystroke path (auxiliary): Private-source synthetic typing is subject
     // to the active IME / window focus, which makes automated delivery flaky
-    // to assert reliably here. It is proven by the TASK-007 spike and covered
+    // to assert reliably here. It is proven by the injection spike and covered
     // by the chunking unit tests; this run attempts it best-effort and reports
     // the observed outcome rather than failing the primary-path acceptance.
     let typed = "typvia typed path 键入验证";

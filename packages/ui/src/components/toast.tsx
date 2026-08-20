@@ -6,7 +6,7 @@ interface ToastProps {
   message: string;
   /**
    * Insert toasts are assertive — the user just changed another app's
-   * content (design handoff §Screen readers). Everything else is polite.
+   * content. Everything else is polite.
    */
   assertive?: boolean;
 }
@@ -19,7 +19,7 @@ interface ToastProps {
 export function Toast({ message, assertive = false }: ToastProps) {
   return (
     <output className="tv-toast" role="status" aria-live={assertive ? 'assertive' : 'polite'}>
-      <Caret height={13} blinking={false} />
+      <Caret height={13} />
       {message}
     </output>
   );

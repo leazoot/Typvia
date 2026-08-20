@@ -1,37 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { I18nProvider } from '../i18n';
 import { SearchLine } from './search-line';
-import { ListTray, SelectionPlate, SnippetRow } from './snippet-row';
 import { StatusDot } from './status-dot';
 import { Toast } from './toast';
-import { TopNav } from './top-nav';
 import { TypeMark } from './type-mark';
 
 afterEach(cleanup);
-
-const NAV_ITEMS = [
-  { key: '/', label: 'Home' },
-  { key: '/library', label: 'Library' },
-];
-
-describe('TopNav', () => {
-  it('marks the active item with aria-current and fires onNavigate', () => {
-    const onNavigate = vi.fn();
-    render(<TopNav items={NAV_ITEMS} activeKey="/library" onNavigate={onNavigate} />);
-    const active = screen.getByRole('button', { name: 'Library' });
-    expect(active.getAttribute('aria-current')).toBe('page');
-    expect(screen.getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Home' }));
-    expect(onNavigate).toHaveBeenCalledWith('/');
-  });
-
-  it('renders text only — no icons anywhere in navigation', () => {
-    const { container } = render(<TopNav items={NAV_ITEMS} activeKey="/" onNavigate={() => {}} />);
-    expect(container.querySelectorAll('svg, img')).toHaveLength(0);
-  });
-});
 
 describe('SearchLine', () => {
   it('is a real input with the decorative caret only while empty', () => {
@@ -45,7 +21,8 @@ describe('SearchLine', () => {
         label="Search snippets"
       />,
     );
-    expect(container.querySelector('.tv-caret')).not.toBeNull();
+    // No decorative caret ever — the native input caret is the only cursor.
+    expect(container.querySelector('.tv-caret')).toBeNull();
 
     const input = screen.getByRole('textbox', { name: 'Search snippets' });
     fireEvent.change(input, { target: { value: 'docker' } });
@@ -78,6 +55,16 @@ describe('TypeMark', () => {
     expect(screen.queryByRole('img', { name: 'CM' })).toBeNull();
   });
 
+  it('announces the Chinese full word under the zh locale, mark unchanged', () => {
+    render(
+      <I18nProvider locale="zh">
+        <TypeMark code="CM" />
+      </I18nProvider>,
+    );
+    const mark = screen.getByRole('img', { name: '命令' });
+    expect(mark.textContent).toBe('CM');
+  });
+
   it('tints only the Secret mark', () => {
     const { container } = render(
       <>
@@ -86,36 +73,6 @@ describe('TypeMark', () => {
       </>,
     );
     expect(container.querySelectorAll('.tv-type-mark.is-secret')).toHaveLength(1);
-  });
-});
-
-describe('SnippetRow and SelectionPlate', () => {
-  it('shows the trigger at rest and ↵ + action + caret when selected', () => {
-    const { rerender } = render(
-      <SnippetRow mark="CM" title="Docker tail logs" trigger=";dockerlog" />,
-    );
-    expect(screen.getByText(';dockerlog')).toBeDefined();
-
-    rerender(<SnippetRow mark="CM" title="Docker tail logs" trigger=";dockerlog" selected />);
-    expect(screen.queryByText(';dockerlog')).toBeNull();
-    expect(screen.getByText('↵')).toBeDefined();
-    expect(screen.getByText('Open')).toBeDefined();
-  });
-
-  it('travels as one plate translated by row height, and hides with no selection', () => {
-    const { rerender } = render(
-      <ListTray>
-        <SelectionPlate index={3} />
-      </ListTray>,
-    );
-    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(156px)');
-
-    rerender(
-      <ListTray>
-        <SelectionPlate index={null} />
-      </ListTray>,
-    );
-    expect(screen.queryByTestId('selection-plate')).toBeNull();
   });
 });
 

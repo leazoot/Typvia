@@ -1,0 +1,880 @@
+/* Typvia Workspace — the desktop shell and the interaction language every
+   workspace page speaks.
+
+   State → Peek → Reveal → Focus → Advanced, plus Search → Act on the pages.
+   The colour roles below are scoped to the shell so nothing leaks into the
+   mobile app, and colour only ever means state. Motion stays on the design
+   scale: nothing over 300ms. */
+
+.tvw-shell {
+  --tvw-bg: #f8f8f6;
+  --tvw-surface: #ffffff;
+  --tvw-hover: #f2f2ef;
+  --tvw-pressed: #ecece8;
+  --tvw-ink: #20201e;
+  --tvw-secondary: #74746f;
+  --tvw-tertiary: #a3a39d;
+  --tvw-divider: rgba(30, 30, 25, 0.07);
+  --tvw-divider-soft: rgba(30, 30, 25, 0.045);
+  --tvw-ok: #4f8060;
+  --tvw-warn: #b3814f;
+  --tvw-danger: #a5524a;
+  --tvw-sheet: #fdfdfc;
+  --tvw-scrim: rgba(32, 32, 30, 0.14);
+  --tvw-focus: 0 0 0 2px rgba(79, 128, 96, 0.5);
+  --tvw-shadow-menu: 0 1px 2px rgba(30, 30, 25, 0.06), 0 12px 32px -14px rgba(30, 30, 25, 0.28);
+  --tvw-shadow-sheet: 0 2px 8px rgba(30, 30, 25, 0.07), 0 30px 70px -28px rgba(30, 30, 25, 0.34);
+  --tvw-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tvw-micro: 120ms;
+  --tvw-standard: 180ms;
+  --tvw-sheet-in: 240ms;
+
+  min-height: 100vh;
+  background: var(--tvw-bg);
+  color: var(--tvw-ink);
+  font-family: var(--font-sans);
+}
+
+[data-theme='dark'] .tvw-shell {
+  --tvw-bg: #191918;
+  --tvw-surface: #20201f;
+  --tvw-hover: #242423;
+  --tvw-pressed: #272725;
+  --tvw-ink: #e9e8e4;
+  --tvw-secondary: #98978f;
+  --tvw-tertiary: #6b6a64;
+  --tvw-divider: rgba(233, 232, 228, 0.08);
+  --tvw-divider-soft: rgba(233, 232, 228, 0.05);
+  --tvw-ok: #6d9c7d;
+  --tvw-warn: #c49768;
+  --tvw-danger: #c07a72;
+  --tvw-sheet: #232322;
+  --tvw-scrim: rgba(0, 0, 0, 0.34);
+  --tvw-shadow-menu: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --tvw-shadow-sheet: 0 30px 70px -28px rgba(0, 0, 0, 0.75);
+}
+
+/* The vault is the same room, one step quieter — never another theme. */
+.tvw-main[data-surface='vault'] {
+  background: #f6f6f3;
+}
+
+[data-theme='dark'] .tvw-main[data-surface='vault'] {
+  background: #171716;
+}
+
+/* The app carries no global border-box reset, and every row, menu item, field
+   and popover item in this layer pairs `width: 100%` with horizontal padding —
+   under content-box each of those overflows its container by exactly its
+   padding, which clips the right end of a row. Declared once for the surfaces
+   this layer owns, so the older pages keep their own box model. */
+:is(.tvw-header, .tvw-palette, .tvh, .tvl, .tvv, .tva, .tvt),
+:is(.tvw-header, .tvw-palette, .tvh, .tvl, .tvv, .tva, .tvt) * {
+  box-sizing: border-box;
+}
+
+/* ---------- header ---------- */
+
+.tvw-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 56px;
+  padding: 0 18px;
+  background: var(--tvw-bg);
+}
+
+.tvw-main {
+  min-height: calc(100vh - 56px);
+}
+
+/* Workspace transition: opacity plus 4px of travel, never a page slide. */
+.tvw-enter {
+  animation: tvw-enter 170ms var(--tvw-ease);
+}
+
+@keyframes tvw-enter {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+
+/* ---------- context navigation ---------- */
+
+.tvw-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tvw-nav-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--tvw-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background var(--tvw-micro) var(--tvw-ease),
+    color var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-nav-item:hover {
+  background: var(--tvw-hover);
+  color: var(--tvw-ink);
+}
+
+.tvw-nav-item[aria-current='page'],
+.tvw-nav-item.is-active {
+  color: var(--tvw-ink);
+  font-weight: 600;
+}
+
+/* 2px micro indicator — the only mark an active destination gets. */
+.tvw-nav-item[aria-current='page']::after,
+.tvw-nav-item.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 12px;
+  height: 2px;
+  margin-left: -6px;
+  border-radius: 1px;
+  background: var(--tvw-ink);
+}
+
+.tvw-nav-item:focus-visible {
+  outline: none;
+  box-shadow: var(--tvw-focus);
+}
+
+/* The bold ghost holds the 600-weight width so activation shifts nothing. */
+.tvw-nav-text {
+  display: inline-block;
+  text-align: center;
+}
+
+.tvw-nav-text::after {
+  content: attr(data-label);
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+}
+
+.tvw-nav-caret {
+  display: inline-block;
+  color: var(--tvw-tertiary);
+  font-size: 9px;
+  transition: transform var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-nav-item[aria-expanded='true'] .tvw-nav-caret {
+  transform: rotate(180deg);
+}
+
+/* Settings morphs between glyph and word: the label's width animates. */
+.tvw-nav-morph {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  white-space: nowrap;
+  transition:
+    max-width var(--tvw-standard) var(--tvw-ease),
+    opacity var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-nav-item:hover .tvw-nav-morph,
+.tvw-nav-item.is-active .tvw-nav-morph {
+  max-width: 88px;
+  opacity: 1;
+  margin-left: 5px;
+}
+
+.tvw-nav-shortcut {
+  color: var(--tvw-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+/* ---------- workspace switcher ---------- */
+
+.tvw-pop-wrap {
+  position: relative;
+}
+
+.tvw-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 268px;
+  padding: 6px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 12px;
+  background: var(--tvw-surface);
+  box-shadow: var(--tvw-shadow-menu);
+  animation: tvw-pop-in 150ms var(--tvw-ease);
+}
+
+@keyframes tvw-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.tvw-pop-label {
+  padding: 7px 10px 5px;
+  color: var(--tvw-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tvw-pop-item {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-pop-item:hover {
+  background: var(--tvw-hover);
+}
+
+.tvw-pop-item:focus-visible {
+  outline: none;
+  box-shadow: var(--tvw-focus);
+}
+
+.tvw-pop-name {
+  display: block;
+  font-size: 13px;
+  color: var(--tvw-ink);
+}
+
+.tvw-pop-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--tvw-secondary);
+}
+
+/* The shortcut arrives on hover; the current room keeps a quiet dot instead. */
+.tvw-pop-item .tvw-nav-shortcut {
+  opacity: 0;
+  transition: opacity var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-pop-item:hover .tvw-nav-shortcut,
+.tvw-pop-item:focus-visible .tvw-nav-shortcut {
+  opacity: 1;
+}
+
+.tvw-pop-here {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tvw-ok);
+}
+
+/* ---------- command palette ---------- */
+
+.tvw-scrim-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--tvw-scrim);
+  animation: tvw-fade 150ms var(--tvw-ease);
+}
+
+@keyframes tvw-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.tvw-palette {
+  position: fixed;
+  top: 14vh;
+  left: 50%;
+  z-index: 61;
+  width: min(560px, calc(100vw - 80px));
+  margin-left: min(-280px, calc(-50vw + 40px));
+  padding: 6px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 14px;
+  background: var(--tvw-surface);
+  box-shadow: var(--tvw-shadow-sheet);
+  animation: tvw-palette-in 190ms var(--tvw-ease);
+}
+
+@keyframes tvw-palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.99);
+  }
+}
+
+.tvw-palette-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--tvw-divider-soft);
+}
+
+.tvw-palette-field input {
+  flex: 1;
+  border: 0;
+  background: none;
+  color: var(--tvw-ink);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.tvw-palette-field input::placeholder {
+  color: var(--tvw-tertiary);
+}
+
+.tvw-palette-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.tvw-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--tvw-ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tvw-palette-item[aria-selected='true'],
+.tvw-palette-item:hover {
+  background: var(--tvw-hover);
+}
+
+.tvw-palette-item .tvw-nav-shortcut {
+  margin-left: auto;
+}
+
+.tvw-palette-empty {
+  padding: 14px 12px 16px;
+  color: var(--tvw-secondary);
+  font-size: 12.5px;
+}
+
+/* ---------- shared row language ---------- */
+
+.tvw-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  transition: background var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-row:hover {
+  background: var(--tvw-hover);
+}
+
+.tvw-row:focus-visible {
+  outline: none;
+  box-shadow: var(--tvw-focus);
+}
+
+/* 2px left indicator on hover — the same peek mark the settings rows use. */
+.tvw-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--tvw-ink);
+  opacity: 0;
+  transition: opacity var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-row:hover::before,
+.tvw-row.is-open::before {
+  opacity: 0.28;
+}
+
+.tvw-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.tvw-row-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tvw-ink);
+}
+
+.tvw-row-preview {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--tvw-secondary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tvw-row-meta {
+  color: var(--tvw-tertiary);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* Contextual actions: nothing until the pointer (or keyboard) arrives. */
+.tvw-hover-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(4px);
+  transition:
+    opacity var(--tvw-micro) var(--tvw-ease),
+    transform var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-row:hover .tvw-hover-actions,
+.tvw-row:focus-within .tvw-hover-actions,
+.tvw-hover-actions.is-pinned {
+  opacity: 1;
+  transform: none;
+}
+
+/* The row's resting meta (trigger token, star, usage count) occupies the same
+   place as the contextual actions, so it hands that place over whole — the two
+   layers cross-fade and never print on top of each other. The
+   selectors mirror the reveal rules above exactly; if they ever drift, the
+   layers overlap. */
+.tvw-row-rest {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: opacity var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-row:hover .tvw-row-rest,
+.tvw-row:focus-within .tvw-row-rest {
+  opacity: 0;
+}
+
+.tvw-act {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--tvw-secondary);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--tvw-micro) var(--tvw-ease),
+    color var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-act:hover {
+  background: var(--tvw-pressed);
+  color: var(--tvw-ink);
+}
+
+.tvw-act:disabled {
+  color: var(--tvw-tertiary);
+  cursor: default;
+}
+
+.tvw-act:focus-visible {
+  outline: none;
+  box-shadow: var(--tvw-focus);
+}
+
+.tvw-act.is-cta {
+  color: var(--tvw-ink);
+}
+
+.tvw-act.is-done {
+  color: var(--tvw-ok);
+}
+
+/* ---------- menus (overflow ··· and context menu) ---------- */
+
+.tvw-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.tvw-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 55;
+  min-width: 176px;
+  padding: 5px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 10px;
+  background: var(--tvw-surface);
+  box-shadow: var(--tvw-shadow-menu);
+  animation: tvw-pop-in 140ms var(--tvw-ease);
+}
+
+.tvw-menu.is-fixed {
+  position: fixed;
+  top: auto;
+  right: auto;
+}
+
+.tvw-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--tvw-ink);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--tvw-micro) var(--tvw-ease),
+    color var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-menu button:hover {
+  background: var(--tvw-hover);
+}
+
+/* Destructive items carry red only on hover, never as resting decoration. */
+.tvw-menu button.danger:hover {
+  color: var(--tvw-danger);
+}
+
+.tvw-menu button:focus-visible {
+  outline: none;
+  box-shadow: var(--tvw-focus);
+}
+
+.tvw-menu hr {
+  height: 1px;
+  margin: 5px 4px;
+  border: 0;
+  background: var(--tvw-divider-soft);
+}
+
+/* ---------- trigger token ---------- */
+
+.tvw-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 5px;
+  background: var(--tvw-hover);
+  color: var(--tvw-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.tvw-trigger .tvw-trigger-mark {
+  color: var(--tvw-tertiary);
+  font-size: 10px;
+}
+
+/* ---------- small parts ---------- */
+
+.tvw-label {
+  color: var(--tvw-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tvw-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tvw-tertiary);
+}
+
+.tvw-dot.ok {
+  background: var(--tvw-ok);
+}
+
+.tvw-dot.warn {
+  background: var(--tvw-warn);
+}
+
+.tvw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tvw-secondary);
+  font-size: 12px;
+}
+
+.tvw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 7px;
+  background: none;
+  color: var(--tvw-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background var(--tvw-micro) var(--tvw-ease),
+    color var(--tvw-micro) var(--tvw-ease);
+}
+
+.tvw-chip:hover {
+  background: var(--tvw-hover);
+  color: var(--tvw-ink);
+}
+
+.tvw-chip[aria-pressed='true'] {
+  background: var(--tvw-pressed);
+  color: var(--tvw-ink);
+}
+
+.tvw-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--tvw-focus);
+}
+
+/* Room marks: the same two-character mono vocabulary as the snippet type
+   marks, without pretending a room is a snippet type. */
+.tvw-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 20px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 4px;
+  background: var(--tvw-hover);
+  color: var(--tvw-secondary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.tvw-glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--tvw-tertiary);
+}
+
+.tvw-glyph svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tvw-key {
+  display: inline-block;
+  color: var(--tvw-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.tvw-mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* Fold: grid-rows, so nothing animates height directly. */
+.tvw-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--tvw-standard) var(--tvw-ease);
+}
+
+.tvw-fold.open {
+  grid-template-rows: 1fr;
+}
+
+.tvw-fold > div {
+  overflow: hidden;
+  /* Closed folds are out of the tab order and out of the a11y tree, not just
+     visually collapsed. */
+  visibility: hidden;
+  transition: visibility 0s linear var(--tvw-standard);
+}
+
+.tvw-fold.open > div {
+  visibility: visible;
+  transition: visibility 0s;
+}
+
+.tvw-fold-inner {
+  padding-top: 8px;
+}
+
+/* Inline confirmation — the product has exactly one modal, and it is the
+   vault unlock; everything else confirms in place. */
+.tvw-confirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 10px;
+  background: var(--tvw-surface);
+}
+
+.tvw-confirm-text {
+  flex: 1;
+  font-size: 13px;
+}
+
+.tvw-confirm-note {
+  display: block;
+  margin-top: 3px;
+  color: var(--tvw-secondary);
+  font-size: 12px;
+}
+
+/* Floating action strip for multi-selection. */
+.tvw-selbar {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 16px;
+  border: 1px solid var(--tvw-divider);
+  border-radius: 12px;
+  background: var(--tvw-surface);
+  box-shadow: var(--tvw-shadow-menu);
+  transform: translateX(-50%);
+  animation: tvw-strip-in 180ms var(--tvw-ease);
+}
+
+@keyframes tvw-strip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.tvw-selbar-count {
+  color: var(--tvw-secondary);
+  font-size: 12.5px;
+}
+
+/* Empty states are built from words and a caret, never an illustration. */
+.tvw-empty {
+  padding: 34px 2px;
+  color: var(--tvw-secondary);
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+.tvw-empty strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--tvw-ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* A hairline that carries progress or remaining life — never a dashboard. */
+.tvw-thread {
+  position: relative;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tvw-divider);
+  overflow: hidden;
+}
+
+.tvw-thread span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 1px;
+  background: var(--tvw-ok);
+  transition: width var(--tvw-standard) var(--tvw-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tvw-shell *,
+  .tvw-shell *::before,
+  .tvw-shell *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

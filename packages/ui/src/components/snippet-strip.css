@@ -1,0 +1,153 @@
+/* Editorial strip (design: typvia_mobile_export): full-bleed row, hairline
+   separator, no fill and no border box. The list container strips the last
+   row's separator. */
+.tv-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 17px 0;
+  border: none;
+  border-bottom: 1px solid var(--tvm-hairline);
+  background: none;
+  text-align: left;
+  cursor: default;
+  transition: transform var(--tvm-motion-micro, 150ms) var(--curve-standard);
+}
+
+.tv-strip-list > :last-child .tv-strip,
+.tv-strip-list > .tv-strip:last-child {
+  border-bottom: none;
+}
+
+/* Press feedback: the row compresses slightly — quiet, no springs. */
+.tv-strip:active:not([aria-disabled]) {
+  transform: scale(0.985);
+}
+
+.tv-strip:focus-visible {
+  outline: none;
+  border-radius: var(--tvm-radius-block, 8px);
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-strip {
+    transition: none;
+  }
+
+  .tv-strip:active:not([aria-disabled]) {
+    transform: none;
+  }
+}
+
+.tv-strip-main {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+.tv-strip-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.014em;
+}
+
+:lang(zh-Hans) .tv-strip-title {
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.tv-strip-preview {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+}
+
+.tv-strip-preview.is-mono {
+  font-family: var(--font-mono);
+}
+
+/* Locked vault rows: a dots line stands in for the preview. */
+.tv-strip-dots {
+  display: block;
+  margin-top: 8px;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+}
+
+.tv-strip-meta {
+  display: block;
+  margin-top: 10px;
+  color: var(--tvm-meta-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+/* Chinese meta lines are sans, tighter tracking, no case transform. */
+:lang(zh-Hans) .tv-strip-meta {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+
+.tv-strip-trailing {
+  flex: none;
+  padding-top: 2px;
+  color: var(--tvm-ghost);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Vault state label in the trailing column ("LOCKED"). */
+.tv-strip-locked {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--tvm-meta-soft);
+}
+
+:lang(zh-Hans) .tv-strip-locked {
+  font-family: var(--font-sans);
+  letter-spacing: 0.08em;
+}
+
+.tv-strip-skeleton-bar {
+  display: block;
+  height: 9px;
+  background: var(--tvm-hairline);
+  border-radius: var(--radius-mark);
+}
+
+.tv-strip-skeleton-title {
+  width: 45%;
+}
+
+.tv-strip-skeleton-preview {
+  width: 70%;
+  margin-top: 9px;
+}

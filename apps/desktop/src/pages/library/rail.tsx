@@ -1,4 +1,5 @@
 import type { Folder, LibraryCounts, Tag } from '@typvia/shared';
+import { useTr } from '@typvia/ui';
 import { useState } from 'react';
 import type { LibraryScope } from './use-snippet-pages';
 
@@ -10,11 +11,11 @@ export interface FolderEntry {
 
 type CountKey = 'total' | 'recent' | 'starred' | 'unsorted';
 
-const VIEWS: Array<{ view: LibraryScope['view']; label: string; countKey: CountKey }> = [
-  { view: 'all', label: 'All snippets', countKey: 'total' },
-  { view: 'recent', label: 'Recent', countKey: 'recent' },
-  { view: 'starred', label: 'Starred', countKey: 'starred' },
-  { view: 'unsorted', label: 'Unsorted', countKey: 'unsorted' },
+const VIEWS: Array<{ view: LibraryScope['view']; en: string; zh: string; countKey: CountKey }> = [
+  { view: 'all', en: 'All snippets', zh: '全部片段', countKey: 'total' },
+  { view: 'recent', en: 'Recent', zh: '最近', countKey: 'recent' },
+  { view: 'starred', en: 'Starred', zh: '星标', countKey: 'starred' },
+  { view: 'unsorted', en: 'Unsorted', zh: '未分类', countKey: 'unsorted' },
 ];
 
 /** Which management interaction is open; the rail shows one at a time. */
@@ -104,6 +105,7 @@ export function LibraryRail({
   onRenameTag,
   onDeleteTag,
 }: RailProps) {
+  const tr = useTr();
   const [mode, setMode] = useState<RailMode>({ kind: 'idle' });
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const folderCounts = new Map(counts?.folders.map((f) => [f.folderId, f.count]));
@@ -112,9 +114,9 @@ export function LibraryRail({
   };
 
   return (
-    <nav aria-label="Library" className="tv-lib-rail">
-      <div className="tv-lib-rail-label">Views</div>
-      {VIEWS.map(({ view, label, countKey }) => (
+    <nav aria-label={tr('Library', '片段库')} className="tv-lib-rail">
+      <div className="tv-lib-rail-label">{tr('Views', '视图')}</div>
+      {VIEWS.map(({ view, en, zh, countKey }) => (
         <button
           key={view}
           type="button"
@@ -124,7 +126,7 @@ export function LibraryRail({
             onScopeChange({ view, folderId: null });
           }}
         >
-          {label}
+          {tr(en, zh)}
           {counts !== null && (
             <span
               className="tv-lib-rail-count"
@@ -137,7 +139,7 @@ export function LibraryRail({
       ))}
 
       <div className="tv-lib-rail-label tv-lib-rail-section">
-        Folders
+        {tr('Folders', '文件夹')}
         <button
           type="button"
           className="tv-lib-rail-add"
@@ -145,13 +147,13 @@ export function LibraryRail({
             setMode({ kind: 'new-folder', parentId: null });
           }}
         >
-          New
+          {tr('New', '新建')}
         </button>
       </div>
       {mode.kind === 'new-folder' && mode.parentId === null && (
         <div className="tv-lib-rail-edit">
           <NameInput
-            label="New folder name"
+            label={tr('New folder name', '新文件夹名称')}
             onCommit={(name) => {
               onCreateFolder(name, null);
               idle();
@@ -167,7 +169,7 @@ export function LibraryRail({
             {mode.kind === 'rename-folder' && mode.id === folder.id ? (
               <div className="tv-lib-rail-edit" style={{ paddingLeft: 22 + depth * 12 }}>
                 <NameInput
-                  label={`Rename ${folder.name}`}
+                  label={tr(`Rename ${folder.name}`, `重命名 ${folder.name}`)}
                   defaultValue={folder.name}
                   onCommit={(name) => {
                     onRenameFolder(folder, name);
@@ -207,7 +209,7 @@ export function LibraryRail({
                     setMode({ kind: 'rename-folder', id: folder.id });
                   }}
                 >
-                  Rename
+                  {tr('Rename', '重命名')}
                 </button>
                 <button
                   type="button"
@@ -215,7 +217,7 @@ export function LibraryRail({
                     setMode({ kind: 'new-folder', parentId: folder.id });
                   }}
                 >
-                  New sub
+                  {tr('New sub', '新建子文件夹')}
                 </button>
                 <button
                   type="button"
@@ -224,14 +226,14 @@ export function LibraryRail({
                     setMode({ kind: 'confirm-delete-folder', id: folder.id });
                   }}
                 >
-                  Delete
+                  {tr('Delete', '删除')}
                 </button>
               </div>
             )}
             {mode.kind === 'new-folder' && mode.parentId === folder.id && (
               <div className="tv-lib-rail-edit" style={{ paddingLeft: 34 + depth * 12 }}>
                 <NameInput
-                  label={`New folder inside ${folder.name}`}
+                  label={tr(`New folder inside ${folder.name}`, `在 ${folder.name} 中新建文件夹`)}
                   onCommit={(name) => {
                     onCreateFolder(name, folder.id);
                     idle();
@@ -243,7 +245,10 @@ export function LibraryRail({
             {mode.kind === 'confirm-delete-folder' && mode.id === folder.id && (
               <div className="tv-lib-rail-confirm" style={{ paddingLeft: 22 + depth * 12 }}>
                 <span>
-                  {`Delete “${folder.name}” — ${formatCount(subtreeCount(folder.id))} snippets move out`}
+                  {tr(
+                    `Delete “${folder.name}” — ${formatCount(subtreeCount(folder.id))} snippets move out`,
+                    `删除「${folder.name}」— ${formatCount(subtreeCount(folder.id))} 个片段将移出`,
+                  )}
                 </span>
                 <span className="tv-lib-rail-confirm-actions">
                   <button
@@ -254,10 +259,10 @@ export function LibraryRail({
                       idle();
                     }}
                   >
-                    Delete
+                    {tr('Delete', '删除')}
                   </button>
                   <button type="button" onClick={idle}>
-                    Cancel
+                    {tr('Cancel', '取消')}
                   </button>
                 </span>
               </div>
@@ -267,7 +272,7 @@ export function LibraryRail({
       })}
 
       <div className="tv-lib-rail-label tv-lib-rail-section">
-        Tags
+        {tr('Tags', '标签')}
         <button
           type="button"
           className="tv-lib-rail-add"
@@ -275,13 +280,13 @@ export function LibraryRail({
             setMode({ kind: 'new-tag' });
           }}
         >
-          New
+          {tr('New', '新建')}
         </button>
       </div>
       {mode.kind === 'new-tag' && (
         <div className="tv-lib-rail-edit">
           <NameInput
-            label="New tag name"
+            label={tr('New tag name', '新标签名称')}
             onCommit={(name) => {
               onCreateTag(name);
               idle();
@@ -293,7 +298,7 @@ export function LibraryRail({
       {mode.kind === 'rename-tag' && (
         <div className="tv-lib-rail-edit">
           <NameInput
-            label="Rename tag"
+            label={tr('Rename tag', '重命名标签')}
             defaultValue={tags.find((tag) => tag.id === mode.id)?.name}
             onCommit={(name) => {
               const tag = tags.find((t) => t.id === mode.id);
@@ -332,7 +337,7 @@ export function LibraryRail({
                 setMode({ kind: 'rename-tag', id: selectedTagId });
               }}
             >
-              Rename
+              {tr('Rename', '重命名')}
             </button>
             <button
               type="button"
@@ -341,13 +346,18 @@ export function LibraryRail({
                 setMode({ kind: 'confirm-delete-tag', id: selectedTagId });
               }}
             >
-              Delete
+              {tr('Delete', '删除')}
             </button>
           </div>
         )}
       {mode.kind === 'confirm-delete-tag' && (
         <div className="tv-lib-rail-confirm">
-          <span>{`Delete tag “${tags.find((tag) => tag.id === mode.id)?.name ?? ''}” — snippets keep their text`}</span>
+          <span>
+            {tr(
+              `Delete tag “${tags.find((tag) => tag.id === mode.id)?.name ?? ''}” — snippets keep their text`,
+              `删除标签「${tags.find((tag) => tag.id === mode.id)?.name ?? ''}」— 片段内容保持不变`,
+            )}
+          </span>
           <span className="tv-lib-rail-confirm-actions">
             <button
               type="button"
@@ -359,10 +369,10 @@ export function LibraryRail({
                 idle();
               }}
             >
-              Delete
+              {tr('Delete', '删除')}
             </button>
             <button type="button" onClick={idle}>
-              Cancel
+              {tr('Cancel', '取消')}
             </button>
           </span>
         </div>

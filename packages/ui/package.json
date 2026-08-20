@@ -6,10 +6,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./ai": "./src/ai/index.ts",
+    "./sync": "./src/sync/index.ts",
     "./base.css": "./src/tokens/base.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@typvia/shared": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"

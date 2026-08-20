@@ -1,4 +1,5 @@
 import { IpcError, copySnippet, injectSnippet } from '@typvia/shared';
+import { useTr } from '@typvia/ui';
 import { useEffect, useRef, useState } from 'react';
 
 /** Seconds the countdown gives the user to focus their target app. */
@@ -27,6 +28,7 @@ interface TestInsertProps {
  * the OS has not granted injection permission.
  */
 export function TestInsert({ snippetId, ready }: TestInsertProps) {
+  const tr = useTr();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -51,21 +53,21 @@ export function TestInsert({ snippetId, ready }: TestInsertProps) {
     setPhase({ kind: 'working' });
     injectSnippet(id)
       .then(() => {
-        finish('Inserted');
+        finish(tr('Inserted', '已插入'));
       })
       .catch((error: unknown) => {
         if (error instanceof IpcError && error.code === 'permission_denied') {
           // Degrade to copy when the OS won't let us synthesize keystrokes.
           copySnippet(id).then(
             () => {
-              finish('Copied instead');
+              finish(tr('Copied instead', '已改为复制'));
             },
             () => {
-              finish("Couldn't insert");
+              finish(tr("Couldn't insert", '未能插入'));
             },
           );
         } else {
-          finish("Couldn't insert");
+          finish(tr("Couldn't insert", '未能插入'));
         }
       });
   };
@@ -98,12 +100,12 @@ export function TestInsert({ snippetId, ready }: TestInsertProps) {
 
   const label =
     phase.kind === 'counting'
-      ? 'Cancel'
+      ? tr('Cancel', '取消')
       : phase.kind === 'working'
-        ? 'Inserting…'
+        ? tr('Inserting…', '插入中…')
         : phase.kind === 'done'
           ? phase.label
-          : 'Test insert';
+          : tr('Test insert', '测试插入');
 
   return (
     <div className="tv-ed-testinsert">
@@ -117,7 +119,10 @@ export function TestInsert({ snippetId, ready }: TestInsertProps) {
       </button>
       {phase.kind === 'counting' && (
         <span role="status" className="tv-ed-testinsert-hint">
-          Focus your target app… {phase.remaining}
+          {tr(
+            `Focus your target app… ${String(phase.remaining)}`,
+            `请聚焦目标应用… ${String(phase.remaining)}`,
+          )}
         </span>
       )}
     </div>

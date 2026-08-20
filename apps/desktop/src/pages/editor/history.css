@@ -1,0 +1,434 @@
+/* Version history. The only screen where red and
+   green appear as fills — the diff tints are ~2% saturation tokens, always
+   paired with a −/+ glyph and a tinted gutter so the diff survives
+   greyscale. Dark tokens carry no diff tints; rows fall back to the sunken
+   surface and the glyph/gutter colors carry the meaning. No motion. */
+
+.tv-hist {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 46px);
+  overflow: hidden;
+}
+
+.tv-hist-back {
+  height: 28px;
+  padding: 0 var(--space-11);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-hist-back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-hist-columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ---- version rail ------------------------------------------------------ */
+
+.tv-hist-rail {
+  width: 268px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-edge);
+  background: var(--color-sunken);
+  padding-top: var(--space-22);
+}
+
+[data-theme='dark'] .tv-hist-rail {
+  border-right-color: var(--color-hairline-quiet);
+}
+
+.tv-hist-rail-head {
+  padding: 0 var(--space-22) var(--space-14);
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: var(--type-section-label-size);
+  font-weight: var(--type-section-label-weight);
+  letter-spacing: var(--type-section-label-tracking);
+  line-height: var(--type-section-label-leading);
+  text-transform: uppercase;
+}
+
+.tv-hist-rail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.tv-hist-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-11) var(--space-22);
+  border: none;
+  border-left: 2px solid transparent;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tv-hist-row:disabled {
+  cursor: default;
+}
+
+.tv-hist-row[data-current] {
+  border-left-color: var(--color-accent);
+  background: var(--color-edge);
+}
+
+.tv-hist-row[data-comparing] {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-tint-bg);
+}
+
+.tv-hist-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-hist-row-line {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.tv-hist-row-v {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+}
+
+.tv-hist-row[data-current] .tv-hist-row-v,
+.tv-hist-row[data-comparing] .tv-hist-row-v {
+  color: var(--color-ink);
+}
+
+.tv-hist-row-note {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tv-hist-row-note-comparing {
+  color: var(--color-accent);
+}
+
+.tv-hist-row-time {
+  margin-left: auto;
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+}
+
+.tv-hist-row-title {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-hist-rail-foot {
+  flex: none;
+  padding: var(--space-14) var(--space-22) 20px;
+  border-top: 1px solid var(--color-hairline-quiet);
+}
+
+.tv-hist-rail-foot p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1.7;
+}
+
+.tv-hist-rail-foot p[lang] {
+  margin-top: 5px;
+  color: var(--color-meta);
+  font-family: var(--font-cjk);
+  font-size: 11px;
+  line-height: 1.85;
+}
+
+/* ---- diff column ------------------------------------------------------- */
+
+.tv-hist-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tv-hist-diff-head {
+  flex: none;
+  padding: var(--space-26) var(--space-34) 0;
+}
+
+.tv-hist-diff-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-14);
+  margin-bottom: 4px;
+}
+
+.tv-hist-diff-title h1 {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-sub-page-title-size);
+  font-weight: var(--type-sub-page-title-weight);
+  letter-spacing: var(--type-sub-page-title-tracking);
+  line-height: var(--type-sub-page-title-leading);
+}
+
+.tv-hist-diff-meta {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+}
+
+.tv-hist-diff-head p[lang] {
+  margin: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-hairline-quiet);
+  color: var(--color-meta);
+  font-family: var(--font-cjk);
+  font-size: var(--type-body-size);
+  line-height: 1.65;
+}
+
+.tv-hist-diff-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-22) var(--space-34) 0;
+}
+
+.tv-hist-label {
+  margin-bottom: 12px;
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: var(--type-section-label-size);
+  font-weight: var(--type-section-label-weight);
+  letter-spacing: var(--type-section-label-tracking);
+  line-height: var(--type-section-label-leading);
+  text-transform: uppercase;
+}
+
+.tv-hist-diff {
+  margin-bottom: var(--space-26);
+  border: 1px solid var(--color-hairline-quiet);
+  border-radius: var(--radius-row);
+  overflow: hidden;
+}
+
+.tv-hist-diff-row {
+  display: flex;
+  border-bottom: 1px solid var(--color-hairline-quiet);
+  background: var(--color-paper);
+}
+
+.tv-hist-diff-row:last-child {
+  border-bottom: none;
+}
+
+.tv-hist-diff-gutter {
+  width: 40px;
+  flex: none;
+  padding: 9px 0;
+  background: var(--color-sunken);
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.tv-hist-diff-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  padding: 9px var(--space-14);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--type-code-size);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tv-hist-diff-sign {
+  flex: none;
+  width: 10px;
+}
+
+.tv-hist-diff-row[data-kind='removed'] {
+  background: var(--color-diff-remove-bg, var(--color-sunken));
+}
+
+.tv-hist-diff-row[data-kind='removed'] .tv-hist-diff-gutter {
+  background: var(--color-diff-remove-gutter, var(--color-edge));
+  color: var(--color-error);
+}
+
+.tv-hist-diff-row[data-kind='removed'] .tv-hist-diff-text {
+  color: var(--color-secondary);
+  text-decoration: line-through;
+}
+
+.tv-hist-diff-row[data-kind='removed'] .tv-hist-diff-sign {
+  color: var(--color-error);
+  text-decoration: none;
+}
+
+.tv-hist-diff-row[data-kind='added'] {
+  background: var(--color-diff-add-bg, var(--color-sunken));
+}
+
+.tv-hist-diff-row[data-kind='added'] .tv-hist-diff-gutter {
+  background: var(--color-diff-add-gutter, var(--color-edge));
+  color: var(--color-success);
+}
+
+.tv-hist-diff-row[data-kind='added'] .tv-hist-diff-sign {
+  color: var(--color-success);
+}
+
+/* ---- field comparison table -------------------------------------------- */
+
+.tv-hist-fields {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  column-gap: var(--space-22);
+  max-width: 720px;
+  margin-bottom: var(--space-26);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+}
+
+.tv-hist-fields > span {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline-quiet);
+  color: var(--color-secondary);
+}
+
+.tv-hist-fields > .tv-hist-fields-head {
+  color: var(--color-meta);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tv-hist-fields > .tv-hist-fields-new {
+  color: var(--color-ink);
+}
+
+.tv-hist-fields > .tv-hist-fields-same {
+  color: var(--color-meta);
+}
+
+/* ---- action bar -------------------------------------------------------- */
+
+.tv-hist-actions {
+  height: 64px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-13);
+  padding: 0 var(--space-34);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.tv-hist-restore {
+  height: 34px;
+  padding: 0 var(--space-14);
+  border: none;
+  border-radius: var(--radius-chip);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-hist-restore:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tv-hist-actions-note {
+  margin-left: auto;
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1.4;
+}
+
+/* ---- waiting / notice states ------------------------------------------- */
+
+.tv-hist-wait {
+  padding: var(--space-34) var(--space-40);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-13);
+}
+
+.tv-hist-wait-row {
+  height: 14px;
+  max-width: 420px;
+  border-radius: var(--radius-mark);
+  background: var(--color-sunken);
+}
+
+.tv-hist-notice {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-34) var(--space-40);
+}
+
+.tv-hist-notice p {
+  margin: 0 0 6px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+}
+
+.tv-hist-notice p[lang] {
+  color: var(--color-secondary);
+  font-family: var(--font-cjk);
+  line-height: calc(var(--type-body-leading) + var(--cn-leading-delta));
+}
+
+/* Security states carry a square outline, never a filled circle. */
+.tv-hist-notice-mark {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin-bottom: var(--space-13);
+  border: 1.5px solid var(--color-accent);
+  border-radius: 3px;
+}

@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev:web",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build && node scripts/prepare-host.mjs",
     "frontendDist": "../dist"
   },
   "app": {
@@ -14,10 +14,13 @@
       {
         "label": "main",
         "title": "Typvia",
-        "width": 1440,
-        "height": 900,
+        "width": 1080,
+        "height": 720,
         "minWidth": 840,
-        "minHeight": 600
+        "minHeight": 600,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 17 }
       },
       {
         "label": "panel",
@@ -28,12 +31,15 @@
         "resizable": false,
         "visible": false,
         "decorations": false,
+        "transparent": true,
+        "shadow": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": true,
         "focus": false
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": "default-src 'self'"
     }
@@ -41,6 +47,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": ["binaries/typvia-browser-host"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

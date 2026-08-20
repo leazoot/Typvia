@@ -1,5 +1,5 @@
 //! macOS injector: arboard clipboard + CGEvent keystroke synthesis, the
-//! exact combination validated by the TASK-007 spike (docs/spikes/injection.md).
+//! exact combination validated by the injection spike.
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -30,12 +30,20 @@ const TYPE_CHUNK_GAP: Duration = Duration::from_millis(15);
 
 pub(crate) struct MacInjector {
     clipboard: arboard::Clipboard,
+    /// The last value written by `copy_guarded`, held (zeroized) only for the
+    /// countdown window so a timed clear can tell a still-present secret from a
+    /// clipboard the user has since overwritten. The clipboard itself carries
+    /// the same plaintext for that same window, so this adds no exposure.
+    guarded: Option<Zeroizing<String>>,
 }
 
 impl MacInjector {
     pub(crate) fn new() -> Result<Self, InjectorError> {
         let clipboard = arboard::Clipboard::new().map_err(|_| InjectorError::Clipboard)?;
-        Ok(Self { clipboard })
+        Ok(Self {
+            clipboard,
+            guarded: None,
+        })
     }
 
     fn paste(&mut self, text: &str) -> Result<(), InjectorError> {
@@ -103,6 +111,30 @@ impl Injector for MacInjector {
         self.clipboard
             .set_text(text)
             .map_err(|_| InjectorError::Clipboard)
+    }
+
+    fn copy_guarded(&mut self, text: &str) -> Result<(), InjectorError> {
+        self.clipboard
+            .set_text(text)
+            .map_err(|_| InjectorError::Clipboard)?;
+        self.guarded = Some(Zeroizing::new(text.to_string()));
+        Ok(())
+    }
+
+    fn clear_guarded(&mut self) -> Result<bool, InjectorError> {
+        let Some(guarded) = self.guarded.take() else {
+            return Ok(false);
+        };
+        // Read the clipboard into a zeroized buffer and clear only when it
+        // still equals what we put there; a copy made since is left untouched.
+        let current = self.clipboard.get_text().ok().map(Zeroizing::new);
+        let still_ours = matches!(&current, Some(text) if text.as_str() == guarded.as_str());
+        if still_ours {
+            self.clipboard
+                .clear()
+                .map_err(|_| InjectorError::Clipboard)?;
+        }
+        Ok(still_ours)
     }
 }
 

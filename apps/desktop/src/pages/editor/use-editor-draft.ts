@@ -1,5 +1,12 @@
-import { IpcError, createSnippet, detectSensitive, updateSnippet } from '@typvia/shared';
+import {
+  createSnippet,
+  detectSensitive,
+  IpcError,
+  ipcErrorCopy,
+  updateSnippet,
+} from '@typvia/shared';
 import type { Snippet } from '@typvia/shared';
+import { useTr } from '@typvia/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Idle time after the last edit before the draft auto-saves. */
@@ -76,9 +83,16 @@ const EMPTY_DRAFT: Draft = {
  * settle are the only feedback. The sensitive scan runs on every successful
  * save and only ever advises; it never blocks the save.
  */
-export function useEditorDraft(initial: Snippet | null, initialTitle = ''): EditorDraft {
+export function useEditorDraft(
+  initial: Snippet | null,
+  initialTitle = '',
+  initialTrigger: string | null = null,
+): EditorDraft {
+  const tr = useTr();
   const [draft, setDraft] = useState<Draft>(
-    initial === null ? { ...EMPTY_DRAFT, title: initialTitle } : draftFrom(initial),
+    initial === null
+      ? { ...EMPTY_DRAFT, title: initialTitle, trigger: initialTrigger }
+      : draftFrom(initial),
   );
   const [status, setStatus] = useState<SaveStatus>(initial === null ? 'draft' : 'saved');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -146,7 +160,9 @@ export function useEditorDraft(initial: Snippet | null, initialTitle = ''): Edit
         });
     } catch (error) {
       setStatus('error');
-      setErrorMessage(error instanceof IpcError ? error.message : 'save failed');
+      setErrorMessage(
+        error instanceof IpcError ? tr(...ipcErrorCopy(error)) : tr('save failed', '保存失败'),
+      );
     } finally {
       saving.current = false;
       if (dirtyWhileSaving.current) {
@@ -154,7 +170,7 @@ export function useEditorDraft(initial: Snippet | null, initialTitle = ''): Edit
         void runSave();
       }
     }
-  }, []);
+  }, [tr]);
 
   const patch = useCallback(
     (changes: Partial<Draft>) => {

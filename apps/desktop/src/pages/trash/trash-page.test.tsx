@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { Snippet } from '@typvia/shared';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { I18nProvider } from '@typvia/ui';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SharedModule from '@typvia/shared';
@@ -53,12 +54,6 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     restoreSnippet: (...args: Parameters<typeof restoreSnippet>) => restoreSnippet(...args),
     deleteSnippetForever: (...args: Parameters<typeof deleteSnippetForever>) =>
       deleteSnippetForever(...args),
-    listFolderChildren: (parentId: string | null) =>
-      Promise.resolve(
-        parentId === null
-          ? [{ id: 'f-1', parentId: null, name: 'Infra', sortOrder: 0, createdAt: 1, updatedAt: 1 }]
-          : [],
-      ),
   };
 });
 
@@ -80,49 +75,78 @@ afterEach(() => {
 });
 
 describe('TrashPage', () => {
-  it('purges expired rows on entry and lists what is left with real days', async () => {
+  it('is compact: a count, a retention promise, and the rows', async () => {
     renderTrash();
     await screen.findByText('Trashed 1');
     expect(purgeExpiredTrash).toHaveBeenCalledTimes(1);
-    // Original folder is shown — restore returns items there.
-    expect(screen.getByText('Infra')).toBeDefined();
-    expect(screen.getByText('Unsorted')).toBeDefined();
-    // 30-day policy with real remaining days per row.
-    expect(screen.getByText('28 days left')).toBeDefined();
-    expect(screen.getByText('1 days left')).toBeDefined();
-    expect(screen.getByText(/After 30 days here/)).toBeDefined();
+    expect(screen.getByText('2 items · kept for 30 days')).toBeDefined();
+    expect(screen.getByText('Deleted 2 days ago')).toBeDefined();
+    // Remaining life is a number on a hairline, not a dashboard.
+    expect(screen.getByText('28 days')).toBeDefined();
+    expect(screen.getByText('1 days')).toBeDefined();
+    // Nothing destructive is on the surface.
+    expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
   });
 
-  it('restores a single row in place', async () => {
+  it('restores a row and says so where the row was', async () => {
     renderTrash();
-    await screen.findByText('Trashed 1');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Restore' })[0]!);
+    const row = await screen.findByRole('button', { name: 'Trashed 1' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Restore' }));
     expect(restoreSnippet).toHaveBeenCalledWith('t-1');
-    // The listing reloads without the restored row.
-    expect(await screen.findByText('1 in trash')).toBeDefined();
+    expect(await screen.findByText('Restored to the Library')).toBeDefined();
+    // No toast anywhere — the row's own place carries the message.
+    await waitFor(() => expect(screen.getByText('1 item · kept for 30 days')).toBeDefined(), {
+      timeout: 3000,
+    });
   });
 
-  it('forever-deletion demands an explicit confirmation with the real count', async () => {
+  it('keeps permanent deletion behind ··· and confirms in place', async () => {
+    renderTrash();
+    const row = await screen.findByRole('button', { name: 'Trashed 1' });
+    fireEvent.click(within(row).getByRole('button', { name: 'More actions' }));
+    // The menu is rendered outside the row on purpose: the row's own surface
+    // clips it (anchored-menu.ts).
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently' }));
+    expect(deleteSnippetForever).toHaveBeenCalledWith('t-1');
+  });
+
+  it('empties the trash only after an in-page confirmation with the real count', async () => {
     renderTrash();
     await screen.findByText('Trashed 1');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Trashed 1' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Trashed 2' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete forever' }));
-    // Nothing is deleted until the count-bearing confirmation is pressed.
+    fireEvent.click(screen.getByRole('button', { name: 'Trash options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Empty Trash' }));
+    const sheet = screen.getByRole('dialog', { name: 'Empty Trash' });
+    expect(within(sheet).getByText('Delete 2 items in the trash forever?')).toBeDefined();
     expect(deleteSnippetForever).not.toHaveBeenCalled();
-    expect(screen.getByText(/Delete 2 snippets forever\? This cannot be undone\./)).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete 2 snippets' }));
+
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Delete forever' }));
     expect(deleteSnippetForever).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText('Trash is empty')).toBeDefined();
+    expect(await screen.findByText('The trash is clean.')).toBeDefined();
   });
 
-  it('restores a whole selection through the batch action', async () => {
+  it('restores a whole selection from the floating strip', async () => {
     renderTrash();
     await screen.findByText('Trashed 1');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Trashed 1' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Trashed 2' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Restore 2 snippets' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Trashed 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Trashed 2' }));
+    const strip = screen.getByRole('group', { name: 'Selection' });
+    expect(within(strip).getByText('2 selected')).toBeDefined();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Restore 2' }));
     expect(restoreSnippet).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText('Trash is empty')).toBeDefined();
+    expect(await screen.findByText('The trash is clean.')).toBeDefined();
+  });
+
+  it('renders a single language — Chinese under the zh locale', async () => {
+    render(
+      <I18nProvider locale="zh">
+        <MemoryRouter initialEntries={['/trash']}>
+          <TrashPage />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    await screen.findByText('Trashed 1');
+    expect(screen.getByRole('heading', { name: '回收站' })).toBeDefined();
+    expect(screen.queryByText('Trash')).toBeNull();
+    expect(screen.getByText('剩 28 天')).toBeDefined();
   });
 });

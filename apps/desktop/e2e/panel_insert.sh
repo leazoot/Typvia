@@ -1,6 +1,6 @@
 #!/bin/zsh
-# First desktop E2E scenario (DEC-012, closes OQ-P1): the global command panel
-# insertion loop, end to end against the real running app.
+# First desktop E2E scenario: the global command panel insertion loop, end to
+# end against the real running app.
 #
 #   summon panel (⌘⇧V) → search → ↵ → assert the snippet text is delivered into
 #   a third-party app (TextEdit), the original clipboard is restored, the panel
@@ -9,12 +9,12 @@
 # Why a platform-native (osascript) harness and not tauri-driver/WebdriverIO:
 # tauri-driver supports only Windows + Linux (macOS WKWebView has no WebDriver),
 # and this flow is global-shortcut + cross-app injection — outside any
-# WebView-DOM driver's reach on any platform. See docs/11_DECISIONS.md DEC-012.
+# WebView-DOM driver's reach on any platform.
 #
 # Opt-in, like the injector live tests: requires a macOS GUI session with
 # Accessibility permission granted to the terminal driving it. Not run in
 # headless CI. Runs the app via `tauri dev` (the built binary is blank under the
-# production CSP — a separate packaging concern, see docs/12_PROGRESS.md).
+# production CSP — a separate packaging concern).
 #
 # Usage:  zsh apps/desktop/e2e/panel_insert.sh   (exit 0 = pass, 1 = fail)
 set -u

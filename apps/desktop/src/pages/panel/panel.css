@@ -1,28 +1,62 @@
 /*
- * Global command panel window. Fills its resident decorationless window; the
- * search field sits at the top with results (TASK-039) below and the key
- * legend pinned to the foot.
- *
- * Deviation (recorded): the design's panel radius (--radius-panel) and the e3
- * shadow / 28% scrim need a transparent window; this build ships an opaque
- * panel, so corner rounding, drop shadow and the scrim are deferred to a
- * transparency pass. The enter motion (below) matches the Motion spec.
+ * Global command panel window. The window is transparent and sized to the
+ * screen: a 28% scrim covers it and the panel card floats centered with the
+ * design's radius, hairline and e3 shadow. The search field sits at the top
+ * of the card with results below and the key legend pinned to the foot.
  */
+
+/* The panel window's page must not paint the paper base (main.tsx scopes). */
+.tv-window-panel,
+.tv-window-panel body {
+  background: transparent;
+}
+
 .tv-panel {
   position: fixed;
   inset: 0;
   display: flex;
-  flex-direction: column;
-  background: var(--color-paper);
+  align-items: center;
+  justify-content: center;
+  background: transparent;
   color: var(--color-ink);
 }
 
-.tv-panel-enter {
+/* Scrim to 28%, no backdrop blur (motion spec); replays per summon. */
+.tv-panel-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-modal);
+  animation: tv-panel-scrim-enter var(--duration-overlay-enter) var(--curve-standard);
+}
+
+@keyframes tv-panel-scrim-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tv-panel-card {
+  position: relative;
+  width: 760px;
+  height: 460px;
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
   display: flex;
-  flex: 1;
   flex-direction: column;
   min-height: 0;
   padding: var(--space-22) var(--space-26);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--elevation-e3);
+  overflow: hidden;
+}
+
+.tv-panel-enter {
   transform-origin: center top;
   animation: tv-panel-enter var(--duration-overlay-enter) var(--curve-standard);
 }
@@ -74,10 +108,18 @@
 }
 
 /* Selection is a lift, never a solid fill (design): shadow on paper in light,
- * a two-step lightness lift in dark. */
+ * a two-step lightness lift in dark. The hairline ring (a box-shadow, so no
+ * layout shift) defines the plate's edge on paper, where the shadow alone
+ * reads too faint (user ruling). */
 .tv-panel-row[data-selected] {
   background: var(--color-lifted, var(--color-paper));
-  box-shadow: var(--elevation-e1-row);
+  box-shadow:
+    0 0 0 1px var(--color-edge),
+    var(--elevation-e1-row);
+}
+
+.tv-panel-row[data-selected] .tv-panel-row-title {
+  font-weight: 600;
 }
 
 .tv-panel-row-main {
@@ -121,6 +163,23 @@
   font-size: 13px;
 }
 
+.tv-panel-hidden {
+  margin: 0;
+  padding: var(--space-8) var(--space-11);
+  color: var(--color-meta);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.tv-panel-notice {
+  flex: none;
+  margin: 0;
+  padding: var(--space-8) var(--space-11) var(--space-13);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
 .tv-panel-footer {
   flex: none;
   padding-top: var(--space-13);
@@ -148,7 +207,177 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tv-panel-enter {
+  .tv-panel-enter,
+  .tv-panel-scrim {
     animation: none;
   }
+}
+
+/* Template fill mode: fields form + resolved injection on ↵. */
+.tv-panel-fill {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tv-panel-fill-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-9) var(--space-13);
+  border-bottom: 1px solid var(--color-hairline-quiet);
+}
+.tv-panel-fill-title {
+  font-size: var(--type-body-size);
+  color: var(--color-ink);
+}
+.tv-panel-fill-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-9);
+  padding: var(--space-13);
+  overflow-y: auto;
+}
+.tv-panel-fill-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+}
+.tv-panel-fill-key {
+  width: 96px;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  color: var(--color-secondary);
+}
+.tv-panel-fill-req {
+  color: var(--color-accent);
+}
+.tv-panel-fill-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 var(--space-9);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-field);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  color: var(--color-ink);
+}
+.tv-panel-fill-input:focus-visible {
+  outline: var(--focus-ring);
+}
+.tv-panel-fill-secret {
+  flex: 1;
+  font-size: var(--type-meta-size);
+  color: var(--color-meta);
+}
+.tv-panel-fill-note {
+  margin: 0;
+  padding: 0 var(--space-13) var(--space-9);
+  font-size: var(--type-meta-size);
+  color: var(--color-secondary);
+}
+
+/* ---- sensitive verify --------------------------------------------------- */
+
+.tv-panel-verify {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-13);
+  gap: var(--space-9);
+}
+.tv-panel-verify-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-9);
+}
+.tv-panel-verify-title {
+  font-size: var(--type-body-size);
+  color: var(--color-ink);
+}
+.tv-panel-verify-sub {
+  margin: 0;
+  font-family: var(--font-cjk);
+  font-size: var(--type-meta-size);
+  color: var(--color-meta);
+}
+.tv-panel-verify-touch {
+  align-self: flex-start;
+  padding: var(--space-6) var(--space-13);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-field);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.tv-panel-verify-touch:hover {
+  border-color: var(--color-accent);
+}
+.tv-panel-verify-touch:focus-visible {
+  outline: var(--focus-ring);
+}
+.tv-panel-verify-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+}
+.tv-panel-verify-key {
+  width: 96px;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  color: var(--color-secondary);
+}
+.tv-panel-verify-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 var(--space-9);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-field);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  color: var(--color-ink);
+}
+.tv-panel-verify-input:focus-visible {
+  outline: var(--focus-ring);
+}
+.tv-panel-verify-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.tv-panel-verify-go {
+  padding: var(--space-6) var(--space-13);
+  background: var(--color-paper);
+  border: 1px solid var(--color-edge);
+  border-radius: var(--radius-field);
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  font-weight: 500;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.tv-panel-verify-go:hover {
+  border-color: var(--color-accent);
+}
+.tv-panel-verify-go:focus-visible {
+  outline: var(--focus-ring);
+}
+.tv-panel-verify-go:disabled {
+  color: var(--color-meta);
+  cursor: default;
+  border-color: var(--color-hairline);
+}
+.tv-panel-verify-error {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--color-secondary);
 }

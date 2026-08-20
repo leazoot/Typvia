@@ -1,7 +1,8 @@
 /**
  * IPC data shapes, mirroring the Rust DTOs in apps/desktop/src-tauri/src/dto.rs
- * (serde camelCase). v1 scope: normal snippets only — a sensitive snippet's
- * `body` is always `null` on this side of the boundary.
+ * (serde camelCase). A sensitive snippet's `body` is always `null` on this side
+ * of the boundary; its plaintext is only ever obtained through `vaultReveal` on
+ * an unlocked session.
  */
 
 export interface Snippet {
@@ -104,4 +105,26 @@ export interface SearchHit {
   title: string;
   tier: SearchTier;
   isSensitive: boolean;
+}
+
+/**
+ * Observable vault-session state (mirrors VaultStatusDto). Carries no key
+ * material — only whether a device vault exists, whether it is unlocked, and
+ * the timestamps the Vault page uses to render the auto-lock countdown.
+ */
+export interface VaultStatus {
+  initialized: boolean;
+  unlocked: boolean;
+  unlockedAt: number | null;
+  lastActivityAt: number | null;
+  idleTimeoutMs: number;
+}
+
+/**
+ * Mobile host boot smoke: proves the on-device database migrated
+ * and the snippet store answers. Served only by the mobile shell.
+ */
+export interface MobileBootstrap {
+  schemaVersion: number;
+  snippetTotal: number;
 }

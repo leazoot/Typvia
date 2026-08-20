@@ -1,6 +1,6 @@
 /* Base surface wiring for the token system: font stack and the paper/ink
  * pairing come from the active theme's CSS variables (applyTheme). All
- * component styling arrives with the component library (TASK-027). */
+ * component styling arrives with the component library. */
 body {
   margin: 0;
   background: var(--color-paper);

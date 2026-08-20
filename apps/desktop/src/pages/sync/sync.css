@@ -1,0 +1,658 @@
+/* Sync & devices, and conflict resolution.
+ * The page is a drawing, not a table: every device row IS a segment of the
+ * route, and only the line that is actually moving carries the segment. */
+
+.tv-sync {
+  display: flex;
+  min-height: 0;
+}
+
+.tv-sync-main {
+  flex: 1;
+  min-width: 0;
+  /* Right padding keeps the route's status column clear of the rail
+     (user-reported clipping). */
+  padding: var(--space-40) var(--space-26) var(--space-34) var(--space-44);
+}
+
+.tv-sync-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-page-title-size);
+  font-weight: var(--type-page-title-weight);
+  letter-spacing: var(--type-page-title-tracking);
+  line-height: var(--type-page-title-leading);
+  color: var(--color-ink);
+}
+
+.tv-sync-subtitle {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-cjk);
+  font-size: var(--type-desktop-row-size);
+  line-height: calc(var(--type-desktop-row-leading) + var(--cn-leading-delta));
+  color: var(--color-meta);
+}
+
+/* --- the route ---------------------------------------------------------- */
+
+.tv-sync-route {
+  margin: var(--space-22) 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 660px;
+}
+
+.tv-sync-row {
+  display: flex;
+  align-items: center;
+  height: 78px;
+}
+
+.tv-sync-row-name {
+  width: 196px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.tv-sync-row-title {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+
+.tv-sync-row-meta {
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1.4;
+  color: var(--color-meta);
+}
+
+.tv-sync-row-meta-warning {
+  color: var(--color-warning-text);
+}
+
+/* The node is a square outline, never a filled circle. This device is the
+ * only filled one — it is where you are, not a better device. */
+.tv-sync-node {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 1.5px solid var(--color-meta);
+  border-radius: var(--radius-mark);
+  box-sizing: border-box;
+}
+
+.tv-sync-node-self {
+  width: 20px;
+  height: 20px;
+  border-color: var(--color-accent);
+  border-radius: 5px;
+  position: relative;
+}
+
+.tv-sync-node-self::after {
+  content: '';
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+
+.tv-sync-node-conflict {
+  border-color: var(--color-warning);
+}
+
+.tv-sync-node-pending {
+  border-style: dashed;
+  border-color: var(--color-hairline-hover);
+}
+
+/* A revoked device keeps its node and gains a strike — it is a device that
+ * was here, not a device that never existed. */
+.tv-sync-node-revoked {
+  border-color: var(--color-hairline-hover);
+  position: relative;
+}
+
+.tv-sync-node-revoked::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: 50%;
+  height: 1.5px;
+  background: var(--color-error);
+  transform: rotate(-45deg);
+}
+
+.tv-sync-line {
+  flex: 1;
+  height: 1px;
+  background: var(--color-hairline);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Offline is a dashed line, not a missing one: the route still exists. */
+.tv-sync-line-offline {
+  background: none;
+  border-top: 1px dashed var(--color-hairline-hover);
+}
+
+.tv-sync-line-quiet {
+  background: var(--color-hairline-quiet);
+}
+
+.tv-sync-segment {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 1px;
+  background: var(--color-accent);
+  animation: tv-sync-flow var(--duration-ambient-loop) var(--curve-standard) infinite;
+}
+
+@keyframes tv-sync-flow {
+  from {
+    transform: translateX(-30px);
+  }
+  to {
+    transform: translateX(660px);
+  }
+}
+
+/* The conflict marker sits on the line that owns it. */
+.tv-sync-line-marker {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--color-warning);
+  transform: translateX(-50%);
+}
+
+.tv-sync-row-status {
+  width: 132px;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1.4;
+  color: var(--color-meta);
+}
+
+.tv-sync-row-status-live {
+  color: var(--color-success);
+}
+
+.tv-sync-row-action {
+  width: 132px;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  color: var(--color-accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tv-sync-row-action:focus-visible,
+.tv-sync-link:focus-visible,
+.tv-sync-button:focus-visible,
+.tv-sync-danger:focus-visible,
+.tv-sync-primary:focus-visible,
+.tv-sync-field:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- conflict summary card ---------------------------------------------- */
+
+.tv-sync-conflict-card {
+  max-width: 660px;
+  margin-top: var(--space-18);
+  padding: var(--space-18);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-field);
+  background: var(--color-sunken);
+}
+
+.tv-sync-conflict-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+  margin-bottom: var(--space-11);
+}
+
+.tv-sync-conflict-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--color-warning);
+}
+
+.tv-sync-run-row {
+  margin-top: var(--space-22);
+}
+
+.tv-sync-conflict-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.tv-sync-conflict-trigger {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  color: var(--color-meta);
+}
+
+/* --- right rail ---------------------------------------------------------- */
+
+.tv-sync-rail {
+  width: 376px;
+  flex: none;
+  border-left: 1px solid var(--color-edge);
+  background: var(--color-sunken);
+  padding: var(--space-40) var(--space-26) var(--space-26);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.tv-sync-rail-label {
+  font-family: var(--font-mono);
+  font-size: var(--type-section-label-size);
+  font-weight: var(--type-section-label-weight);
+  letter-spacing: var(--type-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-meta);
+  margin-bottom: var(--space-14);
+}
+
+.tv-sync-rail-note {
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: 1.7;
+  color: var(--color-meta);
+  margin: 0 0 var(--space-26);
+  text-wrap: pretty;
+}
+
+.tv-sync-card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-field);
+  padding: var(--space-22);
+  margin-bottom: var(--space-14);
+}
+
+.tv-sync-server-list {
+  margin: 0 0 var(--space-26);
+  padding: 0;
+  list-style: none;
+}
+
+.tv-sync-server-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-11);
+  padding: var(--space-9) 0;
+  border-bottom: 1px solid var(--color-hairline-quiet);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.tv-sync-server-row:last-child {
+  border-bottom: 0;
+}
+
+.tv-sync-server-mark {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+
+.tv-sync-server-url {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  color: var(--color-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 190px;
+}
+
+.tv-sync-rail-foot {
+  margin-top: auto;
+  padding-top: var(--space-18);
+  border-top: 1px solid var(--color-hairline-quiet);
+}
+
+.tv-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+  flex-wrap: wrap;
+}
+
+/* --- controls ------------------------------------------------------------ */
+
+.tv-sync-button,
+.tv-sync-primary,
+.tv-sync-danger {
+  flex: none;
+  height: 30px;
+  padding: 0 var(--space-13);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--color-hairline);
+  color: var(--color-secondary);
+}
+
+.tv-sync-button:hover,
+.tv-sync-primary:hover {
+  border-color: var(--color-hairline-hover);
+}
+
+/* The one filled control on the page: the choice being recommended by
+ * position, not by colour. */
+.tv-sync-primary {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-paper);
+}
+
+/* Destructive: red text over a hairline, never a red fill. */
+.tv-sync-danger {
+  border: 0;
+  padding: 0;
+  height: auto;
+  color: var(--color-error);
+  background: transparent;
+}
+
+.tv-sync-button:disabled,
+.tv-sync-primary:disabled,
+.tv-sync-danger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tv-sync-link {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tv-sync-field {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: var(--space-9);
+  padding: var(--space-8) var(--space-9);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink);
+  background: transparent;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-chip);
+}
+
+.tv-sync-empty {
+  max-width: 620px;
+  padding: var(--space-40) 0 0;
+}
+
+.tv-sync-lead {
+  margin: var(--space-14) 0 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-secondary);
+  max-width: 560px;
+  text-wrap: pretty;
+}
+
+/* Skeleton route while the first status is loading: the drawing's own
+ * vocabulary, never a spinner. */
+.tv-sync-skeleton-line {
+  height: 1px;
+  background: var(--color-hairline-quiet);
+  max-width: 660px;
+  margin: 39px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The line must never disappear; motion is replaced by a static
+   * accent segment resting at the start of its pass. */
+  .tv-sync-segment {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* The short authentication string: mono, spaced, and large enough to compare
+ * across two screens without leaning in. */
+.tv-sync-sas {
+  margin: var(--space-14) 0;
+  padding: var(--space-11) var(--space-14);
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  color: var(--color-ink);
+  background: var(--color-sunken);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-chip);
+}
+
+/* --- conflict resolution -------------------------------------------------- */
+
+.tv-conflict {
+  padding: var(--space-34) var(--space-40) var(--space-26);
+}
+
+.tv-conflict-count {
+  display: flex;
+  align-items: center;
+  gap: var(--space-11);
+  margin-bottom: var(--space-8);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-warning-text);
+}
+
+.tv-conflict-lead {
+  margin: var(--space-8) 0 var(--space-26);
+  max-width: 620px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-secondary);
+  text-wrap: pretty;
+}
+
+.tv-conflict-pair {
+  display: flex;
+  gap: var(--space-18);
+  align-items: stretch;
+}
+
+.tv-conflict-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* The card with the border is the version that kept the entity — position,
+ * not colour, and never a recommendation. */
+.tv-conflict-column-source {
+  border-color: var(--color-accent);
+  box-shadow: var(--elevation-e1);
+}
+
+.tv-conflict-head {
+  flex: none;
+  padding: var(--space-14) var(--space-18);
+  border-bottom: 1px solid var(--color-edge);
+  background: var(--color-paper);
+}
+
+.tv-conflict-head-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-9);
+  margin-bottom: var(--space-6);
+}
+
+.tv-conflict-mark {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 1.5px solid var(--color-hairline-hover);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+.tv-conflict-column-source .tv-conflict-mark {
+  border-color: var(--color-accent);
+}
+
+.tv-conflict-name {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.tv-conflict-time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-meta);
+}
+
+.tv-conflict-shape {
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  color: var(--color-secondary);
+  padding-left: var(--space-18);
+}
+
+.tv-conflict-body {
+  flex: 1;
+  min-height: 220px;
+  max-height: 420px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-14) var(--space-18);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-paper);
+}
+
+/* A sensitive conflict is compared as two locked rows: the bodies stay
+ * encrypted, so neither side is ever decrypted just to be looked at. */
+.tv-conflict-locked {
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+}
+
+.tv-conflict-foot {
+  flex: none;
+  padding: var(--space-13) var(--space-18);
+  border-top: 1px solid var(--color-edge);
+  background: var(--color-sunken);
+}
+
+.tv-conflict-keep {
+  width: 100%;
+  height: 34px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--color-hairline);
+  color: var(--color-secondary);
+}
+
+.tv-conflict-column-source .tv-conflict-keep {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.tv-conflict-keep:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tv-conflict-keep:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.tv-conflict-or {
+  flex: none;
+  width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-13);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-meta);
+}
+
+.tv-conflict-or-line {
+  width: 1px;
+  flex: 1;
+  background: var(--color-hairline-quiet);
+}
+
+.tv-conflict-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-13);
+  flex-wrap: wrap;
+  padding: var(--space-22) 0 var(--space-26);
+}
+
+.tv-conflict-promise {
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  color: var(--color-secondary);
+}

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { Snippet } from '@typvia/shared';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { I18nProvider } from '@typvia/ui';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as SharedModule from '@typvia/shared';
@@ -43,20 +44,26 @@ const createTag = vi.fn(() => Promise.resolve({}));
 const renameTag = vi.fn(() => Promise.resolve());
 const deleteTag = vi.fn(() => Promise.resolve());
 const copySnippet = vi.fn(() => Promise.resolve());
+const createSnippet = vi.fn(() => Promise.resolve({}));
+const updateSnippet = vi.fn(() => Promise.resolve({}));
+const trashSnippet = vi.fn(() => Promise.resolve());
+const snippetConvertToSensitive = vi.fn(() => Promise.resolve());
 const searchLibrary = vi.fn((query: string) =>
   Promise.resolve(
     query.includes('zzz')
       ? []
-      : [fakeSnippet(7), fakeSnippet(21), fakeSnippet(35)].map((s, i) => ({
-          ...s,
-          title: `Hit ${String(i)}`,
+      : [fakeSnippet(7), fakeSnippet(21), fakeSnippet(35)].map((snippet, index) => ({
+          ...snippet,
+          title: `Hit ${String(index)}`,
         })),
   ),
 );
 const listSnippetPage = vi.fn(
   (_view: string, _folderId: string | null, _type: string | null, limit: number, offset: number) =>
     Promise.resolve(
-      Array.from({ length: Math.min(limit, TOTAL - offset) }, (_, i) => fakeSnippet(offset + i)),
+      Array.from({ length: Math.min(limit, TOTAL - offset) }, (_, index) =>
+        fakeSnippet(offset + index),
+      ),
     ),
 );
 
@@ -78,7 +85,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
       }),
     countSnippets: (...args: Parameters<typeof countSnippets>) => countSnippets(...args),
     listSnippetPage: (...args: Parameters<typeof listSnippetPage>) => listSnippetPage(...args),
-    searchLibrary: (...args: Parameters<typeof searchLibrary>) => searchLibrary(...args),
+    searchLibraryDeep: (...args: Parameters<typeof searchLibrary>) => searchLibrary(...args),
     listFolderChildren: (parentId: string | null) =>
       Promise.resolve(
         parentId === null
@@ -114,6 +121,11 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     renameTag: (...args: Parameters<typeof renameTag>) => renameTag(...args),
     deleteTag: (...args: Parameters<typeof deleteTag>) => deleteTag(...args),
     copySnippet: (...args: Parameters<typeof copySnippet>) => copySnippet(...args),
+    createSnippet: (...args: Parameters<typeof createSnippet>) => createSnippet(...args),
+    updateSnippet: (...args: Parameters<typeof updateSnippet>) => updateSnippet(...args),
+    trashSnippet: (...args: Parameters<typeof trashSnippet>) => trashSnippet(...args),
+    snippetConvertToSensitive: (...args: Parameters<typeof snippetConvertToSensitive>) =>
+      snippetConvertToSensitive(...args),
     listTags: () => Promise.resolve([{ id: 'tag-1', name: 'prod', createdAt: 1 }]),
   };
 });
@@ -135,169 +147,196 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('LibraryPage', () => {
-  it('virtualises 50k rows: only a window of rows is ever mounted', async () => {
+describe('LibraryPage — browsing', () => {
+  it('virtualises 50k rows and keeps the complexity folded away', async () => {
     const { container } = renderPage();
     await screen.findByText('Snippet 0');
-    const rows = container.querySelectorAll('.tv-row');
+    const rows = container.querySelectorAll('.tvl-row');
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.length).toBeLessThan(100);
-    // Only the first page was fetched for the visible window.
-    expect(listSnippetPage).toHaveBeenCalledTimes(1);
     expect(listSnippetPage).toHaveBeenCalledWith('all', null, null, 200, 0);
+    // Nothing but the three views is exposed before the user asks.
+    expect(screen.queryByRole('button', { name: 'Command' })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Library' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'All' })).toBeDefined();
   });
 
-  it('shows rail counts and switches scope from the rail', async () => {
+  it('narrows by type from the filter popover and shows a removable chip', async () => {
     renderPage();
-    const rail = await screen.findByRole('navigation', { name: 'Library' });
-    expect(within(rail).getByText('50,000')).toBeDefined();
-    fireEvent.click(within(rail).getByRole('button', { name: /Starred/ }));
+    await screen.findByText('Snippet 0');
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Command' }));
+    expect(countSnippets).toHaveBeenLastCalledWith('all', null, 'command');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove type filter' }));
+    expect(countSnippets).toHaveBeenLastCalledWith('all', null, null);
+  });
+
+  it('switches views from the text tabs and folders from the popover', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    fireEvent.click(screen.getByRole('tab', { name: 'Starred' }));
     expect(countSnippets).toHaveBeenLastCalledWith('starred', null, null);
-    fireEvent.click(within(rail).getByRole('button', { name: /Infra/ }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Infra' }));
     expect(countSnippets).toHaveBeenLastCalledWith('folder', 'f-1', null);
   });
 
-  it('narrows by type when a filter chip is picked', async () => {
+  it('opens a row in place and edits from the peek', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Snippet 2' }));
+    const peek = screen.getByRole('region', { name: 'Details' });
+    expect(within(peek).getByText('body 2')).toBeDefined();
+    expect(within(peek).getByText(';t2')).toBeDefined();
+    fireEvent.click(within(peek).getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByText('editor-edit-stub')).toBeDefined();
+  });
+
+  it('walks rows with the arrow keys', async () => {
     renderPage();
     await screen.findByText('Snippet 0');
-    fireEvent.click(screen.getByRole('button', { name: 'Secret' }));
-    expect(countSnippets).toHaveBeenLastCalledWith('all', null, 'sensitive');
+    const input = screen.getByLabelText('Search snippets');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Snippet 0');
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Snippet 1');
   });
+});
 
-  it('selecting a row travels the plate and opens a read-only preview', async () => {
+describe('LibraryPage — row actions', () => {
+  it('copies from the row and confirms on the button', async () => {
     renderPage();
-    fireEvent.click(await screen.findByText('Snippet 2'));
-    const plate = screen.getByTestId('selection-plate');
-    expect(plate.style.transform).toBe('translateY(104px)');
-
-    const preview = screen.getByRole('complementary', { name: 'Snippet preview' });
-    expect(within(preview).getByRole('heading', { name: 'Snippet 2' })).toBeDefined();
-    expect(within(preview).getByText('body 2')).toBeDefined();
-    // A preview, never an edit form (design 1b).
-    expect(within(preview).queryAllByRole('textbox')).toHaveLength(0);
-    expect(preview.querySelectorAll('input, textarea, select')).toHaveLength(0);
+    const row = await screen.findByRole('button', { name: 'Snippet 1' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Copy' }));
+    expect(copySnippet).toHaveBeenCalledWith('s-1');
+    expect(await within(row).findByRole('button', { name: 'Copied' })).toBeDefined();
   });
 
-  it('copies the selected snippet from the preview and confirms inline', async () => {
+  it('keeps duplicate, vault and delete behind ··· , with delete last', async () => {
     renderPage();
-    fireEvent.click(await screen.findByText('Snippet 2'));
-    const preview = screen.getByRole('complementary', { name: 'Snippet preview' });
-    fireEvent.click(within(preview).getByRole('button', { name: 'Copy' }));
-    expect(copySnippet).toHaveBeenCalledWith('s-2');
-    // The label flips to a confirmation (usage is recorded host-side).
-    expect(await within(preview).findByRole('button', { name: 'Copied' })).toBeDefined();
+    const row = await screen.findByRole('button', { name: 'Snippet 1' });
+    fireEvent.click(within(row).getByRole('button', { name: 'More actions' }));
+    // The menu leaves the scrolling list on purpose — the list would clip it
+    // (anchored-menu.ts) — so it is queried from the document, not the row.
+    const menu = screen.getByRole('menu');
+    expect(document.querySelector('.tvl-list')?.contains(menu)).toBe(false);
+    const items = within(menu)
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent);
+    expect(items).toEqual(['Duplicate', 'Star', 'Move to Vault', 'Move to Trash']);
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Move to Vault' }));
+    expect(snippetConvertToSensitive).toHaveBeenCalledWith('s-1');
   });
 
-  it('replaces results instantly per keystroke and auto-selects the first hit', async () => {
+  it('offers the same actions on right-click', async () => {
+    renderPage();
+    const row = await screen.findByRole('button', { name: 'Snippet 1' });
+    fireEvent.contextMenu(row);
+    const menu = screen.getByRole('menu', { name: 'Snippet actions' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Move to Trash' }));
+    expect(trashSnippet).toHaveBeenCalledWith('s-1');
+  });
+
+  it('stars a row without leaving it', async () => {
+    renderPage();
+    const row = await screen.findByRole('button', { name: 'Snippet 1' });
+    fireEvent.click(within(row).getByRole('button', { name: '☆' }));
+    expect(updateSnippet).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 's-1', isFavorite: true }),
+    );
+  });
+});
+
+describe('LibraryPage — search and selection', () => {
+  it('replaces results on every keystroke', async () => {
     renderPage();
     await screen.findByText('Snippet 0');
     const input = screen.getByLabelText('Search snippets');
     fireEvent.change(input, { target: { value: 'd' } });
     fireEvent.change(input, { target: { value: 'do' } });
-    // One search per keystroke — no debounce.
     expect(searchLibrary).toHaveBeenCalledTimes(2);
     expect(searchLibrary).toHaveBeenLastCalledWith('do', 500);
 
-    await screen.findAllByText('Hit 0');
+    expect(await screen.findByText('Hit 0')).toBeDefined();
     expect(screen.queryByText('Snippet 0')).toBeNull();
-    // First hit is selected: the plate sits at row 0.
-    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(0px)');
-    // Result count is announced politely.
-    expect(screen.getByRole('status').textContent).toBe('3 results');
-  });
-
-  it('moves the selection with arrows and opens with Enter', async () => {
-    renderPage();
-    await screen.findByText('Snippet 0');
-    const input = screen.getByLabelText('Search snippets');
-    fireEvent.change(input, { target: { value: 'docker' } });
-    await screen.findAllByText('Hit 0');
-
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(52px)');
-    fireEvent.keyDown(input, { key: 'ArrowUp' });
-    expect(screen.getByTestId('selection-plate').style.transform).toBe('translateY(0px)');
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(await screen.findByText('editor-edit-stub')).toBeDefined();
+    expect(screen.getByText('3 results')).toBeDefined();
   });
 
   it('offers two real actions when nothing matches', async () => {
     renderPage();
     await screen.findByText('Snippet 0');
-    const input = screen.getByLabelText('Search snippets');
+    const input = screen.getByLabelText<HTMLInputElement>('Search snippets');
     fireEvent.change(input, { target: { value: 'zzz' } });
-    await screen.findByText('No snippet matches that');
+    expect(await screen.findByText('No snippet matches that')).toBeDefined();
 
-    // Clear filters returns to browsing.
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect((input as HTMLInputElement).value).toBe('');
+    expect(input.value).toBe('');
     expect(await screen.findByText('Snippet 0')).toBeDefined();
 
-    // Save as snippet goes to the editor with the typed text.
     fireEvent.change(input, { target: { value: 'zzz again' } });
     await screen.findByText('No snippet matches that');
     fireEvent.click(screen.getByRole('button', { name: 'Save as snippet' }));
     expect(await screen.findByText('editor-new-stub')).toBeDefined();
   });
 
-  it('checkbox selection raises the batch bar with a real count', async () => {
+  it('raises the floating strip on ⌘-click, never on a permanent checkbox', async () => {
     renderPage();
     await screen.findByText('Snippet 0');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 1' }));
-    expect(screen.getByText('2 selected')).toBeDefined();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 1' }));
-    expect(screen.getByText('1 selected')).toBeDefined();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Snippet 0' }), { metaKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Snippet 1' }), { metaKey: true });
+    const strip = screen.getByRole('group', { name: 'Selection' });
+    expect(within(strip).getByText('2 selected')).toBeDefined();
+
+    fireEvent.click(within(strip).getByRole('button', { name: 'Move' }));
+    fireEvent.click(within(strip).getByRole('menuitem', { name: 'Infra' }));
+    expect(batchMoveSnippets).toHaveBeenCalledWith(['s-0', 's-1'], 'f-1');
+    await waitFor(() => expect(screen.queryByText('2 selected')).toBeNull());
   });
 
-  it('batch move and tag go through the batch APIs via popovers', async () => {
+  it('extends a selection with ⇧-click and asks with the real number', async () => {
     renderPage();
     await screen.findByText('Snippet 0');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Snippet 0' }), { metaKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Snippet 2' }), { shiftKey: true });
+    const strip = screen.getByRole('group', { name: 'Selection' });
+    expect(within(strip).getByText('3 selected')).toBeDefined();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }));
-    const movePopover = screen.getByRole('listbox', { name: 'Move to folder' });
-    fireEvent.click(within(movePopover).getByRole('button', { name: 'Infra' }));
-    expect(batchMoveSnippets).toHaveBeenCalledWith(['s-0', 's-1'], 'f-1');
-    // The batch clears once the operation lands.
-    expect(await screen.findByText(/Local library/)).toBeDefined();
-    expect(screen.queryByText('2 selected')).toBeNull();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(strip).getByRole('button', { name: 'Delete 3 snippets' }));
+    expect(batchTrashSnippets).toHaveBeenCalledWith(['s-0', 's-1', 's-2']);
+  });
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
-    const tagPopover = screen.getByRole('listbox', { name: 'Add tag' });
-    fireEvent.click(within(tagPopover).getByRole('button', { name: 'prod' }));
+  it('tags a selection from the strip', async () => {
+    renderPage();
+    await screen.findByText('Snippet 0');
+    fireEvent.click(screen.getByRole('button', { name: 'Snippet 0' }), { metaKey: true });
+    const strip = screen.getByRole('group', { name: 'Selection' });
+    fireEvent.click(within(strip).getByRole('button', { name: 'Tag' }));
+    fireEvent.click(within(strip).getByRole('menuitem', { name: 'prod' }));
     expect(batchTagSnippets).toHaveBeenCalledWith(['s-0'], 'tag-1');
   });
+});
 
-  it('batch delete asks with the real number before trashing', async () => {
+describe('LibraryPage — folders and tags', () => {
+  it('keeps organisation folded away and still creates, renames and deletes', async () => {
     renderPage();
     await screen.findByText('Snippet 0');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 0' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Snippet 2' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    // Real count, never "Clear all".
-    const confirm = screen.getByRole('button', { name: 'Delete 2 snippets' });
-    fireEvent.click(confirm);
-    expect(batchTrashSnippets).toHaveBeenCalledWith(['s-0', 's-2']);
-  });
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Folders & tags' }));
+    const panel = await screen.findByRole('region', { name: 'Folders & tags' });
 
-  it('creates, renames and deletes folders with inline confirmation', async () => {
-    renderPage();
-    const rail = await screen.findByRole('navigation', { name: 'Library' });
-
-    // Create.
-    fireEvent.click(within(rail).getAllByRole('button', { name: 'New' })[0]!);
-    const input = within(rail).getByLabelText('New folder name');
+    fireEvent.click(within(panel).getAllByRole('button', { name: 'New' })[0]!);
+    const input = within(panel).getByLabelText('New folder name');
     fireEvent.change(input, { target: { value: 'Notes' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(createFolder).toHaveBeenCalledWith({ name: 'Notes', parentId: null, sortOrder: 2 });
 
-    // Activate a folder to reveal its management actions, then rename.
-    fireEvent.click(within(rail).getByRole('button', { name: /Infra/ }));
-    fireEvent.click(within(rail).getByRole('button', { name: 'Rename' }));
-    const rename = within(rail).getByLabelText('Rename Infra');
+    fireEvent.click(within(panel).getByRole('button', { name: /Infra/ }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Rename' }));
+    const rename = within(panel).getByLabelText('Rename Infra');
     fireEvent.change(rename, { target: { value: 'Infrastructure' } });
     fireEvent.keyDown(rename, { key: 'Enter' });
     expect(updateFolder).toHaveBeenCalledWith({
@@ -307,51 +346,28 @@ describe('LibraryPage', () => {
       sortOrder: 0,
     });
 
-    // Delete: inline confirmation carries the real subtree count.
-    fireEvent.click(within(rail).getByRole('button', { name: /Infra/ }));
-    fireEvent.click(within(rail).getByRole('button', { name: 'Delete' }));
-    expect(within(rail).getByText(/2,104 snippets move out/)).toBeDefined();
-    const confirmRow = within(rail).getByText(/snippets move out/).parentElement;
-    fireEvent.click(within(confirmRow as HTMLElement).getByRole('button', { name: 'Delete' }));
-    expect(deleteFolder).toHaveBeenCalledWith('f-1');
-  });
-
-  it('reorders sibling folders with alt+arrows', async () => {
-    renderPage();
-    const rail = await screen.findByRole('navigation', { name: 'Library' });
-    fireEvent.keyDown(within(rail).getByRole('button', { name: /Infra/ }), {
-      key: 'ArrowDown',
-      altKey: true,
-    });
-    // Swap persists a clean sequential order: both siblings get new slots.
-    expect(updateFolder).toHaveBeenCalledWith({
-      id: 'f-2',
-      name: 'Support',
-      parentId: null,
-      sortOrder: 0,
-    });
-    expect(updateFolder).toHaveBeenCalledWith({
-      id: 'f-1',
-      name: 'Infra',
-      parentId: null,
-      sortOrder: 1,
-    });
-  });
-
-  it('creates and deletes tags from the rail', async () => {
-    renderPage();
-    const rail = await screen.findByRole('navigation', { name: 'Library' });
-    fireEvent.click(within(rail).getAllByRole('button', { name: 'New' })[1]!);
-    const input = within(rail).getByLabelText('New tag name');
-    fireEvent.change(input, { target: { value: 'urgent' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.click(within(panel).getAllByRole('button', { name: 'New' })[1]!);
+    const tagInput = within(panel).getByLabelText('New tag name');
+    fireEvent.change(tagInput, { target: { value: 'urgent' } });
+    fireEvent.keyDown(tagInput, { key: 'Enter' });
     expect(createTag).toHaveBeenCalledWith('urgent');
+  });
+});
 
-    fireEvent.click(within(rail).getByRole('button', { name: 'prod' }));
-    fireEvent.click(within(rail).getByRole('button', { name: 'Delete' }));
-    expect(within(rail).getByText(/Delete tag “prod”/)).toBeDefined();
-    const confirmRow = within(rail).getByText(/Delete tag/).parentElement;
-    fireEvent.click(within(confirmRow as HTMLElement).getByRole('button', { name: 'Delete' }));
-    expect(deleteTag).toHaveBeenCalledWith('tag-1');
+describe('LibraryPage — language', () => {
+  it('renders single-language Chinese copy under locale zh', async () => {
+    render(
+      <I18nProvider locale="zh">
+        <MemoryRouter initialEntries={['/library']}>
+          <Routes>
+            <Route path="/library" element={<LibraryPage />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: '片段库' })).toBeDefined();
+    expect(screen.getByRole('tab', { name: '全部' })).toBeDefined();
+    expect(screen.getByLabelText('搜索片段')).toBeDefined();
+    expect(screen.queryByRole('tab', { name: 'All' })).toBeNull();
   });
 });

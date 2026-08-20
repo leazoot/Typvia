@@ -1,11 +1,22 @@
 /** Stable error codes shared with the Rust IPC layer (error.rs). */
-export type IpcErrorCode = 'validation' | 'conflict' | 'not_found' | 'permission_denied' | 'system';
+export type IpcErrorCode =
+  | 'validation'
+  | 'conflict'
+  | 'not_found'
+  | 'permission_denied'
+  | 'rule_blocked'
+  | 'unavailable'
+  | 'system';
 
 /**
  * Typed IPC failure. `validation` is user-correctable input, `conflict` /
- * `not_found` / `permission_denied` are business outcomes (the last one means
- * injection needs OS permission — callers fall back to copy), `system` is an
- * internal failure with a deliberately generic message.
+ * `not_found` / `permission_denied` / `rule_blocked` are business outcomes
+ * (`permission_denied` means injection needs OS permission — callers fall
+ * back to copy; `rule_blocked` means an app rule refused the action and the
+ * panel shows the rule notice instead; `unavailable` means a remote service
+ * could not be reached, which the UI shows as the offline state rather than a
+ * failure), `system` is an internal failure with a deliberately generic
+ * message.
  */
 export class IpcError extends Error {
   readonly code: IpcErrorCode;
@@ -22,6 +33,8 @@ const CODES: readonly IpcErrorCode[] = [
   'conflict',
   'not_found',
   'permission_denied',
+  'rule_blocked',
+  'unavailable',
   'system',
 ];
 

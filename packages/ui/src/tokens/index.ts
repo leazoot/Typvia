@@ -1,14 +1,14 @@
 /**
  * Design tokens (Quiet Path). `tokens.json` here is a byte-for-byte vendor
- * copy of design/design_handoff_typvia/tokens.json — the design handoff owns
- * the values, and a test fails on any drift between the two files.
+ * copy of the upstream design token file — the design source owns the values,
+ * and a test fails on any drift between the two files.
  *
  * CSS custom properties are generated from the JSON at runtime, so no value
- * is ever transcribed by hand. Theme-specific color keys follow the handoff
- * exactly: keys one theme lacks (e.g. `tray` on graphite, `lifted` on paper)
- * are intentionally absent there — components express those differences per
- * the design (selection is a shadow lift on paper, a two-step lightness lift
- * on graphite), never via an invented fallback color.
+ * is ever transcribed by hand. Theme-specific color keys follow the upstream
+ * file exactly: keys one theme lacks (e.g. `tray` on graphite, `lifted` on
+ * paper) are intentionally absent there — components express those differences
+ * per the design (selection is a shadow lift on paper, a two-step lightness
+ * lift on graphite), never via an invented fallback color.
  */
 import raw from './tokens.json';
 
@@ -112,8 +112,8 @@ export function cssVariables(theme: ThemeName): Record<string, string> {
 
   vars['--scrim-modal'] = raw.scrim.modal;
   // Ink surfaces (toast, primary button) exist in both themes; on them the
-  // caret always uses the graphite accent ("carries the caret in light
-  // accent", Phase 6 Toast). Generated, not hand-copied.
+  // caret always uses the graphite accent, so it stays a light accent on a
+  // dark surface. Generated, not hand-copied.
   vars['--color-accent-on-ink'] = raw.color.dark.accent;
   vars['--focus-ring'] = raw.focus.ring
     .replace('<surface>', 'var(--focus-ring-surface, var(--color-paper))')

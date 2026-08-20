@@ -1,3 +1,4 @@
+import { useTr } from '@typvia/ui';
 import { useEffect, useRef, useState } from 'react';
 
 /** Splits body text into plain runs and `{{variable}}` token runs. */
@@ -46,6 +47,7 @@ function offsetFromPoint(container: HTMLElement, x: number, y: number): number |
  * the clicked caret position carries over 1:1.
  */
 export function EditorBody({ value, onChange }: EditorBodyProps) {
+  const tr = useTr();
   const [editing, setEditing] = useState(value === '');
   const [caret, setCaret] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -66,7 +68,7 @@ export function EditorBody({ value, onChange }: EditorBodyProps) {
         className="tv-ed-body tv-ed-body-view"
         role="button"
         tabIndex={0}
-        aria-label="Edit snippet body"
+        aria-label={tr('Edit snippet body', '编辑片段正文')}
         onMouseDown={(event) => {
           event.preventDefault();
           setCaret(offsetFromPoint(event.currentTarget, event.clientX, event.clientY));
@@ -94,8 +96,8 @@ export function EditorBody({ value, onChange }: EditorBodyProps) {
     <textarea
       ref={textareaRef}
       className="tv-ed-body tv-ed-body-input"
-      aria-label="Snippet body"
-      placeholder="Write the snippet body…"
+      aria-label={tr('Snippet body', '片段正文')}
+      placeholder={tr('Write the snippet body…', '在此撰写片段正文…')}
       value={value}
       onChange={(event) => {
         onChange(event.target.value);

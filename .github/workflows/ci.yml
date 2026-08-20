@@ -56,6 +56,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/sync-server/go.mod
+          cache-dependency-path: apps/sync-server/go.sum
+
       - name: Install cargo-audit
         run: cargo install --locked cargo-audit
 
@@ -66,3 +71,80 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm audit
+
+      - name: Go vulnerability audit
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        working-directory: apps/sync-server
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the scan covers every commit, not just the tip.
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  # Linux desktop packaging: deb + AppImage artifacts.
+  # Push-to-main only — the checks job already compiles the workspace per PR,
+  # and bundling doubles the Rust build time.
+  linux-bundle:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libgtk-3-dev
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bundle deb + AppImage
+        run: pnpm --dir apps/desktop tauri build --bundles deb appimage
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: typvia-desktop-linux
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+  # Windows compile face for the desktop host and the native-messaging
+  # host: the registry-based manifest registration is
+  # cfg(windows)-only and cannot be cross-checked from macOS/Linux
+  # (libsqlite3-sys needs an msvc C toolchain). Push-to-main only, same
+  # rationale as linux-bundle.
+  windows-check:
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check windows targets
+        run: cargo check -p typvia-desktop -p typvia-browser-host

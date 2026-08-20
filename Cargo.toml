@@ -2,15 +2,21 @@
 resolver = "2"
 # Throwaway spike crates live outside the workspace so root-level quality
 # commands stay scoped to formal modules (spike code is exempt from lint).
-exclude = ["apps/mobile/src-tauri", "spikes/injection", "spikes/ffi"]
+exclude = ["spikes/injection", "spikes/ffi"]
 members = [
+    "apps/browser-host",
     "apps/desktop/src-tauri",
+    "apps/mobile/src-tauri",
+    "crates/ai",
     "crates/core",
     "crates/crypto",
     "crates/search",
+    "crates/semantic",
     "crates/sync",
     "crates/template",
     "crates/espanso-adapter",
+    "crates/host-service",
+    "crates/mobile-ffi",
 ]
 
 [workspace.package]

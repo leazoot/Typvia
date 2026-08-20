@@ -1,0 +1,30 @@
+# Secret scanning config for the local and CI secret scans.
+# Extends the default gitleaks rules. The allowlist admits only this
+# repository's deliberate fake values — tests and docs use loud
+# AKIA_FAKE-style markers precisely so nothing real-looking ever needs to
+# appear.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Deliberate fake values used by tests, docs and demos"
+regexes = [
+  '''AKIA[_]?FAKE[A-Z0-9_]*''',
+  '''FAKE_DEMO_PW''',
+  '''correct-horse-t087''',
+  '''sk_test_51NfEXAMPLEONLY''',
+]
+paths = [
+  # The sensitive-content detector's own fixtures are secret-shaped by
+  # definition (fake PEM/JWT bodies spelled FAKE); everything else in the
+  # tree stays scanned.
+  '''crates/core/tests/sensitive_detection\.rs''',
+  # Build artifacts and third-party trees (not committed; the git scan
+  # covers everything that ships).
+  '''node_modules/''',
+  '''^target/''',
+  '''dist/''',
+  '''\.pnpm/''',
+  '''src-tauri/gen/''',
+]

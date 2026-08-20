@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Typvia",
+  "version": "0.1.0",
+  "description": "Search and insert your Typvia snippets without leaving the browser.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "extension@typvia.dev",
+      "strict_min_version": "121.0"
+    }
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Typvia"
+  },
+  "background": {
+    "scripts": ["dist/background.js"],
+    "type": "module"
+  },
+  "permissions": ["nativeMessaging", "activeTab", "scripting"]
+}

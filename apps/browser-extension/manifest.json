@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Typvia",
+  "version": "0.1.0",
+  "description": "Search and insert your Typvia snippets without leaving the browser.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsxQHvjE/FuncOpvya4ve7kQevBjyhis1ZaUfaGEllt0XuVf3SV4UATqifobDN9pNyPEbIRSxwHrwCwe9vb55p8Uwe4t4D+LuLpZzEMy+m2GImTpc37ha9VJQoESwS/ewaLE1K0B4ytuzdHAIH9OeOmFLobPrOkzQr5ni7LSod/FfT2/lfwo58fMZTmYOvYIs25G4uH3B6Xg7650Sk7ZREx7IssvlmzFPephwObwBcONKR9d/FAJzptlfHcRfbcoqD84ZeNwcasZggLCsw3pLsY2F4qIp7ve6wwwofWdooU3TfqOdBDfvgqxUQ5/O/XKkYxQYriFjUPGzgc5zcY0rFwIDAQAB",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Typvia"
+  },
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "permissions": ["nativeMessaging", "activeTab", "scripting"]
+}

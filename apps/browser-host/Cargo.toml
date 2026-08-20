@@ -1,0 +1,26 @@
+[package]
+name = "typvia-browser-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native-messaging host serving the browser extension from the read-only snapshot"
+
+[lints]
+workspace = true
+
+[dependencies]
+# Wire (de)serialization for native-messaging JSON frames; already in tree.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Snapshot read model + validation (the only data this host may see).
+typvia-core = { path = "../../crates/core" }
+# Template placeholder parsing — parsing stays in Rust, never re-implemented
+# in the extension's JS.
+typvia-template = { path = "../../crates/template" }
+
+[dev-dependencies]
+# Real snapshot fixtures for the process-level end-to-end test: an in-memory
+# DB seeded through the same service layer the app uses. All in tree.
+rusqlite = { version = "0.38", features = ["bundled"] }
+tempfile = "3"
+typvia-host-service = { path = "../../crates/host-service" }

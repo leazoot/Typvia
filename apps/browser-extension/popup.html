@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Typvia</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="search-line">
+      <input id="search" type="text" autocomplete="off" spellcheck="false" />
+    </div>
+    <ul id="results" role="listbox"></ul>
+    <form id="variables" hidden></form>
+    <p id="note" role="status" aria-live="polite"></p>
+    <script type="module" src="dist/popup.js"></script>
+  </body>
+</html>

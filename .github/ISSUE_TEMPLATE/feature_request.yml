@@ -1,0 +1,82 @@
+name: Feature request
+description: Suggest a capability or an improvement.
+title: '[Feature]: '
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful feature requests describe a **problem**, not a solution.
+        A concrete story about what you were trying to do, and where the current
+        product got in your way, is worth far more than a proposed menu item —
+        it lets the design work start from the need instead of from one guess at
+        the answer.
+
+        Please do not include snippet content, passwords, tokens, or API keys.
+        Issues are public and permanent.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >-
+        Describe the situation, not the feature. What were you doing, what did you
+        want to happen, and what stopped you? If you have a workaround today,
+        describe that too — including why it is unsatisfying.
+      placeholder: >-
+        When I switch machines mid-task I lose track of which snippets I edited most
+        recently, so I end up searching for the same three items over and over...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Which platforms does this concern?
+      description: Select every platform where this would matter.
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - iOS
+        - Android
+        - Browser extension
+        - Sync server (self-hosted)
+        - All platforms
+        - Not platform-specific
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What alternatives have you considered?
+      description: >-
+        Other approaches you thought about, other tools that solve this well or
+        badly, or reasons an obvious solution would not actually work. If you do
+        have a specific solution in mind, this is the place for it.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: >-
+        Optional. Sketches, references, or prior art. Screenshots must not show real
+        snippet content.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I searched existing issues and discussions and this is not already requested.
+          required: true
+        - label: >-
+            I understand Typvia is pre-1.0 with a deliberately controlled scope, that
+            staying small and local-first is a product goal, and that a well-argued
+            request may still be declined or deferred.
+          required: true

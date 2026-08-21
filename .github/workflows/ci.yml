@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Every step below compiles the desktop crate, whose build script fails
+      # if the native-messaging host is missing from the external-binary
+      # directory. The bundling job gets this from the pre-build hook; here it
+      # has to be explicit.
+      - name: Stage the native-messaging host
+        run: node apps/desktop/scripts/prepare-host.mjs
+
       - name: Lint
         run: pnpm lint
 

@@ -17,7 +17,7 @@ workspace = true
 # in the tree. `rand_core` enables OsRng key generation, `zeroize` wipes
 # secret material on drop.
 ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
-x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+x25519-dalek = { version = "3", features = ["static_secrets", "zeroize"] }
 # SHA-256 for the device fingerprint; RustCrypto, already in the
 # dependency tree transitively.
 sha2 = "0.10"

@@ -10,6 +10,9 @@
 
 /// Splits `text` into substrings of at most `max_units` UTF-16 code units,
 /// always on `char` boundaries so surrogate pairs stay whole.
+// Only the macOS injector calls this, but the module stays compiled
+// everywhere so the surrogate-pair tests below run on every CI platform.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn chunk_utf16(text: &str, max_units: usize) -> Vec<String> {
     // Invariant: any Unicode scalar value fits in one chunk (2 units max).
     assert!(max_units >= 2, "chunk size must fit a surrogate pair");

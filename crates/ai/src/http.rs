@@ -120,7 +120,7 @@ fn map_read_error(error: std::io::Error) -> TransportFailure {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use std::io::{Read as _, Write};
+    use std::io::Write;
     use std::net::TcpListener;
     use std::sync::mpsc;
     use std::thread;

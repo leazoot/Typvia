@@ -15,7 +15,7 @@ workspace = true
 # Hugging Face-maintained, Apache-2.0.
 candle-core = "0.9"
 candle-nn = "0.9"
-candle-transformers = "0.9"
+candle-transformers = "0.11"
 # Loads the model's tokenizer.json (same ecosystem, Apache-2.0).
 tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
 # Parses the model's config.json; already in the tree.

@@ -109,7 +109,7 @@ core-foundation = "0.10"
 # HKCU native-messaging host registration (browser integration):
 # Windows uses registry values instead of well-known manifest paths.
 # Maintained, MIT; the platform has no std registry API.
-winreg = "0.55"
+winreg = "0.56"
 
 [dev-dependencies]
 # Isolated temp directory for the espanso config-regeneration test (writes a

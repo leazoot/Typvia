@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Test-support host for the keyboard XCUITest. NOT a product
 // surface: the Typvia app's WebView offers no reliable native text field for
 // insertion assertions, so this tiny app provides one, plus a fixture

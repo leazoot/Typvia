@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Crypto red-line tests (regression-mandatory): wrong keys must fail,
 //! nonces must not repeat, AAD binds ciphertexts to their purpose, the
 //! KDF is deterministic per salt.

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+
 # Search red lines: 10k < 50ms, 50k < 150ms.
 # Runs the criterion suite and prints the per-scenario worst mean time.
 # More than 20% slower than the recorded baseline counts as a failure.

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // The Typvia IME. It is a snippet panel, never a QWERTY: a 52dp bar of recent
 // strips that expands into the full panel — search line with the brand
 // caret, editorial snippet rows, footer tab rail. Tap inserts the full body

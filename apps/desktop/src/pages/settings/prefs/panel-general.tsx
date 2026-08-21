@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 /** General — language and appearance as segmented controls. */
 import { useTr, useUiPrefs, type LocalePref, type ThemePref } from '@typvia/ui';
 import { PrefSection } from './pref-section';

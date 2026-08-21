@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Atomic writer for the KeyboardSnapshot document that extension surfaces
 //! read: the iOS keyboard (App Group container), the Android IME (private
 //! app-data subdirectory), and the desktop browser-integration host

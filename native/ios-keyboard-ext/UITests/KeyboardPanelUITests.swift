@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // XCUITest closing the loop for the formal keyboard: keyboard enablement is
 // not programmable, so the test drives the Settings app inside the simulator,
 // switches to the Typvia keyboard in a native host text view, taps a snippet

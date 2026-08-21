@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! RFC 4648 base32 (upper-case alphabet, no padding). Encoding serves the
 //! device-fingerprint display code and the SAS short code; decoding serves
 //! only the recovery code, the one base32 value a user types back in.

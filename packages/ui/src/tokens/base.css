@@ -1,3 +1,9 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
 /* Base surface wiring for the token system: font stack and the paper/ink
  * pairing come from the active theme's CSS variables (applyTheme). All
  * component styling arrives with the component library. */

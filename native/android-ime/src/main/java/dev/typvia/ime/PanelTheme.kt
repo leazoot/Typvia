@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Design tokens for the keyboard panel. Pigment lives in res/values
 // (+values-night) so the system appearance resolves it; this class carries
 // the resolved colors plus the panel's metric and type scale.

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 /**
  * The typed IPC layer — the frontend's ONLY data entry point. Components
  * never call `invoke` directly (enforced by the no-restricted-imports lint

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! UTF-16 chunking for CGEvent string posts. A single keyboard event carries
 //! roughly 20 UTF-16 units, so typed text is split
 //! into bounded chunks without ever cutting a surrogate pair.

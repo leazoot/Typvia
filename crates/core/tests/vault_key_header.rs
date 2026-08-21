@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! End-to-end key-header round-trip:
 //! derive the KEK from the master password, wrap the MK and a domain key,
 //! persist the header, load it back, and unlock. The red line: the correct

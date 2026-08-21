@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Read-only access to the KeyboardSnapshot document the host app writes
 // into the App Group container. The extension NEVER writes to the container;
 // parsing and validation live in Rust (typvia-mobile-ffi) so a malformed,

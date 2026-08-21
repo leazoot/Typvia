@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Index consistency after snippet CRUD: every searchable field is
 //! matchable, updates/deletes/trash keep the index in step, CJK substrings
 //! match, and rebuild restores the whole index.

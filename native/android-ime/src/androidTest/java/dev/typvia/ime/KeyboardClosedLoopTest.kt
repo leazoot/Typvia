@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Instrumentation closed loop for the Typvia IME, mirroring the
 // iOS XCUITest (native/ios-keyboard-ext/UITests): enable the IME, switch to
 // it, tap a snippet row inside a real host field, and assert the insertion

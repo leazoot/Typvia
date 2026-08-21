@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Mobile snapshot-file plumbing: resolves where the KeyboardSnapshot
 //! document lives on this host (App Group container on iOS, private
 //! app-data subdirectory on Android) and re-exports the shared atomic

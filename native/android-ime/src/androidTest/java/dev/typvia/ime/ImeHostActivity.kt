@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Test-only host for the instrumentation closed loop, mirroring
 // the iOS KbTestHost: one plain multiline field to receive real insertions
 // and one password field to prove the refusal red line. Declared in the

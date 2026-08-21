@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Read-only snapshot access with mtime-based lazy reload: the desktop app
 //! is the only writer, this host re-reads the file when its metadata changes
 //! and keeps serving the previous parse otherwise. Sensitive entries are

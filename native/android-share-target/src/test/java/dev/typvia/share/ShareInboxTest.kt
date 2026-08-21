@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Host-JVM tests for the write-only inbox layer: file landing protocol
 // (tmp+rename, uuid .json names), schema-v1 byte shape the host's
 // share_inbox.rs reader pins, and the derived-title rule mirrored from the

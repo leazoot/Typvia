@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Process-level end-to-end test: spawns the real host binary and speaks
 //! the exact native-messaging frames a browser would, over a snapshot
 //! produced by the same writer the desktop app uses. It covers everything

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 /**
  * Bottom-navigation line icons (design: typvia_mobile_export, 20px grid,
  * 1.4px strokes with a 1.7px inner accent stroke). Stroke colour rides on

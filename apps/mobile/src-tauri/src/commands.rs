@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Mobile host IPC commands: parse args, call the shared host-service layer,
 //! map errors. The surface is the boot smoke, the read-only browse/search
 //! commands, the snippet create/edit + version-list commands, and the vault

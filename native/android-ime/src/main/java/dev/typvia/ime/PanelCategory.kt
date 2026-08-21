@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Category tabs of the expanded panel's footer rail (Recent · Favorites ·
 // folders · Templates · Vault). Tabs render only when the snapshot actually
 // holds matching data — no dead filters. Mirrors the iOS PanelCategory.

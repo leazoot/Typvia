@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // SPIKE: host app writes a KeyboardSnapshot-style JSON file into
 // the App Group container, then focuses a text view so the custom keyboard
 // comes up and its insertions land somewhere visible.

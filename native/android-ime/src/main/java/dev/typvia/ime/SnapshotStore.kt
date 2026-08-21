@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Read-only access to the KeyboardSnapshot document the host app writes into
 // its private data dir. The IME runs in the same APK/UID, so a plain file
 // read suffices — it never writes, and parsing/validation live in Rust

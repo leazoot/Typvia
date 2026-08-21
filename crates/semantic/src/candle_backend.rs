@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! candle-based BERT-family embedder: loads a local model directory
 //! (config.json + tokenizer.json + safetensors), mean-pools the last
 //! hidden state under the attention mask and L2 normalizes — the e5

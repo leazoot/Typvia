@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Builds the browser-extension native-messaging host and stages it where
 // tauri's externalBin bundling expects it: src-tauri/binaries/
 // typvia-browser-host-<target-triple>[.exe]. Runs from beforeBuildCommand,

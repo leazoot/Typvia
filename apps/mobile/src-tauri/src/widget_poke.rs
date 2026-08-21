@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Best-effort widget refresh after a successful KeyboardSnapshot write:
 //! widgets are event-driven, so the host pokes the platform
 //! widget machinery instead of running any polling timeline. A poke failure

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! AI IPC commands. The organize command runs in three phases so the AI
 //! round trip never holds the database lock: prompt build
 //! (short lock) → provider call (lock free; the egress sink re-locks

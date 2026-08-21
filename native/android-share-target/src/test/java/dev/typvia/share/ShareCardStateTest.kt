@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Pins the card's honest state trio, including the >128 KB refusal that no
 // real sender can produce on the emulator (shell single-argument cap and
 // Chrome's 100k-character share truncation); this test is that branch's

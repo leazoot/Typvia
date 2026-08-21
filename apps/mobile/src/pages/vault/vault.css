@@ -1,3 +1,9 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
 /* Vault: locked, unlocked and dark readings of one page.
    The vault sits one paper notch below the app surface: the page paints
    --tvm-vault-paper itself, including the status-bar inset the shell padded,

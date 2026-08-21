@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! API-key database red line: after configuring providers in a real
 //! migrated database and storing a key through this crate's credential
 //! path, the database file must not contain the key bytes anywhere. The

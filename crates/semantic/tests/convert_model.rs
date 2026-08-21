@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Utility runner: converts a downloaded fp32 model directory to the
 //! product's f16 serving layout (same conversion the desktop download
 //! pipeline performs). Env-gated and ignored so normal runs never touch

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+
 # One-time local dev signing identity: a self-signed
 # code-signing certificate in the login keychain gives rebuilt bundles a
 # stable identity, so keychain ACLs and TCC grants survive repackaging

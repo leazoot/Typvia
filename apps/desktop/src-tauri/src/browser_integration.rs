@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Desktop browser-integration data plane: an opt-in switch and the
 //! browser-snapshot directory the native-messaging host reads. The
 //! extension host never touches the main database — this module is the only

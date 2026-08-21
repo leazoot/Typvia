@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Principal class of the Typvia keyboard extension. The keyboard is a
 // snippet PANEL, never a QWERTY: a caret-led search header, title+preview
 // rows, and a fixed five-tab bar whose ABC key is the system input-mode

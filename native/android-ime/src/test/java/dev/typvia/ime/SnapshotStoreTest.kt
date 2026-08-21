@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Runs the real FFI on the host JVM (JNA loads the host dylib built by
 // crates/mobile-ffi/build-android.sh — the same loading path as the mobile-ffi
 // smoke test), so the sensitive red line is asserted through the exact code the

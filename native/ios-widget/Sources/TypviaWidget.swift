@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Home-screen and lock-screen widgets. The widget is a navigation surface:
 // rows are title + type mark only (no body preview), every tap leaves for
 // the app through the two controlled typvia:// deep links, and the

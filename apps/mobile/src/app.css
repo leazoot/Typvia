@@ -1,3 +1,9 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
 /* Platform difference layer: iOS WebKit reports the notch/home-bar insets
    via env(); the Android WebView reports 0 while the activity is
    edge-to-edge, so the host-measured system-bar insets (--tv-inset-*, set

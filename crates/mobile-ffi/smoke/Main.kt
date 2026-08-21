@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Host Kotlin smoke for the UniFFI surface: the same typed calls and
 // assertions as smoke/main.swift, run through the generated Kotlin
 // bindings so the Android chain proves the identical contract. Run by

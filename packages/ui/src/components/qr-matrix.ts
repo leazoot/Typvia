@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Self-contained QR Code encoder (ISO/IEC 18004): byte mode, error-correction
 // level M, versions 1..40. Device pairing renders offline on every platform, so
 // the symbol is generated locally instead of pulling in an encoder dependency.

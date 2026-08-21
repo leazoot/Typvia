@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Real-model smoke test: loads an actual multilingual-e5-small directory
 //! and checks that similar sentences outrank dissimilar ones in both
 //! languages, recording the single-query latency. Gated behind

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Device revocation and K_sync rotation, plus the receiving side of
 //! sealed key updates: distribution of new generations to every verified
 //! active device, late vault authorization, and the in-sync application

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! System-scheduled background sync entries. Both platforms funnel into the
 //! same round the foreground triggers run — there is no second sync
 //! orchestration here, only the plumbing that reaches it from a background

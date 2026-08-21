@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Mobile AI host wiring: the same assembly the desktop host performs — the
 //! configured `ai_provider` row, the secure-store API key, the HTTP transport
 //! and the database egress-log sink — for the mobile main app only. The

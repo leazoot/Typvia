@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! One row of the AI egress audit log. Device-local, append-only: every AI
 //! request that actually left this device gets a row saying when, to which
 //! provider, of which class, and how many body bytes — and nothing else. The

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Share save sheet: a full-width bottom sheet over the dimmed host — grabber,
 // accent-bar header, the shared text in a sunken mono box, a TITLE field on
 // a hairline rule, and an ink-filled Save plate beside a Cancel text action.

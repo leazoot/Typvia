@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Search-index behavior across a schema downgrade/upgrade round trip.
 //! Migration 0003 recreates `snippet_fts`, so any round trip crossing
 //! version 3 leaves the index empty while every snippet row

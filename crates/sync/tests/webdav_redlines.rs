@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Malicious-storage red lines for the WebDAV form: the store never sees
 //! plaintext or key material at the byte level, a
 //! tampered record is rejected without poisoning the round, a forged

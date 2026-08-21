@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Benchmark harness code: aborting on setup failure is the desired behavior,
 // so the no-expect rule for runtime paths does not apply here.
 #![allow(clippy::expect_used)]

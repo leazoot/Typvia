@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Interactive live verification of the macOS Keychain SecureStore backend on
 //! a real device: store, then biometric prompt, then retrieve. The `retrieve`
 //! call triggers the Touch ID / passcode prompt, which cannot be automated

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! System-event vault auto-lock: drops the master key when the machine goes
 //! to sleep or the screen locks, so an unlocked vault never survives a
 //! lid-close or a lock shortcut. The idle timeout (5 min) still covers

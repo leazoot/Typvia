@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Sync command surface. Each command parses its arguments, takes the host
 //! guards in the fixed `sync` → `conn` → `vault` order, calls the engine or
 //! a host-service use case, and maps the failure — no business logic here.

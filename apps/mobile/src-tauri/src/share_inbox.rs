@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Ingestion of share-inbox documents on iOS and Android. The
 //! platform share surface — the iOS share extension in the App Group
 //! container, the Android share-target Activity in the app data dir

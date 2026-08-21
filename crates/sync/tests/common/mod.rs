@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 //! Shared test support for the WebDAV storage form: an in-process
 //! WebDAV-enough server over a real TCP listener, with the ETag and
 //! precondition semantics the protocol depends on, plus fault-injection

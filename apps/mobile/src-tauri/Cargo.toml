@@ -64,7 +64,7 @@ typvia-crypto = { path = "../../../crates/crypto" }
 # crate and version already in the tree via tao/wry — whose `exec` closures
 # hand over a `&mut JNIEnv` of exactly this type — so no new external code
 # enters the build. Maintained (jni-rs org), MIT/Apache-2.0.
-jni = "0.21"
+jni = "0.22"
 
 [target.'cfg(target_os = "ios")'.dependencies]
 # Resolves the App Group container via NSFileManager. Security

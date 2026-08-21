@@ -30,14 +30,23 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Device plus both simulator architectures: the FFI xcframework is
+      # assembled from all three before Xcode runs.
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The keyboard and widget extensions reference the FFI xcframework as a
+      # framework dependency, and Xcode resolves that path before any build
+      # phase runs — so the project's own pre-build script cannot create it on
+      # a clean checkout. It has to exist before xcodebuild starts.
+      - name: Build the FFI xcframework
+        run: bash crates/mobile-ffi/build-xcframework.sh
 
       # Driven through the Tauri CLI rather than xcodebuild: the Rust phase
       # of the Xcode project depends on an option service the CLI hosts, so a
@@ -45,14 +54,12 @@ jobs:
       - name: Build unsigned device package
         run: pnpm --dir apps/mobile tauri ios build --target aarch64 --no-sign --ci
 
-      # Both shapes are collected because an unsigned build may stop at the
-      # .app rather than reaching the .ipa export step. Whichever appears is
-      # the artifact; an empty upload means the build produced neither.
+      # An unsigned build still reaches the .ipa: Payload/Typvia.app with the
+      # keyboard, share and widget extensions embedded, and no code signature.
+      # Re-sign it against an Apple ID to install it.
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: typvia-ios-unsigned
-          path: |
-            apps/mobile/src-tauri/gen/apple/build/**/*.ipa
-            apps/mobile/src-tauri/gen/apple/build/**/*.app
+          path: apps/mobile/src-tauri/gen/apple/build/arm64/*.ipa
           if-no-files-found: error

@@ -36,4 +36,4 @@ serde_json = "1"
 # The FFI layer: typed Swift/Kotlin bindings via proc-macro export +
 # library-mode bindgen, no UDL. Mozilla-maintained and MPL-2.0 (same license
 # as this project).
-uniffi = "0.30"
+uniffi = "0.32"

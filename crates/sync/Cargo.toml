@@ -2,6 +2,7 @@
 name = "typvia-sync"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
 description = "End-to-end encrypted sync client: device identity, sealed change-set records and the push/pull engine"

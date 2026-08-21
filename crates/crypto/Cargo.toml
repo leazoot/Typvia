@@ -2,6 +2,7 @@
 name = "typvia-crypto"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
 description = "Cryptographic primitives: key derivation, AEAD envelopes and the platform secure-store trait"

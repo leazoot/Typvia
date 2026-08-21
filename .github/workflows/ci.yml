@@ -11,6 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Linting and testing the workspace compiles the desktop crate, which
+      # links the system WebView. Without these the build fails at glib-sys
+      # long before any lint runs.
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libgtk-3-dev
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -160,6 +169,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The desktop crate declares the native-messaging host as an external
+      # binary, and its build script fails if that file is missing. Locally
+      # this is staged by the pre-build hook; a bare cargo check has to do it
+      # explicitly.
+      - name: Stage the native-messaging host
+        run: node apps/desktop/scripts/prepare-host.mjs
 
       - name: Check windows targets
         run: cargo check -p typvia-desktop -p typvia-browser-host

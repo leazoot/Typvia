@@ -1,10 +1,11 @@
 name: Build iOS
 
-# Manual only, simulator target only: an on-device .ipa needs an Apple
-# Developer team and signing certificates, which do not exist yet. The
-# simulator build still exercises the whole chain — Rust core, UniFFI
-# surface, Swift keyboard and share extensions, WebView shell — without any
-# signing material in the environment.
+# Manual only. The .ipa is built for a real device but left unsigned: no
+# Apple Developer certificates exist yet, and none may ever live in the
+# repository. An unsigned .ipa will not install as-is — it has to be
+# re-signed against an Apple ID first, with the seven-day limit a free
+# account carries — but it is a complete device build, which a simulator
+# build is not.
 on:
   workflow_dispatch:
 
@@ -31,7 +32,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios-sim
+          targets: aarch64-apple-ios
 
       - uses: Swatinem/rust-cache@v2
 
@@ -41,12 +42,17 @@ jobs:
       # Driven through the Tauri CLI rather than xcodebuild: the Rust phase
       # of the Xcode project depends on an option service the CLI hosts, so a
       # standalone xcodebuild invocation cannot complete the build.
-      - name: Build for simulator
-        run: pnpm --dir apps/mobile tauri ios build --target aarch64-sim
+      - name: Build unsigned device package
+        run: pnpm --dir apps/mobile tauri ios build --target aarch64 --no-sign --ci
 
-      - name: Upload app bundle
+      # Both shapes are collected because an unsigned build may stop at the
+      # .app rather than reaching the .ipa export step. Whichever appears is
+      # the artifact; an empty upload means the build produced neither.
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: typvia-ios-simulator
-          path: apps/mobile/src-tauri/gen/apple/build/**/*.app
+          name: typvia-ios-unsigned
+          path: |
+            apps/mobile/src-tauri/gen/apple/build/**/*.ipa
+            apps/mobile/src-tauri/gen/apple/build/**/*.app
           if-no-files-found: error

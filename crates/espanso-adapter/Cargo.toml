@@ -2,6 +2,7 @@
 name = "typvia-espanso-adapter"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
 description = "Espanso integration: config generation, match-file import and CLI-driven engine lifecycle"

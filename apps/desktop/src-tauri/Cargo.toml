@@ -3,7 +3,9 @@ name = "typvia-desktop"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Typvia desktop application shell (Tauri host)"
+publish = false
 
 [build-dependencies]
 # Tauri build-time codegen: config validation, icon embedding, capability

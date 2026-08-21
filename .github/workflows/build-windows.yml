@@ -1,0 +1,48 @@
+name: Build Windows
+
+# Manual only. Tag-triggered releases come later.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Unsigned: no code-signing certificate exists yet, so SmartScreen will
+      # warn on first launch. These installers are for testing on a real
+      # Windows machine, which the desktop paths have not had yet.
+      - name: Bundle msi + nsis
+        run: pnpm --dir apps/desktop tauri build --bundles msi nsis
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: typvia-desktop-windows
+          path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*.exe
+          if-no-files-found: error

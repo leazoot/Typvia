@@ -24,7 +24,6 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Local reference clone of Espanso (GPL-3.0). It must never be committed:
 # Typvia is MPL-2.0 and keeps Espanso at arm's length.
 /espanso/
 

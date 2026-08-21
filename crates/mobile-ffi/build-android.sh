@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+
 # Reproducible Android FFI build: compiles the typvia-mobile-ffi shared
 # library for the two required Android ABIs (arm64-v8a device + x86_64
 # emulator, min API 28), generates the Kotlin bindings in library mode (no
@@ -53,8 +60,12 @@ rm -rf "$OUT"
 mkdir -p "$GEN" "$OUT/jniLibs/arm64-v8a" "$OUT/jniLibs/x86_64"
 
 echo "==> Generating Kotlin bindings (library mode)"
+# The host cdylib carries the build host's extension: .dylib on a macOS
+# workstation, .so on a Linux CI runner.
+HOST_LIB="$ROOT/target/release/$LIB.dylib"
+[[ -f "$HOST_LIB" ]] || HOST_LIB="$ROOT/target/release/$LIB.so"
 cargo run -p typvia-mobile-ffi --bin uniffi-bindgen --features uniffi/cli --release -- \
-  generate --library "$ROOT/target/release/$LIB.dylib" \
+  generate --library "$HOST_LIB" \
   --language kotlin --out-dir "$GEN"
 
 # jniLibs layout matches the Android packaging convention (ABI dir names,

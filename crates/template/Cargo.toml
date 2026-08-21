@@ -3,6 +3,8 @@ name = "typvia-template"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "Storage-agnostic template parsing and rendering for snippet bodies"
 
 [dependencies]
 # Template fields and their type enum are owned by core; dependency direction

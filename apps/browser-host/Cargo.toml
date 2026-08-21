@@ -3,7 +3,9 @@ name = "typvia-browser-host"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Native-messaging host serving the browser extension from the read-only snapshot"
+publish = false
 
 [lints]
 workspace = true

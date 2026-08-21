@@ -3,6 +3,8 @@ name = "typvia-espanso-adapter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "Espanso integration: config generation, match-file import and CLI-driven engine lifecycle"
 
 [dependencies]
 # Snippet model is the compiler input. Dependency direction espanso-adapter →

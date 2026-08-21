@@ -1,0 +1,49 @@
+name: Build macOS
+
+# Manual only. Tag-triggered releases come later, once signing and
+# notarization credentials exist.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The packaging chain builds the app, injects the managed expansion
+      # engine as a nested helper together with its GPL-3.0 licence set,
+      # signs, notarizes and produces the .dmg. With no credentials in the
+      # environment it reports the signing and notarization stages as PENDING
+      # rather than as a pass, and still emits an installable bundle.
+      - name: Package
+        run: bash scripts/release/macos_package.sh
+
+      - name: Upload disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: typvia-desktop-macos
+          path: target/release/bundle/dmg/*.dmg
+          if-no-files-found: error

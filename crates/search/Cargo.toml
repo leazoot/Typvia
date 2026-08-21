@@ -3,6 +3,8 @@ name = "typvia-search"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "Local full-text search: FTS5 index maintenance and weighted ranking"
 
 [lints]
 workspace = true

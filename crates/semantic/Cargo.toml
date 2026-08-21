@@ -3,6 +3,7 @@ name = "typvia-semantic"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Local semantic-search kernel: int8 vector scan and the embedder abstraction"
 
 [lints]

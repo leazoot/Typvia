@@ -3,6 +3,7 @@ name = "typvia-host-service"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Shared desktop/mobile IPC orchestration layer"
 
 [lints]

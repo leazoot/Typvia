@@ -1,0 +1,52 @@
+name: Build iOS
+
+# Manual only, simulator target only: an on-device .ipa needs an Apple
+# Developer team and signing certificates, which do not exist yet. The
+# simulator build still exercises the whole chain — Rust core, UniFFI
+# surface, Swift keyboard and share extensions, WebView shell — without any
+# signing material in the environment.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Driven through the Tauri CLI rather than xcodebuild: the Rust phase
+      # of the Xcode project depends on an option service the CLI hosts, so a
+      # standalone xcodebuild invocation cannot complete the build.
+      - name: Build for simulator
+        run: pnpm --dir apps/mobile tauri ios build --target aarch64-sim
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: typvia-ios-simulator
+          path: apps/mobile/src-tauri/gen/apple/build/**/*.app
+          if-no-files-found: error

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// SPDX-License-Identifier: MPL-2.0
+
 // Formal Typvia IME library module. Included by the committed
 // apps/mobile/src-tauri/gen/android/settings.gradle so the InputMethodService
 // ships inside the main app APK, where sharing the app's UID lets it read the
@@ -13,7 +19,11 @@ plugins {
 // does not depend on which Gradle root includes the module.
 val repoRoot: File = projectDir.parentFile.parentFile
 val ffiOut = File(repoRoot, "target/mobile-ffi-android")
-val hostDylib = File(repoRoot, "target/release/libtypvia_mobile_ffi.dylib")
+// The host library carries the build host's extension, not the target's: a
+// macOS workstation produces .dylib, a Linux CI runner .so. Both load through
+// the same JNA path in the host-JVM unit tests.
+val hostLib = if (System.getProperty("os.name").startsWith("Mac")) "dylib" else "so"
+val hostDylib = File(repoRoot, "target/release/libtypvia_mobile_ffi.$hostLib")
 
 // The module consumes the mobile-ffi build products (generated Kotlin bindings
 // + per-ABI .so + host dylib for JVM unit tests). They are never committed;

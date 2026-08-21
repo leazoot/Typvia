@@ -1,0 +1,97 @@
+version: 2
+
+# Every ecosystem is checked weekly and groups its minor + patch bumps into a
+# single pull request, so routine dependency drift costs one review per week per
+# ecosystem instead of one per package. Major bumps stay ungrouped: they need to
+# be read individually.
+updates:
+  # Rust workspace: all crates under crates/*, apps/*/src-tauri, and
+  # apps/browser-host resolve through the root Cargo.toml and Cargo.lock.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # JavaScript/TypeScript workspace. The repo uses pnpm; Dependabot's npm
+  # ecosystem reads pnpm-lock.yaml and pnpm-workspace.yaml, so this one entry
+  # covers apps/desktop, apps/mobile, apps/browser-extension, and packages/*.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # Go sync server: go.mod and go.sum live in the server module, not the root.
+  - package-ecosystem: gomod
+    directory: /apps/sync-server
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      gomod-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions used by the workflows in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # Android Gradle root: the committed settings.gradle plus the Android Gradle
+  # Plugin and Kotlin plugin classpath, and the app module's AndroidX and
+  # Material dependencies.
+  - package-ecosystem: gradle
+    directory: /apps/mobile/src-tauri/gen/android
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      gradle-android-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # Android IME library module. It is included by the Gradle root above but
+  # declares its own dependencies (JNA for the generated bindings, AndroidX
+  # Test for the instrumentation loop), so it needs its own entry.
+  - package-ecosystem: gradle
+    directory: /native/android-ime
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      gradle-ime-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch

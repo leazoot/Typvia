@@ -3,6 +3,8 @@ name = "typvia-mobile-ffi"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "UniFFI surface exposing snapshot reads and template fill to the mobile keyboard extensions"
 
 [lib]
 name = "typvia_mobile_ffi"

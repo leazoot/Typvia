@@ -1,0 +1,61 @@
+name: Build Android
+
+# Manual only. The APK is unsigned: no release keystore exists yet, and a
+# keystore must never be committed. Tag-triggered releases come later.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same JDK baseline as the Gradle project.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Two ABIs, not one: the app itself is built for arm64, but the IME
+      # module consumes an FFI chain that also produces the x86_64 emulator
+      # library.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The Tauri CLI reads NDK_HOME; the FFI build script reads
+      # ANDROID_NDK_HOME. The runner image ships the NDK under a versioned
+      # path exposed as ANDROID_NDK_LATEST_HOME.
+      - name: Build APK
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          pnpm --dir apps/mobile tauri android build --apk --target aarch64
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: typvia-android
+          path: apps/mobile/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

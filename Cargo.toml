@@ -23,6 +23,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 license = "MPL-2.0"
+repository = "https://github.com/leazoot/Typvia"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"

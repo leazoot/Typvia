@@ -3,6 +3,8 @@ name = "typvia-ai"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "AI provider adapter: the provider trait, OpenAI-compatible client and the mandatory egress gate"
 
 [lints]
 workspace = true

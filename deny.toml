@@ -1,0 +1,85 @@
+# cargo-deny configuration.
+#
+# Typvia ships two differently licensed things from one repository:
+# the clients and every shared crate are MPL-2.0, and the Go sync server
+# (not covered by this file, which only sees the Cargo graph) is AGPL-3.0.
+# The job of this file is to keep a strong-copyleft crate — GPL, AGPL, SSPL
+# and friends — from silently entering the MPL-2.0 client tree, where it
+# would be a genuine licence conflict rather than a paperwork problem.
+#
+# The allow-list below is deliberately not a generic template: every entry
+# corresponds to a licence that some crate in the current graph actually
+# carries. A new licence therefore fails the check and gets a human look,
+# which is the intended behaviour.
+
+[licenses]
+# cargo-deny denies every licence that is not listed here, so an
+# unlicensed or non-SPDX crate fails the check without extra configuration.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    # LLVM exception: still Apache-2.0, only relaxes the linking/attribution
+    # obligation. Carried by the rustix / wasi / target-lexicon family.
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "BSL-1.0",
+    "CC0-1.0",
+    # Unicode-3.0 is the licence of the ICU data crates. It is permissive;
+    # its attribution clause is satisfied by the licence text shipped in the
+    # crate sources, and no ICU data is embedded in a distributed binary in a
+    # form that requires a separate notice.
+    "Unicode-3.0",
+    # MPL-2.0 is Typvia's own licence. It is file-level copyleft: modifying an
+    # MPL file obliges you to publish that file, it never reaches out to the
+    # rest of the program. Depending on MPL-2.0 crates from an MPL-2.0 project
+    # is the ordinary case, not an exception. Present via uniffi, the Tauri
+    # config parser's CSS crates, and option-ext.
+    "MPL-2.0",
+]
+
+# 0.8 is cargo-deny's default and is loose enough to match a licence file
+# that carries an extra copyright header. Raised so a near-miss on a
+# hand-edited licence file is reported rather than silently accepted.
+confidence-threshold = 0.93
+
+# Per-crate grants. Anything here is allowed for that crate only, so the
+# licence cannot spread to the rest of the graph unnoticed.
+[[licenses.exceptions]]
+# webpki-roots is the Mozilla CA root store republished as a Rust crate, and
+# CDLA-Permissive-2.0 is the data licence Mozilla uses for it. It is
+# permissive with no copyleft or source-disclosure obligation, but it is a
+# data licence rather than a software one, so it is scoped to this crate
+# instead of being allowed graph-wide.
+crate = "webpki-roots"
+allow = ["CDLA-Permissive-2.0"]
+
+[advisories]
+# cargo-audit already gates the same database in CI; this section keeps a
+# local `cargo deny check advisories` honest and consistent with it.
+yanked = "deny"
+# Every advisory must be fixed or consciously listed here with a reason.
+# An empty list is the desired steady state.
+ignore = []
+
+[bans]
+# A wildcard version requirement makes the resolved graph — and therefore
+# the set of licences audited above — unreproducible.
+wildcards = "deny"
+# Path dependencies inside the workspace legitimately use a wildcard version.
+allow-wildcard-paths = true
+# Duplicate versions are a size and supply-chain concern, not a licence
+# defect, and are usually forced by a transitive dependency we do not
+# control. Reported, not fatal.
+multiple-versions = "warn"
+highlight = "all"
+deny = []
+
+[sources]
+# Everything must come from crates.io. A git or vendored dependency has no
+# stable licence metadata for this check to read, and would bypass the
+# allow-list above.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

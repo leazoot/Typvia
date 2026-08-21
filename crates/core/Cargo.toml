@@ -3,6 +3,8 @@ name = "typvia-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "Core business logic: data model, SQLite storage and use-case orchestration"
 
 [lints]
 workspace = true

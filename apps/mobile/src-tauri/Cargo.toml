@@ -3,7 +3,9 @@ name = "typvia-mobile"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Typvia mobile application shell (Tauri host, iOS first)"
+publish = false
 
 [lib]
 # Mobile targets link the app as a library (staticlib for iOS, cdylib for

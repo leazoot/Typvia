@@ -14,7 +14,7 @@ workspace = true
 # BERT-family local inference for the e5 embedder backend: a pure Rust
 # runtime, so there are no per-platform C++ dynamic libraries to distribute.
 # Hugging Face-maintained, Apache-2.0.
-candle-core = "0.9"
+candle-core = "0.11"
 candle-nn = "0.9"
 candle-transformers = "0.9"
 # Loads the model's tokenizer.json (same ecosystem, Apache-2.0).

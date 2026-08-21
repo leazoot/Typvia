@@ -69,7 +69,7 @@ typvia-semantic = { path = "../../../crates/semantic" }
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 # SHA-256 pinning of downloaded model files (checksum before use).
 # RustCrypto, already in the tree via crates/crypto.
-sha2 = "0.10"
+sha2 = "0.11"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Reads the frontmost app when the panel is summoned and re-activates it on

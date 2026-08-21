@@ -42,7 +42,7 @@ jobs:
         run: bash scripts/release/macos_package.sh
 
       - name: Upload disk image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typvia-desktop-macos
           path: target/release/bundle/dmg/*.dmg

@@ -39,7 +39,7 @@ jobs:
         run: pnpm --dir apps/desktop tauri build --bundles msi nsis
 
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typvia-desktop-windows
           path: |

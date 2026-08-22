@@ -8,8 +8,8 @@
   Go、不需要任何构建工具链**。
 - **`docker-compose.yml`** —— 给开发机用。从本仓库源码构建镜像,然后运行。
 
-想让远程可访问又完全不暴露端口,见 [`../cloudflare/`](../cloudflare/guide.md)(Cloudflare
-Tunnel,英文)。
+想让远程可访问又完全不暴露端口,见 [`../cloudflare/`](../cloudflare/guide.zh-CN.md)
+(Cloudflare Tunnel)。
 
 ## 部署主机:拉取并运行
 
@@ -73,7 +73,7 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/typvia-sync-server
 
 - 在前面放 Caddy 或 nginx 终结 TLS 并反向代理到 `127.0.0.1:8787`,端口映射仍然留在
   loopback 上;或者
-- 换用 [`../cloudflare/`](../cloudflare/guide.md),它完全不开端口。把那份 compose 文件里的
+- 换用 [`../cloudflare/`](../cloudflare/guide.zh-CN.md),它完全不开端口。把那份 compose 文件里的
   `build:` 换成 `image: ${TYPVIA_IMAGE}`,它同样不需要源码。
 
 直接绑到 `0.0.0.0` 只会得到一个明文监听端口,客户端根本不会跟它说话。

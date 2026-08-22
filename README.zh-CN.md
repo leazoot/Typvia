@@ -103,7 +103,7 @@ curl http://127.0.0.1:8787/healthz
 
 多架构镜像随每次推送发布到 GHCR。从源码构建、升级与备份见
 [`deploy/docker/`](deploy/docker/README.zh-CN.md);
-不暴露任何端口的隧道部署见 [`deploy/cloudflare/`](deploy/cloudflare/guide.md)(英文)。
+不暴露任何端口的隧道部署见 [`deploy/cloudflare/`](deploy/cloudflare/guide.zh-CN.md)。
 
 ## 从源码构建
 

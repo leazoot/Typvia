@@ -1,5 +1,7 @@
 # Typvia sync server · Cloudflare Tunnel
 
+English · [简体中文](guide.zh-CN.md)
+
 A self-hosting path with no public IP and no exposed port: the server listens
 only on the compose network, `cloudflared` dials out to Cloudflare's edge, and
 TLS terminates at Cloudflare. The server stores ciphertext and metadata only, so

@@ -1,5 +1,7 @@
 # Typvia sync server · Docker
 
+English · [简体中文](README.zh-CN.md)
+
 Two files, two ways to run it:
 
 - **`compose.image.yml`** — for the deployment host. Runs a published image; the

@@ -9,6 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.286"
+    "@types/chrome": "^0.2.7"
   }
 }

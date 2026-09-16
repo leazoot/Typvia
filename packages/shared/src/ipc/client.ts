@@ -16,6 +16,7 @@ import type {
   Folder,
   FolderCreateInput,
   FolderUpdateInput,
+  InsertionPause,
   LibraryCounts,
   LibraryView,
   MobileBootstrap,
@@ -59,14 +60,25 @@ export function listSnippetsByFolder(
   return call('snippet_list_by_folder', { folderId, limit, offset });
 }
 
+/** A reader-chosen Library order, independent of the view; omit to keep the view's own. */
+export type ListOrder = 'recent' | 'added' | 'used';
+
 export function listSnippetPage(
   view: LibraryView,
   folderId: string | null,
   snippetType: string | null,
   limit: number,
   offset: number,
+  order?: ListOrder,
 ): Promise<Snippet[]> {
-  return call('snippet_list_page', { view, folderId, snippetType, limit, offset });
+  return call('snippet_list_page', {
+    view,
+    folderId,
+    snippetType,
+    order: order ?? null,
+    limit,
+    offset,
+  });
 }
 
 export function countSnippets(
@@ -125,6 +137,19 @@ export function deleteFolder(id: string): Promise<void> {
   return call('folder_delete', { id });
 }
 
+/**
+ * Folds one folder into another in one transaction; resolves to the ids of the
+ * snippets that moved, so the merge can be undone.
+ */
+export function mergeFolders(sourceId: string, targetId: string): Promise<string[]> {
+  return call('folder_merge', { sourceId, targetId });
+}
+
+/** Writes a new folder order, first id first, all or nothing. */
+export function reorderFolders(ids: string[]): Promise<void> {
+  return call('folder_reorder', { ids });
+}
+
 export function listFolderChildren(parentId: string | null): Promise<Folder[]> {
   return call('folder_list_children', { parentId });
 }
@@ -173,6 +198,43 @@ export type InjectionMethod = 'paste' | 'keystrokes';
  */
 export function injectSnippet(id: string, method?: InjectionMethod): Promise<void> {
   return call('snippet_inject', { id, method: method ?? null });
+}
+
+/**
+ * Library insert: Typvia steps aside, the app the reader came from takes focus
+ * again, and the snippet is injected there once its app rules allow it. Rejects
+ * with `permission_denied` (no injection permission) or `rule_blocked`, and the
+ * window comes back so the page can say why.
+ */
+export function mainInsert(id: string, method?: InjectionMethod): Promise<void> {
+  return call('main_insert', { id, method: method ?? null });
+}
+
+/**
+ * Library insert of a template with its variables filled in: the same
+ * step-aside and rule gate as {@link mainInsert}, the values rendered host-side.
+ */
+export function mainInsertTemplate(
+  id: string,
+  values: Record<string, string>,
+  method?: InjectionMethod,
+): Promise<void> {
+  return call('main_insert_template', { id, values, method: method ?? null });
+}
+
+/** Brings up the About window. */
+export function aboutShow(): Promise<void> {
+  return call('about_show');
+}
+
+/** Whether Typvia may type into other apps (the macOS Accessibility grant). */
+export function accessibilityStatus(): Promise<boolean> {
+  return call('accessibility_status');
+}
+
+/** Opens the system's Accessibility settings page; macOS only. */
+export function openAccessibilitySettings(): Promise<void> {
+  return call('open_accessibility_settings');
 }
 
 /** Copies a snippet to the clipboard and records one usage. */
@@ -661,11 +723,37 @@ export function panelResults(query: string, limit: number): Promise<PanelResults
 
 // --- Onboarding -------------------------------------------------------------
 
-/** Whether first-run onboarding already ran (or was skipped) on this data dir. */
+/**
+ * Packs a WebDAV username and password into the one string the transport
+ * stores and reads.
+ *
+ * Asked for rather than composed here: the shape of that string belongs beside
+ * the parser that reads it back, and a second copy of it is a copy that can
+ * still be writing the old shape after the first one changes.
+ *
+ * @returns null for a folder that needs no credentials — which is not the same
+ *   as a folder handed empty ones.
+ */
+export function webdavCredentials(username: string, password: string): Promise<string | null> {
+  return call('webdav_credentials', { username, password });
+}
+
+/**
+ * The shortest master password the vault accepts.
+ *
+ * Asked for rather than known: the rule belongs to the core, and a form that
+ * keeps its own copy will one day refuse a password the vault would have
+ * taken, or take one it would have refused.
+ */
+export function masterPasswordMinLength(): Promise<number> {
+  return call('master_password_min_length');
+}
+
 export interface OnboardingStatus {
   completed: boolean;
 }
 
+/** Whether first-run onboarding already ran (or was skipped) on this data dir. */
 export function onboardingStatus(): Promise<OnboardingStatus> {
   return call('onboarding_status');
 }
@@ -1077,4 +1165,51 @@ export function syncConflicts(): Promise<ConflictPair[]> {
  */
 export function syncConflictResolve(copyId: string, keep: ConflictKeep): Promise<void> {
   return call('sync_conflict_resolve', { copyId, keep });
+}
+
+/** The tray card's shortlist: recent snippets it can insert as they are. */
+export function trayResults(limit: number): Promise<Snippet[]> {
+  return call('tray_results', { limit });
+}
+
+/** Inserts from the tray card into the app that was frontmost when it opened. */
+export function trayInsert(id: string, method?: InjectionMethod): Promise<void> {
+  return call('tray_insert', { id, method: method ?? null });
+}
+
+/** The tray card has laid out at `height` logical pixels; place and show it. */
+export function trayPresent(height: number): Promise<void> {
+  return call('tray_present', { height });
+}
+
+export function hideTray(): Promise<void> {
+  return call('tray_hide');
+}
+
+export function trayOpenLibrary(): Promise<void> {
+  return call('tray_open_library');
+}
+
+export function quitApp(): Promise<void> {
+  return call('app_quit');
+}
+
+export function insertionPauseStatus(): Promise<InsertionPause> {
+  return call('insertion_pause_status');
+}
+
+export function pauseInsertion(minutes: number): Promise<InsertionPause> {
+  return call('insertion_pause', { minutes });
+}
+
+export function resumeInsertion(): Promise<InsertionPause> {
+  return call('insertion_resume');
+}
+
+export function autostartStatus(): Promise<boolean> {
+  return call('autostart_status');
+}
+
+export function setAutostart(enabled: boolean): Promise<boolean> {
+  return call('autostart_set', { enabled });
 }

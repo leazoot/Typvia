@@ -120,6 +120,9 @@ impl From<VaultError> for IpcError {
         match error {
             VaultError::NotInitialized => Self::conflict("vault is not set up"),
             VaultError::AlreadyInitialized => Self::conflict("vault is already set up"),
+            // Correctable input, so validation rather than conflict: the
+            // reader can type a longer one and the vault is unchanged.
+            VaultError::PasswordTooShort => Self::validation("master password is too short"),
             VaultError::WrongPassword => Self::permission_denied("unlock failed"),
             VaultError::Throttled { .. } => {
                 Self::permission_denied("too many attempts, try again later")

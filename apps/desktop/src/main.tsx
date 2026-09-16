@@ -6,13 +6,17 @@
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { applyStoredUiPrefs, UiPrefsProvider } from '@typvia/ui';
-import '@typvia/ui/base.css';
+import './paper/fonts';
+import './paper/tokens.css';
+import './paper/base.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { installBackspaceGuard } from './backspace-guard';
+import { ABOUT_WINDOW_LABEL, AboutApp } from './pages/about';
 import { PANEL_WINDOW_LABEL, PanelApp } from './pages/panel';
+import { TRAY_WINDOW_LABEL, TrayApp } from './pages/tray';
 
 // First paint already carries the stored theme and language; UiPrefsProvider
 // keeps them live (including cross-window changes) from mount on.
@@ -26,7 +30,9 @@ if (container === null) {
 
 // The resident panel window (tauri.conf.json) loads the same bundle; it mounts
 // only the command panel, never the full navigation shell.
-const isPanel = getCurrentWindow().label === PANEL_WINDOW_LABEL;
+const label = getCurrentWindow().label;
+const isPanel = label === PANEL_WINDOW_LABEL;
+const isTray = label === TRAY_WINDOW_LABEL;
 
 // The panel window is transparent: its page background must stay
 // clear so only the scrim and the floating card paint. The class scopes the
@@ -34,12 +40,20 @@ const isPanel = getCurrentWindow().label === PANEL_WINDOW_LABEL;
 if (isPanel) {
   document.documentElement.classList.add('tv-window-panel');
 }
+// The tray card's window is transparent too, so only its rounded card paints.
+if (isTray) {
+  document.documentElement.classList.add('tv-window-tray');
+}
 
 createRoot(container).render(
   <StrictMode>
     <UiPrefsProvider>
       {isPanel ? (
         <PanelApp />
+      ) : isTray ? (
+        <TrayApp />
+      ) : label === ABOUT_WINDOW_LABEL ? (
+        <AboutApp />
       ) : (
         <BrowserRouter>
           <App />

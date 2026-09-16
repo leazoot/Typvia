@@ -6,9 +6,9 @@
 
 // Instrumentation closed loop for the Typvia IME, mirroring the
 // iOS XCUITest (native/ios-keyboard-ext/UITests): enable the IME, switch to
-// it, tap a snippet row inside a real host field, and assert the insertion
-// plus the two red lines (locked rows insert nothing, password fields refuse
-// everything).
+// it, tap a sheet on the bench inside a real host field, and assert the
+// insertion plus the two red lines (a locked sheet types nothing, password
+// fields refuse everything).
 //
 // The loop runs entirely inside the self-instrumenting test APK
 // (dev.typvia.ime.test): the fixture snapshot is written into that package's
@@ -28,14 +28,16 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import dev.typvia.mobile.ui.Translator
+import dev.typvia.mobile.ui.UiLanguage
 import java.io.File
+import java.util.Locale
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
@@ -58,57 +60,51 @@ class KeyboardClosedLoopTest {
     // MARK: The loop
 
     @Test
-    fun tappingASnippetRowInsertsItsFullBody() {
+    fun tappingASheetTypesItsFullBody() {
         tap(ImeHostActivity.PLAIN_FIELD)
-        // The strip rendering at all closes the read side of the loop: its
+        // The sheet rendering at all closes the read side of the loop: its
         // title can only have come from the fixture snapshot on disk.
-        tap(STANDUP_STRIP)
+        tap(STANDUP_SHEET)
         awaitPlainText(STANDUP_BODY)
     }
 
     @Test
-    fun lockedRowsShowNoPlaintextAndInsertNothing() {
+    fun aLockedSheetShowsNoPlaintextAndTypesNothing() {
         tap(ImeHostActivity.PLAIN_FIELD)
-        tap(STANDUP_STRIP)
+        tap(STANDUP_SHEET)
         awaitPlainText(STANDUP_BODY)
 
-        expandPanel()
         val locked = device.wait(Until.findObject(By.desc(LOCKED_DESC)), FIND_TIMEOUT_MS)
-        assertNotNull("locked row must render in the expanded panel", locked)
-        // The locked row carries the generic label and nothing else — the
-        // fixture's envelope bytes must never surface as text anywhere.
-        assertNotNull(device.findObject(By.text(PanelStrings.LOCKED_TITLE)))
+        assertNotNull("the locked sheet must be on the bench", locked)
+        // It carries the dot run and nothing else — the fixture's envelope
+        // bytes must never surface as text anywhere on screen.
+        assertNotNull(device.findObject(By.text(LOCKED_TITLE)))
         assertNull(device.findObject(By.textContains(ENVELOPE_MARKER)))
 
         locked.click()
-        // Asserting the *absence* of an insertion needs a bounded settle
-        // window; the insert path lands well under this on the emulator.
+        // Tapping it opens the ink room, which is a room with no way in: it
+        // says where the secret would go, and nothing is typed.
+        assertNotNull(
+            "the ink room must come up",
+            device.wait(Until.findObject(By.textContains(copy.backToBench)), FIND_TIMEOUT_MS),
+        )
         SystemClock.sleep(SETTLE_MS)
-        assertEquals("locked row must not insert", STANDUP_BODY, plainText())
+        assertEquals("a locked sheet must not type", STANDUP_BODY, plainText())
+        assertNull(device.findObject(By.textContains(ENVELOPE_MARKER)))
     }
 
     @Test
-    fun passwordFieldsRefuseTheWholePanel() {
+    fun passwordFieldsRefuseTheWholeBench() {
         tap(ImeHostActivity.PASSWORD_FIELD)
-        // The service keeps its bar/panel expansion across input sessions,
-        // so either refusal face may greet the field first; wait for one,
-        // then walk both states so each is asserted regardless of order.
-        awaitAnyRefusal()
 
-        collapsePanel()
         assertNotNull(
-            "password refusal bar must show",
-            device.wait(Until.findObject(By.textContains(PASSWORD_BAR_MATCH)), FIND_TIMEOUT_MS),
+            "the refusal must say what is still good",
+            device.wait(Until.findObject(By.textContains(PASSWORD_MATCH)), FIND_TIMEOUT_MS),
         )
-        assertNull(device.findObject(By.desc(STANDUP_STRIP)))
-
-        expandPanel()
-        assertNotNull(
-            "password refusal state must show in the panel",
-            device.wait(Until.findObject(By.text(PanelStrings.PASSWORD_MAIN)), FIND_TIMEOUT_MS),
-        )
-        assertNull(device.findObject(By.desc(STANDUP_STRIP)))
-        assertNull(device.findObject(By.desc(DOCKER_STRIP)))
+        // Nothing insertable is drawn at all, so there is nothing to mis-tap.
+        assertNull(device.findObject(By.desc(STANDUP_SHEET)))
+        assertNull(device.findObject(By.desc(DOCKER_SHEET)))
+        assertNull(device.findObject(By.desc(LOCKED_DESC)))
 
         SystemClock.sleep(SETTLE_MS)
         assertEquals("nothing may enter a password field", "", passwordText())
@@ -121,38 +117,6 @@ class KeyboardClosedLoopTest {
         val target = device.wait(Until.findObject(By.desc(desc)), FIND_TIMEOUT_MS)
         assertNotNull("expected on-screen element: $desc", target)
         target.click()
-    }
-
-    /** Brings the expanded panel up whatever state the service kept. */
-    private fun expandPanel() {
-        device.wait(Until.findObject(By.desc(EXPAND_DESC)), SHORT_TIMEOUT_MS)?.click()
-        assertNotNull(
-            "expanded panel must show its collapse affordance",
-            device.wait(Until.findObject(By.desc(COLLAPSE_DESC)), FIND_TIMEOUT_MS),
-        )
-    }
-
-    /** Brings the bar back whatever state the service kept. */
-    private fun collapsePanel() {
-        device.wait(Until.findObject(By.desc(COLLAPSE_DESC)), SHORT_TIMEOUT_MS)?.click()
-        assertNotNull(
-            "bar must show its expand affordance",
-            device.wait(Until.findObject(By.desc(EXPAND_DESC)), FIND_TIMEOUT_MS),
-        )
-    }
-
-    /** Waits until either refusal face (bar copy or panel state) is up. */
-    private fun awaitAnyRefusal() {
-        val deadline = SystemClock.uptimeMillis() + FIND_TIMEOUT_MS
-        while (SystemClock.uptimeMillis() < deadline) {
-            if (device.hasObject(By.textContains(PASSWORD_BAR_MATCH)) ||
-                device.hasObject(By.text(PanelStrings.PASSWORD_MAIN))
-            ) {
-                return
-            }
-            SystemClock.sleep(POLL_MS)
-        }
-        fail("no password refusal state appeared")
     }
 
     private fun plainText(): String {
@@ -179,22 +143,24 @@ class KeyboardClosedLoopTest {
 
     companion object {
         private const val SERVICE = "dev.typvia.ime.TypviaImeService"
-        private const val EXPAND_DESC = "Expand snippet panel"
-        private const val COLLAPSE_DESC = "Collapse to snippet bar"
-        private const val LOCKED_DESC = "Locked, vault snippet"
-        private const val STANDUP_STRIP = "text, Standup notes"
-        private const val DOCKER_STRIP = "command, Docker logs"
+        private const val LOCKED_DESC = "secret, ••••••••"
+        private const val LOCKED_TITLE = "••••••••"
+        private const val STANDUP_SHEET = "text, Standup notes"
+        private const val DOCKER_SHEET = "command, Docker logs"
         /** Multiline on purpose: exercises commitText across line breaks. */
         private const val STANDUP_BODY =
             "Yesterday: shipped the IME panel\nToday: close the loop\nNo blockers"
-        /** Substring of PanelStrings.PASSWORD_BAR stable across copy tweaks. */
-        private const val PASSWORD_BAR_MATCH = "password fields"
+        /** The copy this device renders — one language, never both. */
+        private val copy =
+            BenchCopy(Translator(UiLanguage.resolve(listOf(Locale.getDefault().toLanguageTag()))))
+
+        /** Stable head of the refusal line, whichever language it is in. */
+        private val PASSWORD_MATCH = copy.passwordBody.take(12)
         /** Deliberately fake marker inside the sensitive
          * envelope, so leak assertions can grep the screen for it. */
         private const val ENVELOPE_MARKER = "AKIA_FAKE_ENVELOPE"
 
         private const val FIND_TIMEOUT_MS = 10_000L
-        private const val SHORT_TIMEOUT_MS = 3_000L
         private const val SETTLE_MS = 800L
         private const val POLL_MS = 100L
         private const val IME_REGISTER_TIMEOUT_MS = 30_000L

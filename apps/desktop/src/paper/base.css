@@ -1,0 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* The page under everything: paper and ink from the tokens. */
+body {
+  margin: 0;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-code);
+}

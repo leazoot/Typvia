@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Paper surface with the system-widget corner radius; pigment comes from
-     the theme-aware color resource, geometry stays identical (tokens rule). -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/tv_paper" />
-    <corners android:radius="16dp" />
-</shape>

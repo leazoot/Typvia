@@ -1,0 +1,503 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+.tvs {
+  min-height: calc(100vh - 38px);
+  padding: 32px 44px 40px;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.tvs-sheet {
+  max-width: 780px;
+}
+
+/* The title bar's right end on this page: the mascot, and the version barely
+   there beside it. */
+.tvs-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tvs-version-text {
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+/* ---- groups and rows ---- */
+
+.tvs-group {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-bottom: 52px;
+}
+
+.tvs-group > .tpi-group {
+  margin-bottom: 4px;
+}
+
+.tvs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 26px;
+}
+
+.tvs-label {
+  flex: none;
+  width: var(--label-col);
+  padding-top: 1px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+}
+
+.tvs-value {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 260px;
+}
+
+.tvs-value.is-narrow {
+  max-width: 460px;
+}
+
+/* Under 640px the label column folds above its content. */
+@media (max-width: 640px) {
+  .tvs {
+    padding: 32px 24px 40px;
+  }
+
+  .tvs-label {
+    width: 100%;
+  }
+
+  .tvs-label:empty {
+    display: none;
+  }
+}
+
+.tvs-text {
+  margin: 0;
+  color: var(--ink-body);
+  font-size: var(--fs-label);
+  line-height: 1.9;
+}
+
+.tvs-text.is-value {
+  color: var(--ink);
+  font-size: var(--fs-option);
+  line-height: 1.6;
+}
+
+.tvs-text.is-meta {
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+}
+
+.tvs-text.is-mono {
+  color: var(--ink-2);
+  font-family: var(--font-code);
+  font-size: var(--fs-body-2);
+  word-break: break-all;
+}
+
+.tvs-lead {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-content);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+/* Explanations stay folded until their row is pointed at or holds focus, then
+   open downward; while folded, the negative margin hands back the column gap. */
+.tvs-hint {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin: -8px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: var(--lh-cjk);
+  opacity: 0;
+  transition:
+    grid-template-rows var(--d-trace) var(--ease-move),
+    margin-top var(--d-trace) var(--ease-move),
+    opacity var(--d-trace) var(--ease-move);
+}
+
+.tvs-hint-text {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tvs-row:hover .tvs-hint,
+.tvs-row:focus-within .tvs-hint {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tvs-hint {
+    transition: opacity var(--d-tap);
+  }
+}
+
+.tvs-said {
+  margin: 0;
+  color: var(--ink-body);
+  font-size: var(--fs-label);
+  line-height: var(--lh-cjk);
+}
+
+.tvs-said-list {
+  display: block;
+  color: var(--ink-muted);
+}
+
+.tvs-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 26px;
+  width: 100%;
+}
+
+.tvs-spacer {
+  flex: 1;
+}
+
+.tvs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 26px;
+  margin-top: 4px;
+}
+
+.tvs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.tvs-file {
+  display: none;
+}
+
+/* An action that leads somewhere else sits at the right end of its group's
+   rule, where it reads as a way out rather than as a setting. */
+.tvs-group-action {
+  flex: none;
+  margin: -12px 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  cursor: pointer;
+  transition: color var(--d-tap);
+}
+
+.tvs-group-action:hover {
+  color: var(--accent-ink);
+}
+
+/* ---- state dot ---- */
+
+.tvs-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}
+
+.tvs-state-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.tvs-state-dot.is-ok {
+  background: var(--ok);
+}
+
+.tvs-state-dot.is-warn {
+  background: var(--warn);
+}
+
+/* ---- destructive words: the one solid fill, only while hovered ---- */
+
+.tvs-danger {
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-code);
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  cursor: pointer;
+  transition:
+    background var(--d-tap),
+    color var(--d-tap);
+}
+
+.tvs-danger:hover {
+  background: var(--accent-dark);
+  color: var(--on-accent);
+}
+
+/* ---- a field is a line under the words ---- */
+
+.tvs-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.tvs-line-label {
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}
+
+.tvs-line input,
+.tvs-line.is-static {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1.5px solid var(--line);
+  background: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: var(--fs-option);
+  outline: none;
+  transition: border-color var(--d-tap);
+}
+
+.tvs-line input:focus {
+  border-bottom-color: var(--accent);
+}
+
+.tvs-line input::placeholder {
+  color: var(--ink-faint);
+}
+
+.tvs-line.is-mono input {
+  font-family: var(--font-code);
+  font-size: var(--fs-body-2);
+}
+
+.tvs-line-text {
+  color: var(--ink-2);
+  font-size: var(--fs-option);
+}
+
+.tvs-line-text.is-faint {
+  color: var(--ink-faint);
+}
+
+/* ---- the device spine ---- */
+
+.tvs-spine {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+}
+
+.tvs-spine-stop-a {
+  stop-color: var(--accent-light);
+}
+
+.tvs-spine-stop-b {
+  stop-color: var(--accent);
+}
+
+.tvs-spine-path {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.tvs-spine-path.is-waiting {
+  stroke: var(--line);
+  stroke-dasharray: 2 9;
+}
+
+.tvs-spine-halo {
+  fill: none;
+  stroke: var(--accent);
+  stroke-opacity: 0.25;
+  stroke-width: 1.5;
+}
+
+.tvs-spine-self {
+  fill: var(--accent);
+}
+
+.tvs-spine-node {
+  fill: var(--paper-1);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.tvs-spine-end {
+  fill: var(--line);
+}
+
+.tvs-spine-label {
+  fill: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: 11px;
+}
+
+.tvs-spine-label.is-faint {
+  fill: var(--ink-faint);
+}
+
+/* ---- import drop ---- */
+
+.tvs-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: -8px -12px;
+  padding: 8px 12px;
+  border-radius: var(--r-row);
+  transition: background var(--d-tap);
+}
+
+.tvs-drop.is-over {
+  background: var(--accent-wash);
+}
+
+/* ---- shortcuts ---- */
+
+/* Three to a row, so the key caps line up in columns; fewer as the window narrows. */
+.tvs-keys {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 36px;
+}
+
+@media (max-width: 760px) {
+  .tvs-keys {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .tvs-keys {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.tvs-key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-width: 0;
+}
+
+.tvs-key-name {
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+}
+
+.tvs-key-row .tpi-key {
+  --tpi-key-paper: var(--paper-0);
+}
+
+/* ---- AI outbound log and per-app rules ---- */
+
+.tvs-log {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-meta);
+  list-style: none;
+}
+
+.tvs-rules,
+.tvs-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tvs-picks {
+  gap: 2px;
+}
+
+.tvs-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+}
+
+.tvs-rule-app {
+  flex: none;
+  min-width: 72px;
+  color: var(--ink);
+  font-family: var(--font-code);
+  font-size: var(--fs-body-2);
+}
+
+.tvs-rule-kind {
+  color: var(--accent-ink);
+  font-size: var(--fs-body-2);
+}
+
+.tvs-rule-what {
+  color: var(--ink-body);
+  font-size: var(--fs-body-2);
+}
+
+.tvs-pick {
+  width: 100%;
+  margin: 0 -10px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tvs-pick:hover {
+  background: var(--paper-2);
+}

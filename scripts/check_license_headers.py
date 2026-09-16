@@ -42,11 +42,19 @@ def main() -> int:
 
     problems = []
     checked = 0
+    # Files the index still lists but the working tree no longer has: a
+    # deletion that has not been staged yet. Skipping them is right, but
+    # skipping them quietly is not — a guard that reads "the file is gone" as
+    # "the check passed" is a guard that stops guarding.
+    absent = []
     for rel in listing:
         extension = rel.rsplit(".", 1)[-1] if "." in rel else ""
         if extension not in EXTENSIONS:
             continue
         if any(part in f"/{rel}" for part in EXEMPT_DIRS):
+            continue
+        if not (root / rel).is_file():
+            absent.append(rel)
             continue
 
         checked += 1
@@ -62,6 +70,16 @@ def main() -> int:
             problems.append(f"{rel}: carries both licence notices")
         elif expected is MPL_ID and NOTICE not in head:
             problems.append(f"{rel}: SPDX identifier without the MPL notice text")
+
+    if absent:
+        print(
+            f"note: {len(absent)} tracked path(s) are missing from the working tree "
+            "and were not checked — stage the deletions so the index matches."
+        )
+        for rel in absent[:5]:
+            print(f"  absent: {rel}")
+        if len(absent) > 5:
+            print(f"  ... and {len(absent) - 5} more")
 
     if problems:
         print(f"Licence header check failed for {len(problems)} of {checked} files:\n")

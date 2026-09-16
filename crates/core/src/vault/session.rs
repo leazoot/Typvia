@@ -37,6 +37,15 @@ const INITIAL_KEY_ID: u32 = 1;
 /// secure store. Opaque to the store backend; stable across sessions.
 pub const BIOMETRIC_MK_ENTRY: &str = "vault.mk.biometric";
 
+/// The shortest master password a vault will be built on, in bytes.
+///
+/// The floor belongs here rather than in each host's setup form: the password
+/// is the only thing standing between a stolen device and the vault, and a
+/// host that forgets to check would build a vault that cannot be strengthened
+/// afterwards without re-wrapping every key. Hosts may say the number, but
+/// they do not get to choose it.
+pub const MASTER_PASSWORD_MIN_LEN: usize = 8;
+
 /// What callers/UI may observe about the vault — never the keys themselves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnlockStatus {
@@ -101,6 +110,9 @@ impl VaultSession {
         password: &[u8],
         now: TimestampMs,
     ) -> Result<(), VaultError> {
+        if password.len() < MASTER_PASSWORD_MIN_LEN {
+            return Err(VaultError::PasswordTooShort);
+        }
         let repo = VaultKeyRepo::new(conn);
         if repo.load_header()?.is_some() {
             return Err(VaultError::AlreadyInitialized);
@@ -311,6 +323,8 @@ pub enum VaultError {
     NotInitialized,
     /// `initialize` was called but a vault already exists.
     AlreadyInitialized,
+    /// The chosen master password is shorter than [`MASTER_PASSWORD_MIN_LEN`].
+    PasswordTooShort,
     /// The master password did not unwrap the MK.
     WrongPassword,
     /// Attempts are refused until `retry_at` after too many failures.
@@ -341,6 +355,9 @@ impl fmt::Display for VaultError {
         match self {
             Self::NotInitialized => f.write_str("vault is not initialized"),
             Self::AlreadyInitialized => f.write_str("vault is already initialized"),
+            // States the rule, never the password or its length: the message
+            // travels into logs and error surfaces.
+            Self::PasswordTooShort => f.write_str("master password is too short"),
             Self::WrongPassword => f.write_str("unlock failed"),
             Self::Throttled { .. } => f.write_str("too many attempts, try again later"),
             Self::Locked => f.write_str("vault is locked"),

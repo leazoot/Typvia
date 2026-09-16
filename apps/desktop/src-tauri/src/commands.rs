@@ -8,7 +8,7 @@
 //! and error mapping only — all behaviour lives in `service` / core.
 
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
 use tauri::{AppHandle, Manager, State};
@@ -31,6 +31,8 @@ use typvia_host_service::service;
 
 use crate::injector::{InjectionMethod, Injector};
 use crate::panel;
+use crate::pause::InsertionPause;
+use crate::tray;
 
 /// Single-writer SQLite connection (WAL, database rules): one mutex, no pool.
 /// The injector is stateful (owns a clipboard handle) and reused across calls.
@@ -46,6 +48,8 @@ pub struct AppState {
     // Managed espanso engine: private directories plus the daemon
     // supervisor; the user's own espanso installation is never touched.
     engine: EngineSupervisor,
+    // Automatic expansion paused by the reader (tray card), in memory only.
+    pause: InsertionPause,
 }
 
 impl AppState {
@@ -61,6 +65,7 @@ impl AppState {
             vault: Mutex::new(VaultSession::new()),
             secure_store,
             engine,
+            pause: InsertionPause::default(),
         }
     }
 
@@ -169,6 +174,7 @@ pub fn snippet_list_page(
     view: String,
     folder_id: Option<String>,
     snippet_type: Option<String>,
+    order: Option<String>,
     limit: u32,
     offset: u32,
 ) -> Result<Vec<SnippetDto>, IpcError> {
@@ -177,6 +183,7 @@ pub fn snippet_list_page(
         &view,
         folder_id.as_deref(),
         snippet_type.as_deref(),
+        order.as_deref(),
         limit,
         offset,
     )
@@ -273,6 +280,20 @@ pub fn folder_update(
 #[tauri::command]
 pub fn folder_delete(state: State<'_, AppState>, id: String) -> Result<(), IpcError> {
     service::folder_delete(&*state.lock()?, &id, now_ms()?)
+}
+
+#[tauri::command]
+pub fn folder_merge(
+    state: State<'_, AppState>,
+    source_id: String,
+    target_id: String,
+) -> Result<Vec<String>, IpcError> {
+    service::folder_merge(&*state.lock()?, &source_id, &target_id, now_ms()?)
+}
+
+#[tauri::command]
+pub fn folder_reorder(state: State<'_, AppState>, ids: Vec<String>) -> Result<(), IpcError> {
+    service::folder_reorder(&*state.lock()?, &ids, now_ms()?)
 }
 
 #[tauri::command]
@@ -393,6 +414,225 @@ pub async fn panel_insert(
     })
     .await
     .map_err(|_| IpcError::system())?
+}
+
+/// The tray card's shortlist of snippets it can insert as they are.
+#[tauri::command]
+pub fn tray_results(state: State<'_, AppState>, limit: u32) -> Result<Vec<SnippetDto>, IpcError> {
+    let conn = state.lock()?;
+    crate::service::tray_rows(&conn, limit)
+}
+
+/// Tray-card insert: gate on the rules of the app that was frontmost when the
+/// icon was clicked, put the card away and hand focus back to that app, let
+/// the window server bring it frontmost, then inject — the panel's order.
+#[tauri::command]
+pub async fn tray_insert(
+    app: AppHandle,
+    id: String,
+    method: Option<String>,
+) -> Result<(), IpcError> {
+    let method = parse_method(method.as_deref())?;
+    let destination = app.state::<tray::TrayState>().destination_app();
+    {
+        let state = app.state::<AppState>();
+        let conn = state.lock()?;
+        service::panel_gate_insert(
+            &conn,
+            &id,
+            service::current_platform(),
+            destination.as_deref(),
+        )?;
+    }
+    let restore = app.clone();
+    app.run_on_main_thread(move || tray::hide(&restore, true))
+        .map_err(|_| IpcError::system())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(Duration::from_millis(panel::FOCUS_SETTLE_MS));
+        let now = now_ms()?;
+        let state = app.state::<AppState>();
+        let conn = state.lock()?;
+        let mut injector = state.lock_injector()?;
+        crate::service::snippet_inject(&conn, injector.as_mut(), &id, method, now)
+    })
+    .await
+    .map_err(|_| IpcError::system())?
+}
+
+/// Longest pause the reader can ask for: a day.
+const PAUSE_MAX_MINUTES: u32 = 24 * 60;
+
+/// How long automatic expansion stays paused; `None` when it is not.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertionPauseDto {
+    remaining_ms: Option<u64>,
+}
+
+fn pause_dto(state: &AppState) -> InsertionPauseDto {
+    InsertionPauseDto {
+        remaining_ms: state
+            .pause
+            .remaining(Instant::now())
+            .map(|left| u64::try_from(left.as_millis()).unwrap_or(u64::MAX)),
+    }
+}
+
+#[tauri::command]
+pub fn insertion_pause_status(state: State<'_, AppState>) -> InsertionPauseDto {
+    pause_dto(&state)
+}
+
+/// Pauses automatic expansion for `minutes`: the engine stops now and a timer
+/// starts it again when the pause runs out (unless it was renewed).
+#[tauri::command]
+pub fn insertion_pause(app: AppHandle, minutes: u32) -> Result<InsertionPauseDto, IpcError> {
+    if minutes == 0 || minutes > PAUSE_MAX_MINUTES {
+        return Err(IpcError::validation(
+            "pause must be between 1 minute and a day",
+        ));
+    }
+    let length = Duration::from_secs(u64::from(minutes) * 60);
+    let state = app.state::<AppState>();
+    state.pause.pause(Instant::now(), length);
+    state.engine.stop();
+    let timer = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(length);
+        let state = timer.state::<AppState>();
+        if state.pause.remaining(Instant::now()).is_none() {
+            engine_autostart(&state);
+        }
+    });
+    Ok(pause_dto(&state))
+}
+
+/// Ends the pause early and brings the engine back.
+#[tauri::command]
+pub fn insertion_resume(state: State<'_, AppState>) -> InsertionPauseDto {
+    state.pause.resume();
+    engine_autostart(&state);
+    pause_dto(&state)
+}
+
+/// Main-window insert (⏎ in the Library): step Typvia aside so the app the
+/// reader came from is frontmost again, name that app for the rules gate,
+/// then inject. Any refusal — a rule, missing permission — brings the window
+/// back, so the reader sees why rather than an app that disappeared.
+#[tauri::command]
+pub async fn main_insert(
+    app: AppHandle,
+    id: String,
+    method: Option<String>,
+) -> Result<(), IpcError> {
+    let method = parse_method(method.as_deref())?;
+    let aside = app.clone();
+    app.run_on_main_thread(move || crate::main_window::step_aside(&aside))
+        .map_err(|_| IpcError::system())?;
+    let worker = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(std::time::Duration::from_millis(panel::FOCUS_SETTLE_MS));
+        let destination = panel::frontmost_bundle_id(&worker);
+        let state = worker.state::<AppState>();
+        let conn = state.lock()?;
+        service::panel_gate_insert(
+            &conn,
+            &id,
+            service::current_platform(),
+            destination.as_deref(),
+        )?;
+        let now = now_ms()?;
+        let mut injector = state.lock_injector()?;
+        crate::service::snippet_inject(&conn, injector.as_mut(), &id, method, now)
+    })
+    .await
+    .map_err(|_| IpcError::system())?;
+    if result.is_err() {
+        let back = app.clone();
+        let _ = app.run_on_main_thread(move || crate::main_window::step_back(&back));
+    }
+    result
+}
+
+/// Main-window insert of a template with its variables filled in: the same
+/// step-aside, rule gate and step-back ordering as `main_insert`, with the
+/// values rendered into the body host-side.
+#[tauri::command]
+pub async fn main_insert_template(
+    app: AppHandle,
+    id: String,
+    values: std::collections::HashMap<String, String>,
+    method: Option<String>,
+) -> Result<(), IpcError> {
+    let method = parse_method(method.as_deref())?;
+    let aside = app.clone();
+    app.run_on_main_thread(move || crate::main_window::step_aside(&aside))
+        .map_err(|_| IpcError::system())?;
+    let worker = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(std::time::Duration::from_millis(panel::FOCUS_SETTLE_MS));
+        let destination = panel::frontmost_bundle_id(&worker);
+        let state = worker.state::<AppState>();
+        let conn = state.lock()?;
+        service::panel_gate_insert(
+            &conn,
+            &id,
+            service::current_platform(),
+            destination.as_deref(),
+        )?;
+        let now = now_ms()?;
+        let mut injector = state.lock_injector()?;
+        crate::service::template_inject(&conn, injector.as_mut(), &id, &values, method, now)
+    })
+    .await
+    .map_err(|_| IpcError::system())?;
+    if result.is_err() {
+        let back = app.clone();
+        let _ = app.run_on_main_thread(move || crate::main_window::step_back(&back));
+    }
+    result
+}
+
+/// Brings up the About window. It is created hidden at launch and closing it
+/// only hides it again, so there is always one to show.
+#[tauri::command]
+pub fn about_show(app: AppHandle) -> Result<(), IpcError> {
+    let window = app
+        .get_webview_window(crate::main_window::ABOUT_LABEL)
+        .ok_or_else(IpcError::not_found)?;
+    window.show().map_err(|_| IpcError::system())?;
+    window.set_focus().map_err(|_| IpcError::system())
+}
+
+/// Whether this app may post synthetic input (the macOS Accessibility grant).
+/// Read on demand: the answer changes while the app runs.
+#[tauri::command]
+pub fn accessibility_status(state: State<'_, AppState>) -> Result<bool, IpcError> {
+    Ok(state.lock_injector()?.accessibility_granted())
+}
+
+/// Opens the Accessibility pane of System Settings so the reader can tick
+/// Typvia there. Other platforms have no such pane and need no grant.
+#[tauri::command]
+pub fn open_accessibility_settings() -> Result<(), IpcError> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .status()
+            .map_err(|_| IpcError::system())?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(IpcError::system())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(IpcError::unavailable(
+            "this platform has no accessibility settings pane",
+        ))
+    }
 }
 
 /// Panel insert of a sensitive snippet (⌵ on a vault item): the same host-owned
@@ -572,14 +812,16 @@ pub fn espanso_status(state: State<'_, AppState>) -> Result<EspansoStatusDto, Ip
     )
 }
 
-/// Regenerates the espanso config from the current snippet set (also the
-/// "enable" action). Path resolution runs before the DB lock is taken.
 /// Reconcile the managed engine with the coexistence gate: start it only when
 /// the gate allows (a running user-owned espanso always wins until the user
 /// has decided — never a silent takeover), and *yield* — stop our
 /// running engine — when the gate closes again, e.g. the user's instance came
 /// back mid-session. Runs on launch, config sync and every status read.
 pub(crate) fn engine_autostart(state: &AppState) {
+    // A running pause keeps the engine down; its own timer starts it again.
+    if state.pause.remaining(Instant::now()).is_some() {
+        return;
+    }
     let gate = typvia_espanso_adapter::engine_gate(&ResolvedEspansoCli, state.engine.dirs());
     if gate == EngineGate::Start {
         // Failure lands in the supervisor state the status surface reports.
@@ -607,6 +849,9 @@ pub(crate) fn engine_bootstrap(state: &AppState) {
     engine_autostart(state);
 }
 
+/// Regenerates the espanso config from the current snippet set; an explicit
+/// sync is also the "enable" action. Path resolution runs before the DB lock
+/// is taken.
 #[tauri::command]
 pub fn espanso_sync(state: State<'_, AppState>) -> Result<EspansoSyncDto, IpcError> {
     let target = espanso_config_path(&state)?;
@@ -757,6 +1002,32 @@ pub fn vault_status(state: State<'_, AppState>) -> Result<VaultStatusDto, IpcErr
     let conn = state.lock()?;
     let mut session = state.lock_vault()?;
     service::vault_status(&conn, &mut session, now)
+}
+
+/// Packs a WebDAV username and password into the one string the transport
+/// stores and reads.
+///
+/// The shape of that string belongs to the sync crate, next to the parser that
+/// reads it back. A screen that writes its own copy will still be writing the
+/// old shape after this one changes — which shows up as an account refusing a
+/// password the reader typed correctly.
+///
+/// `None` is a folder that needs no credentials, which is not the same as a
+/// folder handed empty ones.
+#[tauri::command]
+pub fn webdav_credentials(username: String, password: String) -> Option<String> {
+    typvia_sync::WebdavCredentials::basic(&username, &password)
+}
+
+/// The shortest master password the vault will be built on.
+///
+/// Exported so the setup form can say the number without holding a second
+/// copy of the rule: a form that decides for itself what is long enough is a
+/// form that will still be asking for eight characters after the vault starts
+/// wanting ten.
+#[tauri::command]
+pub fn master_password_min_length() -> u32 {
+    u32::try_from(typvia_core::vault::MASTER_PASSWORD_MIN_LEN).unwrap_or(u32::MAX)
 }
 
 #[tauri::command]

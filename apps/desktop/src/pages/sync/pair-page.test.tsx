@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   pairingBeginWebdav: vi.fn(),
   pairingPoll: vi.fn(),
   pairingFinalize: vi.fn(),
+  webdavCredentials: vi.fn(),
   pairingCancel: vi.fn(),
 }));
 
@@ -147,6 +148,8 @@ describe('Pairing — the admitting device', () => {
 
 describe('Pairing — the joining device', () => {
   beforeEach(() => {
+    // The core composes the credential string; the page only carries it.
+    mocks.webdavCredentials.mockResolvedValue('basic:FAKE_user:FAKE_dav_pw');
     mocks.syncStatus.mockResolvedValue(status({ configured: false, enabled: false }));
     mocks.pairingBegin.mockResolvedValue({ code: 'TYPVIA-PAIR.V1.abc', sessionId: 'session-1' });
     mocks.pairingPoll.mockResolvedValue(null);
@@ -170,6 +173,8 @@ describe('Pairing — the joining device', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show my pairing code' }));
 
     await waitFor(() =>
+      // What is asserted is that the composed string is handed on, not what
+      // it looks like: the shape is the transport's, not this page's.
       expect(mocks.pairingBeginWebdav).toHaveBeenCalledWith(
         'https://dav.example.com/typvia',
         'basic:FAKE_user:FAKE_dav_pw',

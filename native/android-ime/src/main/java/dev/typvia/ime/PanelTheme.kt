@@ -4,72 +4,118 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-// Design tokens for the keyboard panel. Pigment lives in res/values
-// (+values-night) so the system appearance resolves it; this class carries
-// the resolved colors plus the panel's metric and type scale.
+// The panel's resolved paint and measurements.
+//
+// Every value here comes from the design system the app is built from rather
+// than from a copy of it: this panel used to carry its own colour resources,
+// which meant the keyboard's paper could drift from the app's paper without
+// anything failing. One palette, resolved once per input session.
 
 package dev.typvia.ime
 
 import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.Dp
+import dev.typvia.mobile.ui.KeyboardBand
+import dev.typvia.mobile.ui.Tokens
+import dev.typvia.mobile.ui.UiLanguage
+import dev.typvia.mobile.ui.UiPreferenceFile
+import dev.typvia.mobile.ui.VaultRoom
 import kotlin.math.roundToInt
 
 class PanelTheme(context: Context) {
     private val density = context.resources.displayMetrics.density
 
-    // Colors, resolved through the resource system (values / values-night).
-    val panelBg = context.getColor(R.color.tv_ime_panel)
-    val vaultBg = context.getColor(R.color.tv_ime_panel_vault)
-    val ink = context.getColor(R.color.tv_ime_ink)
-    val secondary = context.getColor(R.color.tv_ime_secondary)
-    val meta = context.getColor(R.color.tv_ime_meta)
-    val micro = context.getColor(R.color.tv_ime_micro)
-    val ghost = context.getColor(R.color.tv_ime_ghost)
-    val accent = context.getColor(R.color.tv_ime_accent)
-    val body = context.getColor(R.color.tv_ime_body)
-    val outline = context.getColor(R.color.tv_ime_outline)
-    val hairline = context.getColor(R.color.tv_ime_hairline)
-    val divider = context.getColor(R.color.tv_ime_divider)
-    val stroke = context.getColor(R.color.tv_ime_stroke)
-    val caretDim = context.getColor(R.color.tv_ime_caret_dim)
+    /**
+     * What the reader chose in the app, if they chose anything.
+     *
+     * This panel is a different process from the app and cannot be told, so it
+     * reads the file the app leaves for it. Where there is nothing to read,
+     * every value below falls back to the phone's own answer — which is what
+     * this panel used to do unconditionally, and the reason a reader who set
+     * the app to Chinese still got an English keyboard.
+     */
+    val chosen = UiPreferenceFile.read(context.dataDir)
 
-    // Metrics in px (mock px read as dp; the 26px gesture strip under the
-    // mock's footer belongs to the system, not the panel).
-    val panelHeight = dp(330f)
-    val barHeight = dp(52f)
-    val headerHeight = dp(48f)
-    val rowMinHeight = dp(58f)
-    val footerHeight = dp(44f)
-    val hInset = dp(22f)
-    val stripRadius = dp(10f).toFloat()
+    private val night = chosen.appearance.isDark(
+        (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES,
+    )
 
-    // Type sizes in sp (setTextSize COMPLEX_UNIT_SP call sites).
-    val searchSp = 14f
-    val rowTitleSp = 14.5f
-    val rowSubSp = 11.5f
-    val ghostSp = 12f
-    val tabSp = 11f
-    val countSp = 10.5f
-    val wordmarkSp = 9.5f
-    val lockedSp = 9.5f
-    val stateMainSp = 14f
-    val stateSubSp = 12.5f
-    val stripSp = 13f
-    val abcSp = 10.5f
-    val capsLabelSp = 9.5f
-    val fieldValueSp = 14f
-    val previewSp = 13f
-    val vaultMainSp = 16f
-    val vaultSubSp = 12.5f
-    val buttonSp = 14f
+    /** Which of the two languages this panel renders. Never both at once. */
+    val language: UiLanguage = chosen.language.resolved(
+        (0 until context.resources.configuration.locales.size()).map {
+            context.resources.configuration.locales[it].toLanguageTag()
+        },
+    )
+
+    val paper = swatch(Tokens.Swatch.paperLight, Tokens.Swatch.paperDark)
+    val carrier = swatch(Tokens.Swatch.carrierLight, Tokens.Swatch.carrierDark)
+    val ink = swatch(Tokens.Swatch.inkLight, Tokens.Swatch.inkDark)
+    val ink2 = swatch(Tokens.Swatch.ink2Light, Tokens.Swatch.ink2Dark)
+    val ink3 = swatch(Tokens.Swatch.ink3Light, Tokens.Swatch.ink3Dark)
+
+    /** The keyboard is the home room's tool, and wears its accent. */
+    val accent = swatch(Tokens.Swatch.homeLight, Tokens.Swatch.homeDark)
+
+    /** The ink room is ink in either theme — the material is the point. */
+    val vaultPaper = VaultRoom.base.toArgb()
+    val vaultInk = VaultRoom.ink.toArgb()
+    val vaultInk2 = VaultRoom.ink2.toArgb()
+    val vaultAccent = VaultRoom.accent.toArgb()
+
+    val hairline = alpha(
+        ink,
+        if (night) Tokens.Line.HAIRLINE_OPACITY_DARK else Tokens.Line.HAIRLINE_OPACITY_LIGHT,
+    )
+
+    // Measurements. The four bands and the gutter under them are the
+    // delivery's; nothing here is a number this file thought of.
+    val searchBand = px(KeyboardBand.search)
+    val sortsBand = px(KeyboardBand.sorts)
+    val tilesBand = px(KeyboardBand.tiles)
+    val functionsBand = px(KeyboardBand.functions)
+    val panelHeight = px(KeyboardBand.total)
+
+    val screenPadding = px(Tokens.Space.screenPadding)
+    val tileWidth = px(Tokens.Viewport.tileWidth)
+    val tileLeadWidth = px(Tokens.Viewport.tileLeadWidth)
+    val tileRadius = dp(Tokens.Radius.card.value).toFloat()
+    val markRadius = dp(Tokens.Radius.sort.value).toFloat()
+    val hairlineWidth = maxOf(1, px(Tokens.Line.hairlineWidth))
+    val caretWidth = px(Tokens.Line.searchHeight) * 2
+
+    // The type ladder, in sp, taken from the same table the app reads.
+    val titleSp = Tokens.Type.bodyS.value
+    val bodySp = Tokens.Type.caption.value
+    val monoSp = Tokens.Type.monoLabel.value
+    val markSp = Tokens.Type.sortMark.value
+
+    /**
+     * How faint a sort mark goes when nothing behind it matches. It stays on
+     * the band at this opacity rather than leaving it.
+     */
+    val dimmedAlpha = 0.45f
+
+    /** A spent tile steps back to here; it does not disappear. */
+    val spentAlpha = 0.55f
 
     fun dp(value: Float): Int = (value * density).roundToInt()
+
+    private fun px(value: Dp): Int = dp(value.value)
+
+    private fun swatch(light: androidx.compose.ui.graphics.Color, dark: androidx.compose.ui.graphics.Color): Int =
+        (if (night) dark else light).toArgb()
+
+    private fun alpha(color: Int, fraction: Float): Int =
+        (color and 0x00FFFFFF) or ((fraction * 255).roundToInt() shl 24)
 }
 
 /**
  * Presentation vocabulary: core snippet-type strings mapped to the two-letter
  * marks of the design system (mirror of packages/ui markForType and the iOS
- * TypeMark; the native layer cannot import the TS module). The keyboard rows
- * no longer draw the mark, but screen readers still get the full word.
+ * TypeMark; the native layer cannot import the TS module).
  */
 object TypeMark {
     private val markByType = mapOf(

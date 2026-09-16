@@ -37,6 +37,12 @@ pub enum ListScope<'a> {
     All,
     /// Snippets used at least once, most recently used first.
     Recent,
+    /// Snippets used at least once, most often used first.
+    ///
+    /// Not a variation on Recent. "What I reached for last" and "what I reach
+    /// for" are different questions, and a screen headed *most used* that is
+    /// really showing *last used* answers neither.
+    Used,
     /// Favorites.
     Starred,
     /// Live snippets outside any folder.
@@ -52,16 +58,23 @@ impl<'a> ListScope<'a> {
         match self {
             ListScope::All => "1 = 1",
             ListScope::Recent => "last_used_at IS NOT NULL",
+            ListScope::Used => "usage_count > 0",
             ListScope::Starred => "is_favorite = 1",
             ListScope::Unsorted => "folder_id IS NULL",
             ListScope::Folder(_) => "folder_id = :folder",
         }
     }
 
-    /// Recent orders by usage recency; every other scope by last update.
+    /// Recent orders by usage recency, Used by usage count; every other scope
+    /// by last update. Each order ends in `id` so a page boundary cannot
+    /// duplicate or skip a row when two snippets tie.
     fn order_clause(self) -> &'static str {
         match self {
             ListScope::Recent => "last_used_at DESC, id",
+            // The recency tiebreak matters: with a young library most counts
+            // are 1, and without it the list would be ordered by nothing the
+            // reader can see.
+            ListScope::Used => "usage_count DESC, last_used_at DESC, id",
             _ => "updated_at DESC, id",
         }
     }
@@ -70,6 +83,33 @@ impl<'a> ListScope<'a> {
         match self {
             ListScope::Folder(id) => Some(id),
             _ => None,
+        }
+    }
+}
+
+/// A reader-chosen order for a Library list, independent of its scope: the
+/// same three orders apply inside every collection, not only in the saved
+/// views that happen to be ordered that way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListOrder {
+    /// Most recently used first; snippets never used follow, newest edit first.
+    LastUsed,
+    /// Most recently created first.
+    Created,
+    /// Most often used first, recency breaking ties.
+    UsageCount,
+}
+
+impl ListOrder {
+    /// Each order ends in `id` so a page boundary cannot duplicate or skip a
+    /// row. SQLite sorts NULL below every value, so the descending recency
+    /// order already puts never-used snippets last — an `IS NULL` term would
+    /// only stop the index from answering the order.
+    fn order_clause(self) -> &'static str {
+        match self {
+            ListOrder::LastUsed => "last_used_at DESC, updated_at DESC, id",
+            ListOrder::Created => "created_at DESC, id",
+            ListOrder::UsageCount => "usage_count DESC, last_used_at DESC, id",
         }
     }
 }
@@ -289,7 +329,20 @@ impl<'c> SnippetRepo<'c> {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<Snippet>, RepoError> {
-        self.list_scoped_where(scope, snippet_type, limit, offset, false)
+        self.list_scoped_where(scope, snippet_type, None, limit, offset, false)
+    }
+
+    /// [`Self::list_scoped`] in a reader-chosen order rather than the scope's
+    /// own; the filters are identical.
+    pub fn list_scoped_ordered(
+        &self,
+        scope: ListScope<'_>,
+        snippet_type: Option<SnippetType>,
+        order: ListOrder,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<Snippet>, RepoError> {
+        self.list_scoped_where(scope, snippet_type, Some(order), limit, offset, false)
     }
 
     /// Recent list for the panel calling surface: same Recent semantics as
@@ -297,36 +350,21 @@ impl<'c> SnippetRepo<'c> {
     /// where the vault verify-then-insert flow lives, unlike the Library
     /// (that rule covers Library entry points only).
     pub fn list_recent_including_sensitive(&self, limit: u32) -> Result<Vec<Snippet>, RepoError> {
-        self.list_scoped_where(ListScope::Recent, None, limit, 0, true)
+        self.list_scoped_where(ListScope::Recent, None, None, limit, 0, true)
     }
 
     fn list_scoped_where(
         &self,
         scope: ListScope<'_>,
         snippet_type: Option<SnippetType>,
+        order: Option<ListOrder>,
         limit: u32,
         offset: u32,
         include_sensitive: bool,
     ) -> Result<Vec<Snippet>, RepoError> {
         let type_text = snippet_type.map(|t| t.as_str());
         let folder = scope.folder_id();
-        let mut sql = format!(
-            "SELECT {SELECT_COLUMNS} FROM snippet
-             WHERE deleted_at IS NULL{} AND {}",
-            if include_sensitive {
-                ""
-            } else {
-                sensitive_exclusion(type_text)
-            },
-            scope.where_clause()
-        );
-        if type_text.is_some() {
-            sql.push_str(" AND type = :type");
-        }
-        sql.push_str(&format!(
-            " ORDER BY {} LIMIT :limit OFFSET :offset",
-            scope.order_clause()
-        ));
+        let sql = scoped_list_sql(scope, type_text, order, include_sensitive);
 
         let mut binds: Vec<(&str, &dyn ToSql)> = vec![(":limit", &limit), (":offset", &offset)];
         if let Some(folder) = folder.as_ref() {
@@ -578,7 +616,6 @@ impl<'c> SnippetRepo<'c> {
         })
     }
 
-    /// Attaches a tag to a batch of snippets; already-tagged pairs are kept.
     /// Attaches one tag to one snippet — a single idempotent statement, safe
     /// inside a caller's transaction (used by the backup restore).
     pub fn add_tag(&self, snippet_id: &str, tag_id: &str) -> Result<(), RepoError> {
@@ -589,6 +626,7 @@ impl<'c> SnippetRepo<'c> {
         Ok(())
     }
 
+    /// Attaches one tag to a batch of snippets; already-tagged pairs are kept.
     pub fn batch_add_tag(&self, ids: &[SnippetId], tag_id: &str) -> Result<(), RepoError> {
         self.in_batch_transaction(|conn| {
             for id in ids {
@@ -722,6 +760,38 @@ fn sensitive_exclusion(type_text: Option<&str>) -> &'static str {
     }
 }
 
+/// Builds one scoped page query.
+///
+/// Only compile-time constants reach the SQL text: the folder id and the type
+/// both travel as bind parameters. Separate from the call that runs it so a
+/// test can assert the query plan of the statement the repository actually
+/// issues, rather than of a copy that is free to drift away from it.
+fn scoped_list_sql(
+    scope: ListScope<'_>,
+    type_text: Option<&str>,
+    order: Option<ListOrder>,
+    include_sensitive: bool,
+) -> String {
+    let mut sql = format!(
+        "SELECT {SELECT_COLUMNS} FROM snippet
+             WHERE deleted_at IS NULL{} AND {}",
+        if include_sensitive {
+            ""
+        } else {
+            sensitive_exclusion(type_text)
+        },
+        scope.where_clause()
+    );
+    if type_text.is_some() {
+        sql.push_str(" AND type = :type");
+    }
+    sql.push_str(&format!(
+        " ORDER BY {} LIMIT :limit OFFSET :offset",
+        order.map_or(scope.order_clause(), ListOrder::order_clause)
+    ));
+    sql
+}
+
 type SnippetRowResult = Result<Snippet, RepoError>;
 
 fn row_to_snippet(row: &Row<'_>) -> rusqlite::Result<SnippetRowResult> {
@@ -807,4 +877,70 @@ fn collect_snippets(
         snippets.push(row??);
     }
     Ok(snippets)
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::*;
+    use crate::db::{migrate_to_latest, open_in_memory};
+
+    fn plan(sql: &str) -> String {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let mut stmt = conn
+            .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+            .expect("the scoped query is valid SQL");
+        // The plan does not run the query, but the statement still has to be
+        // bound; the values are irrelevant to the plan SQLite picks.
+        let limit: u32 = 3;
+        let offset: u32 = 0;
+        let binds: &[(&str, &dyn ToSql)] = &[(":limit", &limit), (":offset", &offset)];
+        let rows = stmt
+            .query_map(binds, |row| row.get::<_, String>(3))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        rows.join(" | ")
+    }
+
+    /// The "most used" list has to hold up at the fifty-thousand-snippet
+    /// target, and the thing that would quietly sink it is not the scan — it
+    /// is the sort. Without an index covering the order, SQLite materialises
+    /// every matching row into a temporary b-tree before it can hand back the
+    /// first page, and that cost grows with the library while the page size
+    /// stays at three.
+    #[test]
+    fn the_most_used_list_is_ordered_by_an_index_not_by_a_temporary_sort() {
+        let plan = plan(&scoped_list_sql(ListScope::Used, None, None, false));
+
+        assert!(
+            plan.contains("idx_snippet_usage_count"),
+            "expected the usage index, got: {plan}"
+        );
+        assert!(
+            !plan.contains("TEMP B-TREE"),
+            "the order must come from the index, got: {plan}"
+        );
+    }
+
+    /// The reader-chosen orders face the same fifty-thousand-row library as
+    /// the saved views, so they carry the same guarantee.
+    #[test]
+    fn reader_chosen_orders_over_the_whole_library_come_from_an_index() {
+        for (order, index) in [
+            (ListOrder::LastUsed, "idx_snippet_last_used_order"),
+            (ListOrder::Created, "idx_snippet_created_order"),
+            (ListOrder::UsageCount, "idx_snippet_usage_count"),
+        ] {
+            let plan = plan(&scoped_list_sql(ListScope::All, None, Some(order), false));
+            assert!(
+                plan.contains(index),
+                "{order:?}: expected {index}, got: {plan}"
+            );
+            assert!(
+                !plan.contains("TEMP B-TREE"),
+                "{order:?}: the order must come from the index, got: {plan}"
+            );
+        }
+    }
 }

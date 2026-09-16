@@ -20,8 +20,8 @@ use typvia_core::model::{
     SnippetVersion, SyncEntityType, Tag, TemplateField, TemplateFieldType, TriggerMode,
 };
 use typvia_core::repo::{
-    AppRuleRepo, FolderRepo, ListScope, RepoError, SnippetRepo, TRASH_RETENTION_MS, TagRepo,
-    TemplateFieldRepo, VaultKeyRepo, VersionRepo, new_id,
+    AppRuleRepo, FolderRepo, ListOrder, ListScope, RepoError, SnippetRepo, TRASH_RETENTION_MS,
+    TagRepo, TemplateFieldRepo, VaultKeyRepo, VersionRepo, new_id,
 };
 use typvia_core::sync_hooks::{self, EntityChange};
 use typvia_core::vault::{SecureStore, UnlockStatus, VaultSession};
@@ -82,6 +82,86 @@ fn parse_snippet_type(value: &str) -> Result<SnippetType, IpcError> {
     SnippetType::from_str(value).map_err(|_| IpcError::validation("unknown snippet type"))
 }
 
+/// A trigger word as it will be stored, and the mode that must travel with it.
+///
+/// An empty field is not an empty trigger — it is no trigger, and the mode has
+/// nothing left to describe. Hosts were normalising this on their own side
+/// (iOS did; Android was about to have to), which is how two platforms come to
+/// disagree about a field the reader left alone.
+///
+/// Trimming stops there: which characters a trigger may contain is the model's
+/// rule, and a caller that sends `;de ploy` is told so rather than quietly
+/// getting something else stored.
+fn snippet_trigger(
+    trigger: Option<String>,
+    mode: Option<String>,
+) -> (Option<String>, Option<String>) {
+    match trigger
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+    {
+        // A trigger with no stated mode is a delimiter trigger. That default
+        // was written down five times across the two hosts and the share
+        // intake; it is a product decision, and it belongs where the decision
+        // can only be made once.
+        Some(trigger) => (
+            Some(trigger),
+            Some(mode.unwrap_or_else(|| DEFAULT_TRIGGER_MODE.to_string())),
+        ),
+        None => (None, None),
+    }
+}
+
+/// What a trigger means when nobody said: type it, then a delimiter.
+const DEFAULT_TRIGGER_MODE: &str = "delimiter";
+
+/// The name a snippet is filed under.
+///
+/// A snippet must have a title — that is the data model's rule and it stays.
+/// What this adds is the product's answer to a reader who did not want to name
+/// anything: the first line of what they wrote. The alternative is a library
+/// full of rows called "Untitled", which is a library nobody can scan.
+///
+/// It lives here rather than in a screen because both hosts were about to have
+/// their own copy of it, and a convenience that differs per platform is not a
+/// convenience — it is two products.
+fn snippet_title(given: &str, body: &str) -> String {
+    let given = given.trim();
+    if !given.is_empty() {
+        return given.to_string();
+    }
+    let first = body
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("");
+    first.chars().take(TITLE_FROM_BODY_MAX_CHARS).collect()
+}
+
+/// How much of the first line becomes a name. Long enough to recognise, short
+/// enough to scan a column of them.
+const TITLE_FROM_BODY_MAX_CHARS: usize = 60;
+
+/// The kind an ordinary save may file a snippet under.
+///
+/// Every kind but one. A secret's body is encrypted before it reaches storage
+/// and its row carries no plaintext beside it; letting this door accept the
+/// secret kind would produce the exact opposite — a row that calls itself a
+/// secret while holding the body in the clear, in the full-text index, and in
+/// every snapshot the extensions can open. The vault has its own door for
+/// that, and an existing snippet is promoted through `convert_to_sensitive`.
+///
+/// The refusal is here rather than in the hosts because otherwise every host
+/// needs its own copy of it, and the one that forgets is the one that leaks.
+fn parse_editable_snippet_type(value: &str) -> Result<SnippetType, IpcError> {
+    match parse_snippet_type(value)? {
+        SnippetType::Sensitive => Err(IpcError::validation(
+            "a secret is written through the vault, not through an ordinary save",
+        )),
+        kind => Ok(kind),
+    }
+}
+
 fn parse_trigger_mode(value: Option<&str>) -> Result<Option<TriggerMode>, IpcError> {
     value
         .map(|v| TriggerMode::from_str(v).map_err(|_| IpcError::validation("unknown trigger mode")))
@@ -106,16 +186,18 @@ pub fn snippet_create(
     input: SnippetCreateInput,
     now: i64,
 ) -> Result<SnippetDto, IpcError> {
+    let title = snippet_title(&input.title, &input.body);
+    let (trigger, trigger_mode) = snippet_trigger(input.trigger, input.trigger_mode);
     let snippet = Snippet {
         id: new_id(),
         workspace_id: WORKSPACE_ID.to_string(),
-        title: input.title,
+        title,
         content: SnippetContent::Plaintext(input.body),
-        snippet_type: parse_snippet_type(&input.snippet_type)?,
+        snippet_type: parse_editable_snippet_type(&input.snippet_type)?,
         description: input.description,
         folder_id: input.folder_id,
-        trigger: input.trigger,
-        trigger_mode: parse_trigger_mode(input.trigger_mode.as_deref())?,
+        trigger,
+        trigger_mode: parse_trigger_mode(trigger_mode.as_deref())?,
         language: input.language,
         security_level: SecurityLevel::Normal,
         is_favorite: false,
@@ -172,11 +254,12 @@ pub fn snippet_update(
     );
     snippet.title = input.title;
     snippet.content = SnippetContent::Plaintext(input.body);
-    snippet.snippet_type = parse_snippet_type(&input.snippet_type)?;
+    snippet.snippet_type = parse_editable_snippet_type(&input.snippet_type)?;
     snippet.description = input.description;
     snippet.folder_id = input.folder_id;
-    snippet.trigger = input.trigger;
-    snippet.trigger_mode = parse_trigger_mode(input.trigger_mode.as_deref())?;
+    let (trigger, trigger_mode) = snippet_trigger(input.trigger, input.trigger_mode);
+    snippet.trigger = trigger;
+    snippet.trigger_mode = parse_trigger_mode(trigger_mode.as_deref())?;
     snippet.language = input.language;
     snippet.is_favorite = input.is_favorite;
     snippet.is_pinned = input.is_pinned;
@@ -524,7 +607,8 @@ pub fn snippet_list_by_folder(
 }
 
 /// Maps the wire view name + optional folder id onto a repo scope. The view
-/// vocabulary is the Library rail: all | recent | starred | unsorted | folder.
+/// vocabulary is the Library rail: all | recent | used | starred | unsorted |
+/// folder.
 fn parse_scope<'a>(view: &str, folder_id: Option<&'a str>) -> Result<ListScope<'a>, IpcError> {
     match (view, folder_id) {
         ("folder", Some(id)) => Ok(ListScope::Folder(id)),
@@ -534,9 +618,22 @@ fn parse_scope<'a>(view: &str, folder_id: Option<&'a str>) -> Result<ListScope<'
         )),
         ("all", None) => Ok(ListScope::All),
         ("recent", None) => Ok(ListScope::Recent),
+        ("used", None) => Ok(ListScope::Used),
         ("starred", None) => Ok(ListScope::Starred),
         ("unsorted", None) => Ok(ListScope::Unsorted),
         _ => Err(IpcError::validation("unknown library view")),
+    }
+}
+
+/// Maps the wire order name onto a repo order; `None` keeps the view's own
+/// order (the mobile chapters rely on that).
+fn parse_order(order: Option<&str>) -> Result<Option<ListOrder>, IpcError> {
+    match order {
+        None => Ok(None),
+        Some("recent") => Ok(Some(ListOrder::LastUsed)),
+        Some("added") => Ok(Some(ListOrder::Created)),
+        Some("used") => Ok(Some(ListOrder::UsageCount)),
+        Some(_) => Err(IpcError::validation("unknown list order")),
     }
 }
 
@@ -545,13 +642,18 @@ pub fn snippet_list_page(
     view: &str,
     folder_id: Option<&str>,
     snippet_type: Option<&str>,
+    order: Option<&str>,
     limit: u32,
     offset: u32,
 ) -> Result<Vec<SnippetDto>, IpcError> {
     check_limit(limit)?;
     let scope = parse_scope(view, folder_id)?;
     let type_filter = snippet_type.map(parse_snippet_type).transpose()?;
-    let rows = SnippetRepo::new(conn).list_scoped(scope, type_filter, limit, offset)?;
+    let repo = SnippetRepo::new(conn);
+    let rows = match parse_order(order)? {
+        Some(order) => repo.list_scoped_ordered(scope, type_filter, order, limit, offset)?,
+        None => repo.list_scoped(scope, type_filter, limit, offset)?,
+    };
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
@@ -591,6 +693,24 @@ pub fn snippet_trash(conn: &Connection, id: &str, now: i64) -> Result<(), IpcErr
     notify_sync(&tx, SyncEntityType::Snippet, id, Some(now), now)?;
     tx.commit().map_err(RepoError::from)?;
     SearchIndex::new(conn).sync_snippet(id)?;
+    Ok(())
+}
+
+/// Records one use of a snippet, after a host has actually delivered it.
+///
+/// Delivery itself is the host's own act — a clipboard here, an injector
+/// there, a text field somewhere else — so this layer cannot do it and does
+/// not pretend to. What it owns is the rule: **a use is counted only after the
+/// words have gone somewhere**, and it is counted with one light statement of
+/// its own rather than inside a content transaction it would have to compete
+/// with.
+///
+/// It exists because the rule was living in one host's private code: the
+/// desktop counted uses, the two mobile hosts did not, and their recall
+/// shelves were empty forever — not because nobody used anything, but because
+/// nobody was writing it down.
+pub fn snippet_record_use(conn: &Connection, id: &str, now: i64) -> Result<(), IpcError> {
+    SnippetRepo::new(conn).record_usage(id, now)?;
     Ok(())
 }
 
@@ -754,6 +874,20 @@ fn snippet_ids_in_subtree(conn: &Connection, folder_id: &str) -> Result<Vec<Stri
     Ok(ids)
 }
 
+/// A folder's name, as it will be stored.
+///
+/// Trimmed, because "上线" and "上线 " are one folder to a reader and two to a
+/// database; refused when there is nothing left, because a nameless folder
+/// renders as a chip with no word on it — unselectable, unrenameable, and
+/// impossible to tell from a rendering fault.
+fn folder_name(raw: &str) -> Result<String, IpcError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(IpcError::validation("a folder needs a name"));
+    }
+    Ok(trimmed.to_string())
+}
+
 pub fn folder_create(
     conn: &Connection,
     input: FolderCreateInput,
@@ -762,7 +896,7 @@ pub fn folder_create(
     let folder = Folder {
         id: new_id(),
         parent_id: input.parent_id,
-        name: input.name,
+        name: folder_name(&input.name)?,
         sort_order: input.sort_order,
         created_at: now,
         updated_at: now,
@@ -781,8 +915,9 @@ pub fn folder_update(
 ) -> Result<FolderDto, IpcError> {
     let repo = FolderRepo::new(conn);
     let mut folder = repo.get(&input.id)?.ok_or_else(IpcError::not_found)?;
-    let renamed = folder.name != input.name;
-    folder.name = input.name;
+    let name = folder_name(&input.name)?;
+    let renamed = folder.name != name;
+    folder.name = name;
     folder.parent_id = input.parent_id;
     folder.sort_order = input.sort_order;
     folder.updated_at = now;
@@ -825,6 +960,89 @@ pub fn folder_delete(conn: &Connection, id: &str, now: i64) -> Result<(), IpcErr
     for snippet_id in &affected {
         index.sync_snippet(snippet_id)?;
     }
+    Ok(())
+}
+
+/// Folds one folder into another in a single transaction: the source's own
+/// snippets move to the target, folders nested under the source move up to
+/// the source's parent so nothing cascades away, and the source is deleted.
+/// Returns the ids that moved, which is what an undo needs to put them back.
+pub fn folder_merge(
+    conn: &Connection,
+    source_id: &str,
+    target_id: &str,
+    now: i64,
+) -> Result<Vec<String>, IpcError> {
+    if source_id == target_id {
+        return Err(IpcError::validation("a folder cannot merge into itself"));
+    }
+    let folders = FolderRepo::new(conn);
+    let source = folders.get(source_id)?.ok_or_else(IpcError::not_found)?;
+    folders.get(target_id)?.ok_or_else(IpcError::not_found)?;
+
+    let snippets = SnippetRepo::new(conn);
+    let mut moved = Vec::new();
+    let mut offset = 0;
+    loop {
+        let page = snippets.list_by_folder(Some(source_id), MAX_PAGE_LIMIT, offset)?;
+        let page_len = page.len();
+        moved.extend(page.into_iter().map(|s| s.id));
+        if page_len < MAX_PAGE_LIMIT as usize {
+            break;
+        }
+        offset += MAX_PAGE_LIMIT;
+    }
+    let children = folders.list_children(Some(source_id))?;
+
+    let tx = conn.unchecked_transaction().map_err(RepoError::from)?;
+    if !moved.is_empty() {
+        SnippetRepo::new(&tx).batch_move(&moved, Some(target_id))?;
+        for id in &moved {
+            notify_sync(&tx, SyncEntityType::Snippet, id, None, now)?;
+        }
+    }
+    let repo = FolderRepo::new(&tx);
+    for mut child in children {
+        child.parent_id.clone_from(&source.parent_id);
+        child.updated_at = now;
+        repo.update(&child)?;
+        notify_sync(&tx, SyncEntityType::Folder, &child.id, None, now)?;
+    }
+    repo.delete(source_id)?;
+    notify_sync(&tx, SyncEntityType::Folder, source_id, Some(now), now)?;
+    tx.commit().map_err(RepoError::from)?;
+
+    // The folder name is indexed with each snippet.
+    let index = SearchIndex::new(conn);
+    for id in &moved {
+        index.sync_snippet(id)?;
+    }
+    Ok(moved)
+}
+
+/// Writes a new order for the given folders, first id first, all or nothing:
+/// a half-applied order would show a list the reader never arranged.
+pub fn folder_reorder(conn: &Connection, ids: &[String], now: i64) -> Result<(), IpcError> {
+    if ids.is_empty() {
+        return Err(IpcError::validation("no folders to order"));
+    }
+    if ids.len() > MAX_PAGE_LIMIT as usize {
+        return Err(IpcError::validation("too many folders in one order"));
+    }
+    let distinct: std::collections::HashSet<&String> = ids.iter().collect();
+    if distinct.len() != ids.len() {
+        return Err(IpcError::validation("a folder appears twice in the order"));
+    }
+    let tx = conn.unchecked_transaction().map_err(RepoError::from)?;
+    let repo = FolderRepo::new(&tx);
+    for (position, id) in ids.iter().enumerate() {
+        let mut folder = repo.get(id)?.ok_or_else(IpcError::not_found)?;
+        folder.sort_order = i32::try_from(position).map_err(|_| IpcError::system())?;
+        folder.updated_at = now;
+        repo.update(&folder)?;
+        notify_sync(&tx, SyncEntityType::Folder, id, None, now)?;
+    }
+    tx.commit().map_err(RepoError::from)?;
     Ok(())
 }
 
@@ -1724,9 +1942,27 @@ pub fn vault_reset(
     for id in &ids {
         SearchIndex::new(conn).sync_snippet(id)?;
     }
+    purge_free_pages(conn)?;
+    vault_status_dto(conn, session)
+}
+
+/// Rewrites the database and truncates the WAL, so bytes that were logically
+/// removed stop existing on disk.
+///
+/// Deleting a row does not erase it: the old page keeps its contents until
+/// something reuses it, and the write-ahead log keeps its own copy of the
+/// page as it was. Both files sit next to each other in the data directory,
+/// and "it will be overwritten eventually" is not a promise anybody made to
+/// the user. Called on the two paths where plaintext stops being allowed to
+/// exist — resetting the vault, and turning an ordinary snippet into a
+/// sensitive one.
+///
+/// Expensive by nature. Both callers are deliberate, rare user actions, and
+/// on both of them being thorough is worth more than being quick.
+fn purge_free_pages(conn: &Connection) -> Result<(), IpcError> {
     conn.execute_batch("VACUUM; PRAGMA wal_checkpoint(TRUNCATE);")
         .map_err(RepoError::from)?;
-    vault_status_dto(conn, session)
+    Ok(())
 }
 
 /// Lists the vault's sensitive snippets (metadata only; `body` is `None`).
@@ -1784,6 +2020,7 @@ pub fn vault_create_secret(
 ) -> Result<SnippetDto, IpcError> {
     let id = new_id();
     let ciphertext = session.encrypt_content(conn, &id, input.body.as_bytes())?;
+    let (trigger, trigger_mode) = snippet_trigger(input.trigger, input.trigger_mode);
     let snippet = Snippet {
         id,
         workspace_id: WORKSPACE_ID.to_string(),
@@ -1792,8 +2029,8 @@ pub fn vault_create_secret(
         snippet_type: SnippetType::Sensitive,
         description: input.description,
         folder_id: input.folder_id,
-        trigger: input.trigger,
-        trigger_mode: parse_trigger_mode(input.trigger_mode.as_deref())?,
+        trigger,
+        trigger_mode: parse_trigger_mode(trigger_mode.as_deref())?,
         language: input.language,
         security_level: SecurityLevel::Sensitive,
         is_favorite: false,
@@ -1840,8 +2077,9 @@ pub fn vault_update_secret(
     snippet.content = SnippetContent::Ciphertext(ciphertext);
     snippet.description = input.description;
     snippet.folder_id = input.folder_id;
-    snippet.trigger = input.trigger;
-    snippet.trigger_mode = parse_trigger_mode(input.trigger_mode.as_deref())?;
+    let (trigger, trigger_mode) = snippet_trigger(input.trigger, input.trigger_mode);
+    snippet.trigger = trigger;
+    snippet.trigger_mode = parse_trigger_mode(trigger_mode.as_deref())?;
     snippet.language = input.language;
     snippet.is_favorite = input.is_favorite;
     snippet.is_pinned = input.is_pinned;
@@ -1901,6 +2139,11 @@ pub fn snippet_convert_to_sensitive(
     let index = SearchIndex::new(conn);
     index.sync_snippet(id)?;
     index.optimize()?;
+    // The row, its history and its index entry no longer hold the plaintext —
+    // but the pages they used to live on still do, and so does the WAL. The
+    // reader was promised the plaintext is gone; "gone" has to mean gone from
+    // the files, not gone from the queries.
+    purge_free_pages(conn)?;
     Ok(snippet.into())
 }
 
@@ -2666,7 +2909,7 @@ mod tests {
         vault_create_secret(&conn, &session, secret_input("APIKEY", "shh"), VAULT_NOW).unwrap();
 
         // Library browse, count and search never surface the secret…
-        let page = snippet_list_page(&conn, "all", None, None, 50, 0).unwrap();
+        let page = snippet_list_page(&conn, "all", None, None, None, 50, 0).unwrap();
         assert_eq!(page.len(), 1);
         assert_eq!(page[0].title, "Email");
         assert_eq!(snippet_count(&conn, "all", None, None).unwrap(), 1);
@@ -2918,7 +3161,7 @@ mod tests {
 
         // The Library keeps it findable (an archived snippet must stay
         // recoverable)…
-        let listed = snippet_list_page(&conn, "all", None, None, 50, 0).unwrap();
+        let listed = snippet_list_page(&conn, "all", None, None, None, 50, 0).unwrap();
         assert!(listed.iter().any(|s| s.id == parked.id));
         assert!(
             search_library(&conn, "Archived", 50)
@@ -3100,6 +3343,53 @@ mod tests {
         }
     }
 
+    /// A host that delivered something says so, and the library remembers.
+    ///
+    /// This is what the recall shelf is built from. Two hosts had no way to
+    /// say it at all, so their shelves were empty forever.
+    #[test]
+    fn a_delivered_snippet_is_counted_and_dated() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Docker tail logs", None), 1).unwrap();
+        assert_eq!(created.usage_count, 0);
+        assert_eq!(created.last_used_at, None);
+
+        snippet_record_use(&conn, &created.id, 1_700_000_000_000).unwrap();
+        snippet_record_use(&conn, &created.id, 1_700_000_060_000).unwrap();
+
+        let seen = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(seen.usage_count, 2);
+        // The latest use, not the first: "last used" is a fact about the most
+        // recent time, and a shelf ordered by a stale one is ordered wrongly.
+        assert_eq!(seen.last_used_at, Some(1_700_000_060_000));
+    }
+
+    #[test]
+    fn a_use_of_something_that_is_not_there_is_refused_rather_than_ignored() {
+        let conn = test_conn();
+
+        let refused = snippet_record_use(&conn, "no-such-id", 1_700_000_000_000);
+
+        assert!(refused.is_err());
+    }
+
+    /// Counting a use must not disturb what the snippet is. The two writes
+    /// compete for the same row, and the light one must never be the reason a
+    /// body changed.
+    #[test]
+    fn counting_a_use_changes_nothing_else_about_the_snippet() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Rollback", Some(";rb")), 1).unwrap();
+
+        snippet_record_use(&conn, &created.id, 1_700_000_000_000).unwrap();
+
+        let seen = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(seen.title, created.title);
+        assert_eq!(seen.body, created.body);
+        assert_eq!(seen.trigger, created.trigger);
+        assert_eq!(seen.version, created.version);
+    }
+
     #[test]
     fn create_then_query_roundtrip_via_list_get_and_search() {
         let conn = test_conn();
@@ -3119,6 +3409,342 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].snippet_id, created.id);
         assert!(!hits[0].is_sensitive);
+    }
+
+    /// A folder is named or it is not made. The mobile editor now creates
+    /// them inline, so whatever was typed arrives here — including nothing.
+    #[test]
+    fn a_folder_is_named_and_the_name_is_trimmed() {
+        let conn = test_conn();
+
+        let blank = folder_create(
+            &conn,
+            FolderCreateInput {
+                name: "   ".to_string(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            1,
+        )
+        .unwrap_err();
+        assert_eq!(blank.code, IpcErrorCode::Validation);
+
+        let made = folder_create(
+            &conn,
+            FolderCreateInput {
+                name: "  上线  ".to_string(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            1,
+        )
+        .unwrap();
+        // One folder to a reader is one folder in the database.
+        assert_eq!(made.name, "上线");
+        assert_eq!(folder_list_children(&conn, None).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn renaming_a_folder_to_nothing_leaves_its_name_alone() {
+        let conn = test_conn();
+        let made = folder_create(
+            &conn,
+            FolderCreateInput {
+                name: "上线".to_string(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            1,
+        )
+        .unwrap();
+
+        let err = folder_update(
+            &conn,
+            FolderUpdateInput {
+                id: made.id.clone(),
+                name: String::new(),
+                parent_id: None,
+                sort_order: 0,
+            },
+            2,
+        )
+        .unwrap_err();
+
+        assert_eq!(err.code, IpcErrorCode::Validation);
+        assert_eq!(folder_list_children(&conn, None).unwrap()[0].name, "上线");
+    }
+
+    fn folder_named(conn: &Connection, name: &str, parent: Option<&str>) -> FolderDto {
+        folder_create(
+            conn,
+            FolderCreateInput {
+                name: name.to_string(),
+                parent_id: parent.map(str::to_string),
+                sort_order: 0,
+            },
+            1,
+        )
+        .unwrap()
+    }
+
+    /// Merging moves the reader's snippets and nothing else about them: the
+    /// triggers stay, the source is gone, and a folder that lived inside the
+    /// source is not swept away with it.
+    #[test]
+    fn merging_a_folder_moves_its_snippets_and_keeps_what_was_inside() {
+        let conn = test_conn();
+        let replies = folder_named(&conn, "客服回复", None);
+        let mail = folder_named(&conn, "邮件", None);
+        let nested = folder_named(&conn, "英文", Some(&replies.id));
+        let mut input = create_input("Order shipped", Some(";ship"));
+        input.folder_id = Some(replies.id.clone());
+        let moving = snippet_create(&conn, input, 1).unwrap();
+        let mut stays = create_input("Refund", None);
+        stays.folder_id = Some(nested.id.clone());
+        let nested_snippet = snippet_create(&conn, stays, 1).unwrap();
+
+        let moved = folder_merge(&conn, &replies.id, &mail.id, 2).unwrap();
+
+        assert_eq!(moved, vec![moving.id.clone()]);
+        let after = snippet_get(&conn, &moving.id).unwrap();
+        assert_eq!(after.folder_id.as_deref(), Some(mail.id.as_str()));
+        assert_eq!(after.trigger.as_deref(), Some(";ship"));
+        let top: Vec<String> = folder_list_children(&conn, None)
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name)
+            .collect();
+        assert_eq!(top, vec!["英文".to_string(), "邮件".to_string()]);
+        assert_eq!(
+            snippet_get(&conn, &nested_snippet.id)
+                .unwrap()
+                .folder_id
+                .as_deref(),
+            Some(nested.id.as_str())
+        );
+    }
+
+    #[test]
+    fn a_folder_merged_into_itself_or_nowhere_is_refused_and_left_alone() {
+        let conn = test_conn();
+        let mail = folder_named(&conn, "邮件", None);
+
+        let itself = folder_merge(&conn, &mail.id, &mail.id, 2).unwrap_err();
+        assert_eq!(itself.code, IpcErrorCode::Validation);
+        let nowhere = folder_merge(&conn, &mail.id, "missing", 2).unwrap_err();
+        assert_eq!(nowhere.code, IpcErrorCode::NotFound);
+
+        assert_eq!(folder_list_children(&conn, None).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn reordering_folders_writes_the_order_given() {
+        let conn = test_conn();
+        let a = folder_named(&conn, "A", None);
+        let b = folder_named(&conn, "B", None);
+        let c = folder_named(&conn, "C", None);
+
+        folder_reorder(&conn, &[c.id.clone(), a.id.clone(), b.id.clone()], 2).unwrap();
+
+        let names: Vec<String> = folder_list_children(&conn, None)
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name)
+            .collect();
+        assert_eq!(
+            names,
+            vec!["C".to_string(), "A".to_string(), "B".to_string()]
+        );
+    }
+
+    /// An order that names a folder that is not there changes nothing at all.
+    #[test]
+    fn an_order_with_an_unknown_folder_leaves_the_old_order() {
+        let conn = test_conn();
+        let a = folder_named(&conn, "A", None);
+        let b = folder_named(&conn, "B", None);
+        folder_reorder(&conn, &[a.id.clone(), b.id.clone()], 2).unwrap();
+
+        let err = folder_reorder(&conn, &[b.id.clone(), "missing".to_string()], 3).unwrap_err();
+        assert_eq!(err.code, IpcErrorCode::NotFound);
+        let twice = folder_reorder(&conn, &[a.id.clone(), a.id.clone()], 3).unwrap_err();
+        assert_eq!(twice.code, IpcErrorCode::Validation);
+
+        let names: Vec<String> = folder_list_children(&conn, None)
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name)
+            .collect();
+        assert_eq!(names, vec!["A".to_string(), "B".to_string()]);
+    }
+
+    /// The default was written down in five places across two hosts. Here it
+    /// is one place, and a host that has no opinion no longer needs one.
+    #[test]
+    fn a_trigger_with_no_stated_mode_is_a_delimiter_trigger() {
+        let conn = test_conn();
+        let mut input = create_input("Greeting", None);
+        input.trigger = Some(";g".to_string());
+        input.trigger_mode = None;
+
+        let created = snippet_create(&conn, input, 1).unwrap();
+
+        assert_eq!(created.trigger_mode.as_deref(), Some("delimiter"));
+    }
+
+    #[test]
+    fn a_stated_mode_is_kept() {
+        let conn = test_conn();
+        let mut input = create_input("Greeting", None);
+        input.trigger = Some(";g".to_string());
+        input.trigger_mode = Some("immediate".to_string());
+
+        let created = snippet_create(&conn, input, 1).unwrap();
+
+        assert_eq!(created.trigger_mode.as_deref(), Some("immediate"));
+    }
+
+    /// A field the reader left alone is no trigger — and the mode, which only
+    /// exists to describe one, goes with it. Both hosts were about to hold
+    /// their own version of this.
+    #[test]
+    fn an_empty_trigger_field_is_no_trigger_rather_than_a_blank_one() {
+        let conn = test_conn();
+        let mut input = create_input("Greeting", None);
+        input.trigger = Some("   ".to_string());
+        input.trigger_mode = Some("delimiter".to_string());
+
+        let created = snippet_create(&conn, input, 1).unwrap();
+
+        assert_eq!(created.trigger, None);
+        assert_eq!(created.trigger_mode, None);
+    }
+
+    #[test]
+    fn a_trigger_is_stored_trimmed_and_keeps_its_mode() {
+        let conn = test_conn();
+        let mut input = create_input("Greeting", None);
+        input.trigger = Some("  ;deploy  ".to_string());
+        input.trigger_mode = Some("delimiter".to_string());
+
+        let created = snippet_create(&conn, input, 1).unwrap();
+
+        assert_eq!(created.trigger.as_deref(), Some(";deploy"));
+        assert_eq!(created.trigger_mode.as_deref(), Some("delimiter"));
+    }
+
+    /// Trimming is not silent repair: a trigger with a space inside it is
+    /// still refused, because which characters are allowed is the model's rule
+    /// and quietly storing something else would be answering a question the
+    /// caller did not ask.
+    #[test]
+    fn a_trigger_with_a_space_inside_is_still_refused() {
+        let conn = test_conn();
+        let mut input = create_input("Greeting", None);
+        input.trigger = Some(";de ploy".to_string());
+        input.trigger_mode = Some("delimiter".to_string());
+
+        let err = snippet_create(&conn, input, 1).unwrap_err();
+
+        assert_eq!(err.code, IpcErrorCode::Validation);
+    }
+
+    /// A reader who did not want to name anything gets the first line of what
+    /// they wrote. Both hosts were about to hold their own copy of this rule.
+    #[test]
+    fn a_snippet_with_no_name_is_filed_under_its_first_line() {
+        let conn = test_conn();
+        let mut input = create_input("ignored", None);
+        input.title = "   ".to_string();
+        input.body = "\n\nkubectl get pods\n--all-namespaces".to_string();
+
+        let created = snippet_create(&conn, input, 1).unwrap();
+
+        // Leading blank lines are not the name; the first line with something
+        // on it is.
+        assert_eq!(created.title, "kubectl get pods");
+    }
+
+    #[test]
+    fn a_given_name_is_kept_and_trimmed() {
+        let conn = test_conn();
+        let mut input = create_input("ignored", None);
+        input.title = "  Rollback  ".to_string();
+
+        let created = snippet_create(&conn, input, 1).unwrap();
+
+        assert_eq!(created.title, "Rollback");
+    }
+
+    /// A body with nothing in it leaves nothing to be named after, and the
+    /// model's own rule then applies: a snippet has a title.
+    #[test]
+    fn nothing_to_write_and_nothing_to_call_it_is_still_refused() {
+        let conn = test_conn();
+        let mut input = create_input("ignored", None);
+        input.title = String::new();
+        input.body = "   ".to_string();
+
+        let err = snippet_create(&conn, input, 1).unwrap_err();
+
+        assert_eq!(err.code, IpcErrorCode::Validation);
+    }
+
+    /// The kind row in the mobile editor offers all eight marks, and the
+    /// secret one must not be writable through this call: it would store the
+    /// body in the clear under a name that says otherwise.
+    #[test]
+    fn an_ordinary_save_refuses_to_file_something_as_a_secret() {
+        let conn = test_conn();
+        let mut input = create_input("Deploy key", None);
+        input.snippet_type = "sensitive".to_string();
+        input.body = "AKIA_FAKE_NOT_A_SECRET_deploy_value".to_string();
+
+        let err = snippet_create(&conn, input, 1).unwrap_err();
+
+        assert_eq!(err.code, IpcErrorCode::Validation);
+        // Refused means nothing was written — not a row, and not an index
+        // entry carrying the body the caller tried to file in the clear.
+        assert!(snippet_list(&conn, 50, 0).unwrap().is_empty());
+        assert!(
+            search_snippets(&conn, "AKIA_FAKE_NOT_A_SECRET_deploy_value", 10, 0)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// The same door from the other side: an ordinary snippet cannot become a
+    /// secret by having its kind rewritten. Promotion re-encrypts and drops
+    /// the plaintext history, which is what `snippet_convert_to_sensitive` is.
+    #[test]
+    fn an_ordinary_edit_refuses_to_turn_a_snippet_into_a_secret() {
+        let conn = test_conn();
+        let created = snippet_create(&conn, create_input("Cluster login", None), 1).unwrap();
+
+        let err = snippet_update(
+            &conn,
+            SnippetUpdateInput {
+                id: created.id.clone(),
+                title: "Cluster login".to_string(),
+                body: "AKIA_FAKE_NOT_A_SECRET_cluster_value".to_string(),
+                snippet_type: "sensitive".to_string(),
+                description: None,
+                folder_id: None,
+                trigger: None,
+                trigger_mode: None,
+                language: None,
+                is_favorite: false,
+                is_pinned: false,
+                is_enabled: true,
+            },
+            2,
+        )
+        .unwrap_err();
+
+        assert_eq!(err.code, IpcErrorCode::Validation);
+        let kept = snippet_get(&conn, &created.id).unwrap();
+        assert_eq!(kept.security_level, "normal");
+        assert_eq!(kept.body.as_deref(), Some("Cluster login body"));
     }
 
     #[test]
@@ -3369,8 +3995,12 @@ mod tests {
     fn error_mapping_covers_the_three_classes() {
         let conn = test_conn();
 
-        // User error: blank title fails validation.
-        let err = snippet_create(&conn, create_input("", None), 1).unwrap_err();
+        // User error: nothing to write and nothing to call it. A blank title
+        // on its own is no longer one — it is filed under the body's first
+        // line — so the case that still fails is the one with neither.
+        let mut empty = create_input("", None);
+        empty.body = String::new();
+        let err = snippet_create(&conn, empty, 1).unwrap_err();
         assert_eq!(err.code, IpcErrorCode::Validation);
 
         // User error: unknown enum input.
@@ -3531,11 +4161,11 @@ mod tests {
         assert_eq!(counts.folders[0].folder_id, folder.id);
         assert_eq!(counts.folders[0].count, 1);
 
-        let page = snippet_list_page(&conn, "folder", Some(&folder.id), None, 50, 0).unwrap();
+        let page = snippet_list_page(&conn, "folder", Some(&folder.id), None, None, 50, 0).unwrap();
         assert_eq!(page.len(), 1);
         assert_eq!(page[0].title, "Filed one");
 
-        let texts = snippet_list_page(&conn, "unsorted", None, Some("text"), 50, 0).unwrap();
+        let texts = snippet_list_page(&conn, "unsorted", None, Some("text"), None, 50, 0).unwrap();
         assert_eq!(texts.len(), 1);
         assert_eq!(texts[0].title, "Loose text");
 
@@ -3548,11 +4178,21 @@ mod tests {
 
         // Validation: unknown view, folder view without id, stray folderId.
         for (view, folder_id) in [("nonsense", None), ("folder", None), ("all", Some("x"))] {
-            let err = snippet_list_page(&conn, view, folder_id, None, 50, 0).unwrap_err();
+            let err = snippet_list_page(&conn, view, folder_id, None, None, 50, 0).unwrap_err();
             assert_eq!(err.code, IpcErrorCode::Validation);
         }
-        let err = snippet_list_page(&conn, "all", None, Some("nonsense"), 50, 0).unwrap_err();
+        let err = snippet_list_page(&conn, "all", None, Some("nonsense"), None, 50, 0).unwrap_err();
         assert_eq!(err.code, IpcErrorCode::Validation);
+        let err = snippet_list_page(&conn, "all", None, None, Some("sideways"), 50, 0).unwrap_err();
+        assert_eq!(err.code, IpcErrorCode::Validation);
+
+        // A reader-chosen order reorders a page without changing what is in it:
+        // "recently added" puts the last one created first, whatever the view.
+        let added = snippet_list_page(&conn, "all", None, None, Some("added"), 50, 0).unwrap();
+        assert_eq!(
+            added.iter().map(|s| s.title.as_str()).collect::<Vec<_>>(),
+            ["Starred one", "Loose text", "Filed one"]
+        );
 
         // A trashed snippet drops out of pages and counts.
         make_fav.is_favorite = false;

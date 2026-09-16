@@ -11,7 +11,8 @@
  */
 import { useTr } from '@typvia/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Glyph } from './kit';
+import { KeyCap } from '../paper/kit';
+import './palette.css';
 
 export interface PaletteEntry {
   id: string;
@@ -55,15 +56,23 @@ export function CommandPalette({ entries, onClose }: PaletteProps) {
   let lastGroup = '';
   return (
     <>
-      <div aria-hidden="true" className="tvw-scrim-layer" onClick={onClose} />
+      <div aria-hidden="true" className="tvc-scrim" onClick={onClose} />
       <div
-        className="tvw-palette"
+        className="tpi tvc"
         role="dialog"
         aria-modal="true"
         aria-label={tr('Search Typvia', '搜索 Typvia')}
       >
-        <div className="tvw-palette-field">
-          <Glyph name="search" />
+        <div className="tvc-field">
+          <svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="4.6" stroke="currentColor" strokeWidth="1.3" />
+            <path
+              d="M9.6 9.6L13 13"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
           <input
             ref={input}
             type="text"
@@ -88,31 +97,25 @@ export function CommandPalette({ entries, onClose }: PaletteProps) {
             }}
           />
         </div>
-        <div className="tvw-palette-list">
+        <div className="tvc-list">
           {matches.length === 0 && (
-            <p className="tvw-palette-empty">
-              {tr('Nothing matches that yet.', '还没有匹配的内容。')}
-            </p>
+            <p className="tvc-empty">{tr('Nothing matches that yet.', '还没有匹配的内容。')}</p>
           )}
           {matches.map((entry, index) => {
             const heading = entry.group === lastGroup ? null : entry.group;
             lastGroup = entry.group;
             return (
               <div key={entry.id}>
-                {heading !== null && <div className="tvw-pop-label">{heading}</div>}
+                {heading !== null && <div className="tpi-eyebrow tvc-group">{heading}</div>}
                 <button
                   type="button"
-                  className="tvw-palette-item"
+                  className="tvc-item"
                   aria-selected={index === active}
                   onMouseEnter={() => setCursor(index)}
                   onClick={() => run(entry)}
                 >
                   {entry.label}
-                  {entry.shortcut !== undefined && (
-                    <span aria-hidden="true" className="tvw-nav-shortcut">
-                      {entry.shortcut}
-                    </span>
-                  )}
+                  {entry.shortcut !== undefined && <KeyCap>{entry.shortcut}</KeyCap>}
                 </button>
               </div>
             );

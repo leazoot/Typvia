@@ -14,9 +14,9 @@ import Foundation
 
 enum WidgetSnapshot {
     /// Must match the `com.apple.security.application-groups` entitlement
-    /// of the host app and this extension (apps/mobile app_group.rs).
+    /// of the host app and this extension.
     static let appGroupId = "group.dev.typvia.mobile"
-    /// File name the host writes atomically (snapshot_file.rs).
+    /// File name the host writes atomically; the host side owns this name.
     static let snapshotFileName = "snapshot.json"
 
     /// Rows for the requested size tier. Empty covers every degraded case

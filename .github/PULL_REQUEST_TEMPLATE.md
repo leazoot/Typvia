@@ -8,7 +8,7 @@ closes, if there is one: Closes #123 -->
 <!-- Delete the lines that do not apply. -->
 
 - [ ] Desktop app (`apps/desktop`)
-- [ ] Mobile app (`apps/mobile`)
+- [ ] iOS app (`apps/ios`)
 - [ ] Browser extension (`apps/browser-extension`)
 - [ ] Sync server (`apps/sync-server`)
 - [ ] Rust crates (`crates/*`)

@@ -18,10 +18,10 @@ import {
   recoveryRecover,
   recoveryRecoverWebdav,
   syncStatus,
+  webdavCredentials,
 } from '@typvia/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { trFor, useLocale } from '../i18n';
-import { webdavCredentials } from './use-sync-setup';
 
 export interface RecoveryExport {
   /** `null` until the first status answer — the loading state. */
@@ -131,7 +131,7 @@ export function useAccountRecover(): AccountRecover {
       if (kind === 'webdav') {
         await recoveryRecoverWebdav(
           serverUrl.trim(),
-          webdavCredentials(username, password),
+          await webdavCredentials(username, password),
           code.trim(),
           masterPassword,
         );

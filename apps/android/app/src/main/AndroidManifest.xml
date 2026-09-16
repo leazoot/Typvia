@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+  SPDX-License-Identifier: MPL-2.0
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The only permission this app asks for, and it asks for it so that a
+      library can leave this device at all: without it every outbound socket is
+      refused by the system, so there is no account, no pairing and no sync
+      round here. It is a normal permission — granted at install, never a
+      prompt — and it is not on the dangerous list, so this app still asks for
+      no dangerous permission at any point.
+
+      What it costs, said plainly: Android grants permissions per UID, and the
+      keyboard service runs in this app's UID. So "the keyboard's manifest asks
+      for nothing" is from now on a fact about the module, not a guarantee the
+      system enforces. What keeps the keyboard offline is the code: it links no
+      networking API, depends on nothing that speaks HTTP, and reads a snapshot
+      file rather than a server.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:label="Typvia"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Typvia">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Typvia"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

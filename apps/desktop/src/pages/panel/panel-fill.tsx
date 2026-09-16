@@ -5,8 +5,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { panelInsertTemplate, type Snippet, type TemplateField } from '@typvia/shared';
-import { useTr } from '@typvia/ui';
-import { useMemo, useRef, useState } from 'react';
+import { counted, useTr } from '@typvia/ui';
+import { useMemo, useState } from 'react';
+import { KeyCap } from '../../paper/kit';
+import { Mascot } from '../../paper/mascot';
+import { loadInsertMethod } from '../../workspace/insert-method';
 
 interface PanelFillProps {
   snippet: Snippet;
@@ -20,16 +23,14 @@ function initialValues(fields: TemplateField[]): Record<string, string> {
 }
 
 /**
- * Panel template fill mode. Select a template → fill its fields → ↵ renders
- * and injects into the app the panel came from. Insert is blocked until every
- * required field is filled; secret-reference fields need the vault, so a
- * template using them cannot be injected yet and says so. ESC returns to the
- * results list.
+ * Filling a template's variables over the app it will land in: one line per
+ * variable, ⇥ to the next, ⏎ types it out. Insert waits until every required
+ * variable has a value; secret-reference fields need the vault, so a template
+ * using them cannot be typed from here and says so. esc goes back to the list.
  */
 export function PanelFill({ snippet, fields, destination, onCancel }: PanelFillProps) {
   const tr = useTr();
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(fields));
-  const firstInput = useRef<HTMLInputElement>(null);
 
   const hasSecret = useMemo(() => fields.some((f) => f.fieldType === 'secret_ref'), [fields]);
   const missingRequired = fields.some(
@@ -39,9 +40,9 @@ export function PanelFill({ snippet, fields, destination, onCancel }: PanelFillP
 
   const submit = () => {
     if (!canInsert) return;
-    // The host hides the panel and restores focus before injecting; a rejection
-    // (e.g. permission) leaves the action reported, not silently lost.
-    void panelInsertTemplate(snippet.id, values).catch(() => undefined);
+    // The host hides the panel and restores focus before injecting, so by the
+    // time this can reject the surface that would report it is gone.
+    void panelInsertTemplate(snippet.id, values, loadInsertMethod()).catch(() => undefined);
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -57,34 +58,38 @@ export function PanelFill({ snippet, fields, destination, onCancel }: PanelFillP
   };
 
   return (
-    <div className="tv-panel-fill" onKeyDown={onKeyDown}>
-      <div className="tv-panel-fill-head">
-        <span className="tv-panel-fill-title">{snippet.title}</span>
-        {destination !== null && <span className="tv-panel-dest">→ {destination}</span>}
+    <div className="tvq-fill" onKeyDown={onKeyDown}>
+      <div className="tvq-head">
+        <Mascot state="typing" size={22} />
+        {snippet.trigger !== null && <span className="tvq-mono">{snippet.trigger}</span>}
+        <span className="tvq-head-title">{snippet.title}</span>
+        <span className="tvq-spacer" />
+        <span className="tvq-flag">
+          {counted(tr, fields.length, 'variable', 'variables', `${String(fields.length)} 个变量`)}
+        </span>
       </div>
 
-      <div className="tv-panel-fill-fields">
+      <div className="tvq-fields">
         {fields.map((field, index) => (
-          <label key={field.name} className="tv-panel-fill-field">
-            <span className="tv-panel-fill-key">
+          <label key={field.name} className="tvq-field">
+            <span className="tvq-field-label">
               {field.label}
-              {field.isRequired && (
-                <span className="tv-panel-fill-req" aria-hidden="true">
-                  {' '}
-                  ·
-                </span>
-              )}
+              {field.isRequired && ` · ${tr('required', '必须填')}`}
             </span>
             {field.fieldType === 'secret_ref' ? (
-              <span className="tv-panel-fill-secret">{tr('Needs the vault', '需要保险库')}</span>
+              <span className="tvq-field-line is-static">
+                {tr('Needs the vault', '需要保险库')}
+              </span>
             ) : (
               <input
-                ref={index === 0 ? firstInput : undefined}
-                className="tv-panel-fill-input"
+                className="tvq-field-line"
                 value={values[field.name] ?? ''}
-                placeholder={field.defaultValue ?? ''}
+                placeholder={
+                  field.defaultValue ?? (field.isRequired ? '' : tr('Can stay empty', '留空也行'))
+                }
                 required={field.isRequired}
                 autoFocus={index === 0}
+                spellCheck={false}
                 onChange={(e) => setValues((v) => ({ ...v, [field.name]: e.target.value }))}
               />
             )}
@@ -93,23 +98,25 @@ export function PanelFill({ snippet, fields, destination, onCancel }: PanelFillP
       </div>
 
       {hasSecret && (
-        <p className="tv-panel-fill-note">
+        <p className="tvq-notice">
           {tr(
-            'Secret fields are filled after unlocking the vault — coming soon.',
-            '密文字段将在解锁保险库后填充——即将推出。',
+            'This template uses a vault field, so it cannot be typed out from here yet.',
+            '这个模板用到了保险库里的字段,暂时不能从这里打出去。',
           )}
         </p>
       )}
 
-      <footer className="tv-panel-footer">
-        <span className="tv-panel-keys">
-          <kbd>tab</kbd>
-          <span className="tv-panel-key-word">{tr('next', '下一项')}</span>
-          <kbd>↵</kbd>
-          <span className="tv-panel-key-word">{tr('insert', '插入')}</span>
-          <kbd>esc</kbd>
-          <span className="tv-panel-key-word">{tr('back', '返回')}</span>
+      <footer className="tvq-foot is-bare">
+        <KeyCap>⇥</KeyCap>
+        <span className="tvq-foot-word">{tr('next', '下一格')}</span>
+        <KeyCap>⏎</KeyCap>
+        <span className="tvq-foot-word">
+          {destination !== null
+            ? tr(`type into ${destination}`, `打到 ${destination} 里`)
+            : tr('type it out', '打出去')}
         </span>
+        <span className="tvq-spacer" />
+        <span className="tvq-foot-note">{tr('esc to go back', 'esc 收起')}</span>
       </footer>
     </div>
   );

@@ -64,6 +64,29 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # The server has cross-cutting tests — handler, wire, limiter, store and the
+  # red lines that keep plaintext and decryption out of it — and until this
+  # job existed none of them ran anywhere but a maintainer's laptop. A first
+  # contributor changing Go code would have been told everything was fine.
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/sync-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/sync-server/go.mod
+          cache-dependency-path: apps/sync-server/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
   audit:
     runs-on: ubuntu-latest
     steps:

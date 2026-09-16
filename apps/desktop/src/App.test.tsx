@@ -6,7 +6,7 @@
 
 // @vitest-environment jsdom
 import { APP_ROUTES } from '@typvia/shared';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as SharedModule from '@typvia/shared';
@@ -29,6 +29,8 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     listSnippetPage: () => Promise.resolve([]),
     listFolderChildren: () => Promise.resolve([]),
     listTags: () => Promise.resolve([]),
+    syncStatus: () => Promise.reject(new Error('no host in tests')),
+    templateVariables: () => Promise.resolve([]),
     detectSensitive: () => Promise.resolve([]),
     listTrash: () => Promise.resolve([]),
     purgeExpiredTrash: () => Promise.resolve(0),
@@ -47,27 +49,19 @@ vi.mock('@typvia/shared', async (importOriginal) => {
 afterEach(cleanup);
 
 describe('app shell routing', () => {
-  it('renders the three navigation destinations, rooms behind the switcher', async () => {
+  it('opens on the Library as the main window, with the places in the title bar', async () => {
     render(
       <MemoryRouter>
         <App />
       </MemoryRouter>,
     );
-    await screen.findByRole('button', { name: 'Home' });
-    expect(screen.getByRole('button', { name: 'Settings' })).toBeDefined();
-    const workspace = screen.getByRole('button', { name: 'Workspace' });
-    expect(workspace.getAttribute('aria-expanded')).toBe('false');
-    // The rooms stay folded until the switcher is opened.
-    expect(screen.queryByRole('button', { name: /Vault/ })).toBeNull();
-    fireEvent.click(workspace);
-    for (const label of [/Library/, /Vault/, /AI Actions/, /Trash/]) {
-      expect(screen.getByRole('menuitem', { name: label })).toBeDefined();
-    }
-    // The editor is not a nav destination: it opens from a
-    // snippet row, the Library's New button, or ⌘N.
-    expect(screen.queryByRole('menuitem', { name: /Snippet editor/ })).toBeNull();
-    // Sync lives under Settings, not in the top navigation.
-    expect(screen.queryByRole('menuitem', { name: /Sync & devices/ })).toBeNull();
+    expect(await screen.findByLabelText('Search snippets')).toBeDefined();
+    expect(screen.getByRole('radio', { name: /All snippets/ })).toBeDefined();
+    const places = screen.getByRole('navigation', { name: 'Places' });
+    expect(
+      within(places).getByRole('button', { name: 'Snippets' }).getAttribute('aria-current'),
+    ).toBe('page');
+    expect(screen.queryByText('Typvia — Library')).toBeNull();
   });
 
   it('offers first-run onboarding until its marker exists', async () => {
@@ -78,28 +72,7 @@ describe('app shell routing', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole('button', { name: 'Skip setup' })).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Workspace' })).toBeNull();
-  });
-
-  it('navigates when a room is picked and the switcher takes its name', async () => {
-    render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>,
-    );
-    fireEvent.click(await screen.findByRole('button', { name: 'Workspace' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Vault/ }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Vault' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Vault' })).toBeDefined();
-  });
-
-  it('reaches the real Library screen at /library', async () => {
-    render(
-      <MemoryRouter initialEntries={['/library']}>
-        <App />
-      </MemoryRouter>,
-    );
-    expect(await screen.findByLabelText('Search snippets')).toBeDefined();
+    expect(screen.queryByLabelText('Search snippets')).toBeNull();
   });
 
   it('reaches the real editor screen at /editor', async () => {
@@ -111,23 +84,13 @@ describe('app shell routing', () => {
     expect(await screen.findByLabelText('Snippet title')).toBeDefined();
   });
 
-  it('reaches the real Home screen at /', async () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <App />
-      </MemoryRouter>,
-    );
-    expect(await screen.findByLabelText('Search snippets')).toBeDefined();
-    expect(screen.getByText('What are you looking for?')).toBeDefined();
-  });
-
   it('reaches the real Trash screen at /trash', async () => {
     render(
       <MemoryRouter initialEntries={['/trash']}>
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('The trash is clean.')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'The trash is empty.' })).toBeDefined();
   });
 
   it('reaches the real Vault screen at /vault', async () => {
@@ -136,25 +99,33 @@ describe('app shell routing', () => {
         <App />
       </MemoryRouter>,
     );
-    // The unlocked vault renders its page heading and the titles-only note.
-    expect(await screen.findByRole('heading', { level: 1, name: 'Vault' })).toBeDefined();
-    expect(
-      await screen.findByText('Titles only — secret contents never enter the search index.'),
-    ).toBeDefined();
+    // The unlocked vault counts down to its relock and says it is empty.
+    expect(await screen.findByText(/^Unlocked \d+:\d\d$/)).toBeDefined();
+    expect(await screen.findByText(/^The vault is empty\./)).toBeDefined();
+  });
+
+  it('reaches the real AI actions page at /ai', async () => {
+    render(
+      <MemoryRouter initialEntries={['/ai']}>
+        <App />
+      </MemoryRouter>,
+    );
+    // No host in tests: the page says the actions are safe and offers a retry.
+    expect(await screen.findByRole('heading', { name: 'Your actions are safe.' })).toBeDefined();
   });
 
   it.each(
     APP_ROUTES.filter(
       (route) =>
-        route.path !== '/library' &&
         route.path !== '/editor' &&
         route.path !== '/' &&
         route.path !== '/trash' &&
         route.path !== '/vault' &&
         route.path !== '/sync' &&
-        // Settings is a real page with its own heading ("Preferences") and
-        // suite (settings-page.test.tsx), not a placeholder.
-        route.path !== '/settings',
+        // Settings and AI actions are real pages with their own suites, not
+        // placeholders.
+        route.path !== '/settings' &&
+        route.path !== '/ai',
     ).map((route) => [route.labelEn, route]),
   )('reaches the %s placeholder page at its route', async (_label, route) => {
     render(

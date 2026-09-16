@@ -1,0 +1,137 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+.tpi-menu-holder {
+  display: contents;
+}
+
+/* A sheet of paper-0 on a hairline, lifted by the float shadow; it fades in
+   and never scales or bounces. */
+.tpi-menu {
+  position: fixed;
+  z-index: 80;
+  width: 300px;
+  max-width: 320px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-0);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  outline: none;
+  animation: tpi-fade-in var(--d-fade) ease both;
+}
+
+.tpi-menu.is-narrow {
+  width: 272px;
+}
+
+/* 13px on 7px / 14px padding makes the 30px row. Hover fills paper-1 only:
+   no accent, no bar on the left, no icon. */
+.tpi-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: default;
+  transition:
+    background var(--d-tap),
+    color var(--d-tap);
+}
+
+.tpi-menu-row.is-active {
+  background: var(--paper-1);
+}
+
+.tpi-menu.is-keyboard .tpi-menu-row.is-active {
+  outline: 2px solid var(--accent-focus);
+  outline-offset: -2px;
+}
+
+/* A destructive row is an ordinary row until it is the one about to run. */
+.tpi-menu-row.is-danger.is-active {
+  background: var(--accent-dark);
+  color: var(--on-accent);
+}
+
+.tpi-menu-row[aria-disabled='true'] {
+  color: var(--ink-faint);
+}
+
+.tpi-menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tpi-menu-keys {
+  flex: none;
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+}
+
+.tpi-menu-row.is-danger.is-active .tpi-menu-keys {
+  color: var(--on-accent-soft);
+}
+
+.tpi-menu-reason {
+  flex: none;
+  color: var(--ink-faint);
+  font-size: var(--fs-caps);
+}
+
+.tpi-menu-chevron {
+  flex: none;
+  color: var(--ink-muted);
+}
+
+/* The single-choice dot; rows without it keep the column so labels align. */
+.tpi-menu-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.tpi-menu-dot[data-on='true'] {
+  background: var(--accent);
+}
+
+.tpi-menu-sep {
+  height: 1px;
+  margin: 7px 12px;
+  background: var(--line-soft);
+}
+
+.tpi-menu-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+}
+
+.tpi-menu-heading-label {
+  color: var(--ink-muted-2);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: var(--ls-caps);
+}
+
+.tpi-menu-status {
+  padding: 7px 14px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 16px;
+}

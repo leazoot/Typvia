@@ -4,448 +4,970 @@
  *
  * SPDX-License-Identifier: MPL-2.0 */
 
-/* Library — a text library, not a database table.
-   Filters stay folded until asked for; rows carry four levels of hierarchy;
-   everything low-frequency waits behind hover, ··· or right-click. */
-
+/* The main window: three columns on one sheet of paper, running up under the
+   glass title bar so their tones show through it. The columns part by
+   lightness — paper-0 either side of the paper-1 list — and the hairline
+   between them is only a fallback, at the lightest weight there is. */
 .tvl {
-  padding: 48px 56px 120px;
-}
-
-.tvl-head {
+  position: relative;
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  height: 100vh;
+  margin-top: calc(-1 * var(--tvw-bar, 38px));
+  overflow: hidden;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
 }
 
-.tvl-head h1 {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+.tvl-grow {
+  flex: 1;
 }
 
-.tvl-count {
-  color: var(--tvw-tertiary);
-  font-family: var(--font-mono);
+/* ---- collections column ---- */
+
+.tvl-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 204px;
+  padding: calc(20px + var(--tvw-bar, 38px)) 16px 20px;
+  border-right: 1px solid var(--line-soft);
+  background: var(--paper-0);
+}
+
+.tvl-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 20px;
+}
+
+.tvl-brand-name {
+  font-family: var(--font-brand);
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: var(--ls-brand);
 }
 
-/* ---- search + tools ---- */
-
+/* Search is a line, not a box; it turns coral while it has the caret. */
 .tvl-search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 18px;
-  padding-bottom: 9px;
-  border-bottom: 1.5px solid var(--tvw-ink);
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 6px 0;
+  border-bottom: 1.5px solid var(--line);
+  color: var(--ink-faint);
+  transition: border-color var(--d-tap);
+}
+
+.tvl-search:focus-within {
+  border-bottom-color: var(--accent);
+  color: var(--ink-muted);
+}
+
+.tvl-search svg {
+  flex: none;
 }
 
 .tvl-search input {
   flex: 1;
   min-width: 0;
+  padding: 0;
   border: 0;
   background: none;
-  color: var(--tvw-ink);
-  caret-color: var(--tvw-ok);
-  font: inherit;
-  font-size: 17px;
-  letter-spacing: -0.01em;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: 14px;
   outline: none;
 }
 
 .tvl-search input::placeholder {
-  color: var(--tvw-tertiary);
+  color: var(--ink-faint);
 }
 
-.tvl-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.tvl-search-key {
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
 }
 
-.tvl-filter-count {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
+.tvl-rail-group {
+  margin-bottom: 18px;
 }
 
-.tvl-pop {
-  right: 0;
-  min-width: 264px;
-  max-height: 62vh;
+.tvl-rail-group.is-vault {
+  margin-bottom: 16px;
+}
+
+.tvl-collections {
+  min-height: 0;
+  margin-bottom: 26px;
   overflow-y: auto;
 }
 
-.tvl-pop-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 4px 10px 10px;
-}
-
-.tvl-choice {
-  padding: 5px 9px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: none;
-  color: var(--tvw-secondary);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-  transition:
-    background var(--tvw-micro) var(--tvw-ease),
-    color var(--tvw-micro) var(--tvw-ease);
-}
-
-.tvl-choice:hover {
-  background: var(--tvw-hover);
-  color: var(--tvw-ink);
-}
-
-.tvl-choice[aria-pressed='true'] {
-  border-color: var(--tvw-divider);
-  color: var(--tvw-ink);
-}
-
-/* ---- view tabs (light text, never pills) ---- */
-
-.tvl-bar {
+.tvl-vault {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 16px;
-  padding: 0 12px;
-}
-
-.tvl-tabs {
-  display: flex;
-  gap: 16px;
-}
-
-.tvl-tab {
-  position: relative;
-  padding: 4px 0 7px;
+  gap: 10px;
+  padding: 3px 0;
   border: 0;
   background: none;
-  color: var(--tvw-secondary);
-  font: inherit;
-  font-size: 13px;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-option);
+  text-align: left;
   cursor: pointer;
-  transition: color var(--tvw-micro) var(--tvw-ease);
+  transition: color var(--d-tap);
 }
 
-.tvl-tab:hover {
-  color: var(--tvw-ink);
+.tvl-vault span {
+  flex: 1;
 }
 
-.tvl-tab[aria-selected='true'] {
-  color: var(--tvw-ink);
+.tvl-vault svg {
+  flex: none;
+  color: var(--ink-muted);
 }
 
-.tvl-tab[aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1.5px;
-  background: var(--tvw-ink);
+.tvl-vault:hover {
+  color: var(--accent-ink);
 }
 
-.tvl-active {
+.tvl-rail-foot {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
 }
 
-.tvl-active-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 6px;
-  background: none;
-  color: var(--tvw-secondary);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+.tvl-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
 }
 
-.tvl-active-chip:hover {
-  color: var(--tvw-ink);
+.tvl-dot.is-ok {
+  background: var(--ok);
 }
 
-/* ---- list ---- */
+.tvl-dot.is-warn {
+  background: var(--warn);
+}
 
-.tvl-list {
+/* ---- list column ---- */
+
+.tvl-column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: var(--tvw-bar, 38px);
+}
+
+.tvl-head {
+  padding: 22px 24px 14px;
+  --tpi-key-paper: var(--paper-0);
+}
+
+.tvl-head-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tvl-head h1 {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-title);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tvl-head-count {
+  flex: none;
+  color: var(--ink-muted-2);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: var(--ls-field);
+}
+
+.tvl-viewport {
   position: relative;
-  margin-top: 6px;
-  height: calc(100vh - 300px);
-  min-height: 280px;
+  flex: 1;
+  padding: 0 12px 20px;
   overflow-y: auto;
+  outline: none;
 }
 
 .tvl-spacer {
   position: relative;
 }
 
-.tvl-slot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  transition: transform var(--tvw-standard) var(--tvw-ease);
-}
-
 .tvl-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  height: 52px;
-}
-
-.tvl-row.is-selected {
-  background: var(--tvw-pressed);
-}
-
-.tvl-row.is-selected::before {
-  opacity: 0.6;
-}
-
-.tvl-tail {
-  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  min-width: 200px;
+  align-items: flex-start;
+  gap: 14px;
+  height: 62px;
+  padding: 10px 12px;
+  border-radius: var(--r-row);
+  cursor: pointer;
+  transition: background var(--d-tap);
 }
 
-.tvl-uses {
-  color: var(--tvw-tertiary);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.tvl-actions {
+.tvl-spacer .tvl-row {
   position: absolute;
+  top: 0;
   right: 0;
+  left: 0;
 }
 
-.tvl-star {
-  color: var(--tvw-warn);
+.tvl-row:hover {
+  background: var(--paper-2);
 }
 
-/* ---- inline peek ---- */
-
-.tvl-peek {
-  margin: 0 12px 10px;
-  padding: 14px 16px 16px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 10px;
-  background: var(--tvw-surface);
-  animation: tvl-peek-in 160ms var(--tvw-ease);
+.tvl-row[aria-selected='true'] {
+  background: var(--paper-0);
+  box-shadow: var(--shadow-hairline);
 }
 
-@keyframes tvl-peek-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-.tvl-peek-body {
-  max-height: 62px;
+.tvl-trigger {
+  flex: none;
+  padding: 1px 6px;
   overflow: hidden;
-  color: var(--tvw-secondary);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  line-height: 1.6;
-  white-space: pre-wrap;
+  border: 1px solid var(--line);
+  border-radius: var(--r-key);
+  background: var(--paper-0);
+  color: var(--ink-2);
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tvl-peek-meta {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  margin-top: 12px;
+.tvl-row[aria-selected='true'] .tvl-trigger {
+  background: var(--paper-1);
 }
 
-.tvl-peek-meta div {
+.tvl-row-main {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 3px;
+  min-width: 0;
 }
 
-.tvl-peek-meta dt {
-  color: var(--tvw-tertiary);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.tvl-row-body {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--font-content);
+  font-size: var(--fs-item);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tvl-peek-meta dd {
-  margin: 0;
-  font-size: 12.5px;
+.tvl-row-body.is-code {
+  font-family: var(--font-code);
+  font-size: 13px;
 }
 
-.tvl-peek-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  margin-top: 12px;
+.tvl-row[aria-selected='true'] .tvl-row-body {
+  color: var(--ink);
 }
 
-/* ---- states ---- */
-
-.tvl-state {
-  padding: 44px 12px;
-  max-width: 460px;
-}
-
-/* ---- organise (folders and tags, folded away by default) ---- */
-
-.tvl-organise {
-  margin-top: 18px;
-  padding: 14px 16px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 10px;
-  background: var(--tvw-surface);
-}
-
-.tvl-organise-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-/* Folder and tag management keeps its existing behaviour (LibraryRail) and
-   wears the workspace language here; its own redesign is a later pass. */
-.tv-lib-rail {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 4px 26px;
-}
-
-.tv-lib-rail-label {
-  color: var(--tvw-tertiary);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.tv-lib-rail-section {
-  margin-top: 12px;
-  padding-bottom: 4px;
-}
-
-.tv-lib-rail-item {
+.tvl-row-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 7px;
-  background: none;
-  color: var(--tvw-ink);
-  font: inherit;
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--tvw-micro) var(--tvw-ease);
+  margin-top: 3px;
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+  white-space: nowrap;
 }
 
-.tv-lib-rail-item:hover {
-  background: var(--tvw-hover);
-}
-
-.tv-lib-rail-count {
-  margin-left: auto;
-  color: var(--tvw-tertiary);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.tv-lib-rail-actions {
+.tvl-row-vars {
   display: inline-flex;
-  gap: 2px;
-  margin-left: auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-ink);
 }
 
-.tv-lib-rail-add,
-.tv-lib-rail-edit,
-.tv-lib-rail-danger {
-  height: 24px;
-  padding: 0 7px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--tvw-secondary);
-  font: inherit;
-  font-size: 11.5px;
-  cursor: pointer;
+.tvl-row-vars-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
-.tv-lib-rail-add:hover,
-.tv-lib-rail-edit:hover {
-  background: var(--tvw-hover);
-  color: var(--tvw-ink);
+.tvl-mark {
+  padding: 1px 2px;
+  border-radius: var(--r-mark);
+  background: var(--accent-wash);
+  color: inherit;
 }
 
-.tv-lib-rail-danger:hover {
-  color: var(--tvw-danger);
+/* ---- search results ---- */
+
+.tvl-results {
+  flex: 1;
+  padding: 0 24px 20px;
+  overflow-y: auto;
 }
 
-.tv-lib-rail-input {
-  width: 100%;
-  padding: 5px 8px;
-  border: 0;
-  border-bottom: 1px solid var(--tvw-ink);
-  background: none;
-  color: var(--tvw-ink);
-  font: inherit;
-  font-size: 12.5px;
+.tvl-results [role='listbox'] {
   outline: none;
 }
 
-.tv-lib-rail-confirm {
-  padding: 8px;
-  border-radius: 7px;
-  background: var(--tvw-hover);
-  color: var(--tvw-secondary);
+.tvl-group {
+  margin-bottom: 26px;
+}
+
+.tvl-group-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px -12px 0;
+}
+
+.tvl-collection-hit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+.tvl-collection-hit-name {
+  flex: 1;
+  font-size: var(--fs-option);
+}
+
+.tvl-collection-hit-count {
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+}
+
+.tvl-results-note {
+  margin: 14px 0 0;
+  color: var(--ink-muted);
   font-size: 12px;
 }
 
-.tv-lib-rail-confirm-actions {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
+.tvl-nomatch {
+  padding: 20px 24px 18px;
 }
 
-.tv-lib-rail-tags {
+.tvl-nomatch-line {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.tvl-nomatch-title {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.tvl-nomatch-ways {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.tvl-nomatch-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}
+
+.tvl-nomatch-esc {
+  color: var(--ink-faint);
+}
+
+/* ---- list states ---- */
+
+.tvl-state {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 32px 36px;
+  overflow: hidden;
+}
+
+.tvl-state-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tvl-state-meta {
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+}
+
+.tvl-state-title {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--fs-title);
+  line-height: 1.4;
+}
+
+.tvl-state-hero {
+  max-width: 420px;
+  margin: 18px 0;
+  font-family: var(--font-content);
+  font-size: var(--fs-hero);
+  line-height: var(--lh-hero);
+}
+
+.tvl-state-body {
+  max-width: 520px;
+  margin: 0 0 30px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+  line-height: 1.9;
+}
+
+/* Fragments of other people's sentences drift behind the empty state, too
+   faint to read as content. */
+.tvl-drift {
+  position: absolute;
+  color: var(--paper-2);
+  font-family: var(--font-content);
+  pointer-events: none;
+  user-select: none;
+}
+
+.tvl-drift.is-a {
+  top: 30px;
+  right: 44px;
+  font-size: 34px;
+  animation: tpi-drift-a 9s ease-in-out infinite;
+}
+
+.tvl-drift.is-b {
+  right: 150px;
+  bottom: 40px;
+  font-size: 22px;
+  animation: tpi-drift-b 11s ease-in-out infinite;
+}
+
+/* ---- detail column ---- */
+
+.tvl-detail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  container: tvl-detail / inline-size;
+  width: clamp(340px, 36vw, 460px);
+  padding: calc(26px + var(--tvw-bar, 38px)) 28px 26px;
+  --label-col: 92px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line-soft);
+  background: var(--paper-0);
+}
+
+.tvl-detail-close {
+  display: none;
+}
+
+.tvl-detail-eyebrow {
+  margin-bottom: 16px;
+}
+
+.tvl-detail-body {
+  font-family: var(--font-content);
+  font-size: 18px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: tpi-fade-in var(--d-fade) ease both;
+}
+
+.tvl-detail-body.is-code {
+  font-family: var(--font-code);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.tvl-detail-note {
+  margin: 16px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+  line-height: 1.9;
+}
+
+.tvl-detail-rule {
+  flex: none;
+  height: 1px;
+  margin: 22px 0 20px;
+  background: var(--line-soft);
+}
+
+.tvl-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.tvl-field {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  padding: 4px 0;
+  align-items: flex-start;
+  gap: 18px;
 }
 
-.tv-lib-tag {
-  display: inline-flex;
+.tvl-field dt {
+  flex: none;
+  width: var(--label-col);
+  padding-top: 1px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+}
+
+.tvl-field dd {
+  flex: 1;
+  min-width: 140px;
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-cjk);
+}
+
+.tvl-field dd.is-mono {
+  color: var(--ink-2);
+  font-family: var(--font-code);
+  font-size: var(--fs-label);
+}
+
+.tvl-detail-failure {
+  padding-top: 20px;
+}
+
+.tvl-note-title {
+  margin: 0 0 8px;
+  font-size: var(--fs-card);
+  font-weight: 600;
+}
+
+.tvl-note-body {
+  margin: 0;
+  color: var(--ink-body);
+  font-size: var(--fs-label);
+  line-height: var(--lh-cjk);
+}
+
+.tvl-note-actions {
+  margin-top: 14px;
+}
+
+.tvl-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 6px;
-  color: var(--tvw-secondary);
+  gap: 12px 24px;
+  padding-top: 22px;
+}
+
+/* An action is one unit: it may move to the next line, never break inside. */
+.tvl-detail-actions > * {
+  flex: none;
+  white-space: nowrap;
+}
+
+.tvl-detail-actions > .tvl-grow {
+  flex: 1;
+}
+
+.tvl-detail-hint {
+  color: var(--ink-faint);
+  font-size: var(--fs-meta);
+}
+
+/* At its narrowest the detail keeps the two actions and lets the key hint go. */
+@container tvl-detail (max-width: 300px) {
+  .tvl-detail-hint {
+    display: none;
+  }
+}
+
+/* Narrower than the rail, a readable list and the narrowest detail: the
+   detail slides in over the list instead of squeezing it. */
+@media (max-width: 899px) {
+  .tvl-detail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(460px, 100%);
+    box-shadow: var(--shadow-float);
+    transform: translateX(100%);
+    transition: transform var(--d-trace) var(--ease-move);
+  }
+
+  .tvl-detail[data-open='true'] {
+    transform: none;
+  }
+
+  .tvl-detail-close {
+    display: block;
+    align-self: flex-end;
+    margin: -12px 0 10px;
+    padding: 12px 0;
+    border: 0;
+    background: none;
+    color: var(--ink-body);
+    font-family: var(--font-ui);
+    font-size: var(--fs-body-2);
+    cursor: pointer;
+  }
+}
+
+/* ---- collections: arranging, and where a drag lands ---- */
+
+.tvl-group-toggle {
+  flex: none;
+  margin: -12px 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  cursor: pointer;
+  transition: color var(--d-tap);
+}
+
+.tvl-group-toggle:hover {
+  color: var(--accent-ink);
+}
+
+/* The landing spot is a 2px coral line and a wash — no scaling, no shadow. */
+.tvl-collections .tpi-choice-option {
+  isolation: isolate;
+}
+
+.tvl-collections .tpi-choice-option[data-marked='true']::before {
+  position: absolute;
+  inset: -3px -10px -1px;
+  z-index: -1;
+  border-radius: 9px;
+  background: var(--accent-wash);
+  content: '';
+}
+
+.tvl-collections .tpi-choice-option[data-marked='true']::after {
+  position: absolute;
+  top: -7px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-gradient);
+  content: '';
+}
+
+.tvl-drop-note {
+  flex: none;
+  margin-right: 8px;
+  color: var(--accent-ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-meta);
+}
+
+.tvl-ghost {
+  position: fixed;
+  z-index: 90;
+  max-width: 280px;
+  padding: 6px 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-note);
+  background: var(--paper-0);
+  color: var(--ink);
+  font-family: var(--font-content);
+  font-size: var(--fs-option);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+:root.tpi-dragging,
+:root.tpi-dragging * {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.tvl-manage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 36px;
+  overflow-y: auto;
+}
+
+.tvl-manage-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 -10px;
+}
+
+.tvl-manage-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  transition: background var(--d-tap);
+}
+
+.tvl-manage-row:hover,
+.tvl-manage-row:focus-within {
+  background: var(--paper-1);
+}
+
+.tvl-manage-row[data-drop='on'] {
+  background: var(--accent-wash);
+}
+
+.tvl-manage-row[data-drop='before']::before,
+.tvl-manage-row[data-drop='after']::after {
+  position: absolute;
+  right: 10px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-gradient);
+  content: '';
+}
+
+.tvl-manage-row[data-drop='before']::before {
+  top: -3px;
+}
+
+.tvl-manage-row[data-drop='after']::after {
+  bottom: -3px;
+}
+
+.tvl-manage-row[data-dragging='true'] {
+  opacity: 0.5;
+}
+
+/* 8×12, three 1.3px lines; only here, only while arranging. */
+.tvl-handle {
+  display: flex;
+  flex: none;
+  width: 8px;
+  color: var(--ink-ghost);
+  cursor: grab;
+  touch-action: none;
+}
+
+.tvl-manage-name {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-option);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.tvl-manage-name {
+  cursor: text;
+}
+
+.tvl-manage-note {
+  flex: none;
+  color: var(--ink-faint);
+  font-size: var(--fs-caps);
+}
+
+.tvl-manage-count {
+  flex: none;
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+}
+
+/* Destructive words turn solid only under the pointer. */
+.tvl-manage-delete {
+  flex: none;
+  margin: -2px -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--r-code);
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    background var(--d-tap),
+    color var(--d-tap),
+    opacity var(--d-tap);
+}
+
+.tvl-manage-row:hover .tvl-manage-delete,
+.tvl-manage-delete:focus-visible {
+  opacity: 1;
+}
+
+.tvl-manage-delete:hover {
+  background: var(--accent-dark);
+  color: var(--on-accent);
+}
+
+.tvl-manage-edit {
+  padding: 9px 10px;
+}
+
+.tvl-name-line {
+  display: flex;
+  align-items: center;
+  margin-left: 20px;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid var(--accent);
+}
+
+.tvl-name-line input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: 16px;
+  outline: none;
+}
+
+.tvl-manage-hint {
+  margin: 8px 0 0 20px;
+  color: var(--ink-muted);
   font-size: 12px;
+  line-height: var(--lh-cjk);
+}
+
+.tvl-merge {
+  margin-top: 18px;
+}
+
+.tvl-manage-rule {
+  flex: none;
+  height: 1px;
+  margin: 24px 0 18px;
+  background: var(--line-soft);
+}
+
+.tvl-manage-new {
+  align-self: flex-start;
+  font-size: var(--fs-body);
+  --tpi-key-paper: var(--paper-1);
+}
+
+/* The column is narrow; the built-in row says why it has no delete on a line
+   of its own rather than squeezing its name to nothing. */
+.tvl-manage-row.is-system {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.tvl-manage-row.is-system .tvl-manage-note {
+  flex-basis: 100%;
+  order: 3;
+  padding-left: 20px;
+}
+
+/* ---- a template's variables, filled in the detail pane ---- */
+
+.tvl-fill {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.tvl-fill-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tvl-fill-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tvl-fill-label {
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: var(--ls-field);
+}
+
+.tvl-fill-line {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1.5px solid var(--line);
+  background: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: var(--fs-lead);
+  outline: none;
+  transition: border-color var(--d-tap);
+}
+
+.tvl-fill-line:focus {
+  border-bottom-color: var(--accent);
+}
+
+.tvl-fill-line::placeholder {
+  color: var(--ink-faint);
+}
+
+.tvl-fill-line.is-static {
+  color: var(--ink-faint);
+}
+
+.tvl-fill-actions {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding-top: 8px;
 }

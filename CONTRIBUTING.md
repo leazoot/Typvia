@@ -201,7 +201,7 @@ to get a check to pass.
 | Path                     | Contents                                                                |
 | ------------------------ | ----------------------------------------------------------------------- |
 | `apps/desktop`           | Tauri 2 desktop app (Windows/macOS/Linux)                               |
-| `apps/mobile`            | Tauri 2 mobile app (iOS/Android)                                        |
+| `apps/ios`               | Native iOS app, keyboard, share and widget extensions (Swift)           |
 | `apps/sync-server`       | Go sync server — ciphertext and metadata only, self-hostable            |
 | `apps/browser-host`      | Native-messaging host for the browser extension                         |
 | `apps/browser-extension` | Browser extension front end                                             |

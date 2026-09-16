@@ -1,0 +1,28 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* Pinned in the corner of the window, over whatever is there; never a toast
+   bar across the bottom and never a modal. */
+.tpi-undo {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 70;
+  width: 300px;
+  font-family: var(--font-ui);
+}
+
+/* The mascot says how it went before the words do. */
+.tpi-undo-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tpi-undo-head .tpi-note-title {
+  margin: 0;
+}

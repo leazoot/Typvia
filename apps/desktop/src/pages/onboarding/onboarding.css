@@ -4,570 +4,241 @@
  *
  * SPDX-License-Identifier: MPL-2.0 */
 
-/* First-run onboarding. Full-viewport takeover: no nav,
-   one idea per screen, transitions are cuts (never animated). */
-
-.tv-onb {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-paper);
-  overflow-y: auto;
+.tvo {
+  min-height: 100vh;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
 }
 
-.tv-onb-head {
-  flex: none;
-  height: 46px;
+.tvo-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-40);
-}
-
-.tv-onb-step-count {
-  font-family: var(--font-sans);
-  font-size: var(--type-meta-size);
-  color: var(--color-meta);
-}
-
-.tv-onb-escape {
-  font-family: var(--font-sans);
-  font-size: var(--type-meta-size);
-  color: var(--color-secondary);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.tv-onb-body {
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-40) var(--space-40) 0 120px;
-}
-
-.tv-onb-welcome {
-  display: flex;
-  flex-direction: column;
   justify-content: center;
-}
-
-.tv-onb-tagline-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-14);
-  margin-bottom: var(--space-26);
-}
-
-.tv-onb-tagline {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--type-display-size);
-  font-weight: var(--type-display-weight);
-  letter-spacing: var(--type-display-tracking);
-  line-height: var(--type-display-leading);
-  color: var(--color-ink);
-}
-
-.tv-onb-welcome-lead {
-  margin: 0 0 0 17px;
-  max-width: 520px;
-  font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--color-secondary);
-  text-wrap: pretty;
-}
-
-.tv-onb-welcome .tv-onb-actions {
-  margin: var(--space-40) 0 0 17px;
-}
-
-.tv-onb-title {
-  margin: 0 0 var(--space-40);
-  font-family: var(--font-sans);
-  font-size: var(--type-page-title-size);
-  font-weight: var(--type-page-title-weight);
-  letter-spacing: var(--type-page-title-tracking);
-  line-height: var(--type-page-title-leading);
-  color: var(--color-ink);
-}
-
-.tv-onb-lead {
-  margin: 0 0 var(--space-26);
-  max-width: 520px;
-  font-family: var(--font-sans);
-  font-size: var(--type-desktop-row-size);
-  line-height: 1.7;
-  color: var(--color-secondary);
-}
-
-.tv-onb-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-13);
-  margin-top: var(--space-26);
-}
-
-.tv-onb-primary {
   height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-9);
-  padding: 0 var(--space-14) 0 var(--space-14);
-  font-family: var(--font-sans);
-  font-size: 13.5px;
-  color: var(--color-paper);
-  background: var(--color-ink);
-  border: none;
-  border-radius: var(--radius-row);
-  cursor: pointer;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--titlebar-veil);
+  backdrop-filter: blur(8px);
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+  user-select: none;
 }
 
-.tv-onb-primary:disabled {
-  opacity: 0.45;
-  cursor: default;
+.tvo-sheet {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 56px 48px;
 }
 
-.tv-onb-primary kbd {
-  font-family: var(--font-mono);
-  font-size: var(--type-key-badge-size);
-  font-weight: var(--type-key-badge-weight);
-  color: var(--color-meta);
-}
+/* ---- the step line ---- */
 
-.tv-onb-ghost {
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--space-14);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--color-secondary);
-  background: transparent;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-row);
-  cursor: pointer;
-}
-
-.tv-onb-ghost:hover {
-  border-color: var(--color-edge);
-}
-
-.tv-onb-skip {
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-secondary);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.tv-onb-aside {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--color-secondary);
-}
-
-.tv-onb-foot {
-  flex: none;
-  min-height: 64px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-13);
-  padding: var(--space-9) var(--space-40) var(--space-9) 120px;
-  border-top: 1px solid var(--color-hairline-quiet);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-meta);
-}
-
-/* Step 2 — storage choice cards */
-
-.tv-onb-cards {
-  display: flex;
-  gap: var(--space-18);
-  max-width: 900px;
-}
-
-.tv-onb-card {
-  flex: 1;
-  padding: var(--space-22) var(--space-26) var(--space-26);
-  background: var(--color-paper);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-}
-
-.tv-onb-card.is-selected {
-  border-color: var(--color-accent);
-  box-shadow: var(--elevation-e1);
-}
-
-.tv-onb-card-glyph {
+.tvo-spine {
   display: block;
-  width: 11px;
-  height: 11px;
-  margin-bottom: var(--space-18);
-  border: 1.5px solid var(--color-accent);
-  border-radius: 3px;
+  width: 100%;
+  height: auto;
+  margin-bottom: 32px;
 }
 
-.tv-onb-card.is-muted .tv-onb-card-glyph {
-  border-color: var(--color-edge);
+.tvo-stop-a {
+  stop-color: var(--accent-light);
 }
 
-.tv-onb-card-title {
-  margin: 0 0 var(--space-6);
-  font-family: var(--font-sans);
-  font-size: var(--type-card-title-size);
-  font-weight: var(--type-card-title-weight);
-  letter-spacing: var(--type-card-title-tracking);
-  color: var(--color-ink);
+.tvo-stop-b {
+  stop-color: var(--accent);
 }
 
-.tv-onb-card-body {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--type-body-size);
-  line-height: 1.75;
-  color: var(--color-secondary);
-  text-wrap: pretty;
+.tvo-spine-path {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
 }
 
-.tv-onb-card-state {
-  display: flex;
-  align-items: center;
-  gap: var(--space-9);
-  margin: var(--space-18) 0 0;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-ink);
+.tvo-spine-path.is-ahead {
+  stroke: var(--line);
+  stroke-dasharray: 2 9;
 }
 
-.tv-onb-card.is-muted .tv-onb-card-state {
-  color: var(--color-secondary);
+.tvo-spine-halo {
+  fill: none;
+  stroke: var(--accent);
+  stroke-opacity: 0.25;
+  stroke-width: 1.5;
 }
 
-.tv-onb-card-state kbd {
-  font-family: var(--font-mono);
-  font-size: var(--type-key-badge-size);
-  font-weight: var(--type-key-badge-weight);
-  color: var(--color-ink);
-  background: var(--color-sunken);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-mark);
-  padding: 3px 6px;
+.tvo-spine-now {
+  fill: var(--accent);
 }
 
-/* Step 3 — first snippet editor */
-
-.tv-onb-split {
-  display: flex;
-  gap: var(--space-40);
+.tvo-spine-done {
+  fill: var(--paper-1);
+  stroke: var(--accent);
+  stroke-width: 1.6;
 }
 
-.tv-onb-split-main {
-  flex: 1;
-  min-width: 0;
+.tvo-spine-ahead {
+  fill: var(--line);
 }
 
-.tv-onb-editor {
-  max-width: 640px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  box-shadow: var(--elevation-e1-row);
+.tvo-spine-label {
+  fill: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: 11px;
 }
 
-.tv-onb-editor-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-11);
-  padding: var(--space-14) var(--space-18);
-  border-bottom: 1px solid var(--color-hairline-quiet);
+.tvo-spine-label.is-ahead {
+  fill: var(--ink-faint);
 }
 
-.tv-onb-editor-title {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-sans);
-  font-size: 16px;
-  letter-spacing: -0.015em;
-  color: var(--color-ink);
-  background: none;
-  border: none;
-  padding: 0;
-}
-
-.tv-onb-editor-title:focus {
+.tvo-spine-back {
+  cursor: pointer;
   outline: none;
 }
 
-.tv-onb-editor-meta {
-  flex: none;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--color-meta);
+.tvo-spine-back:hover .tvo-spine-label,
+.tvo-spine-back:focus-visible .tvo-spine-label {
+  fill: var(--accent-ink);
 }
 
-.tv-onb-editor-body {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  padding: var(--space-14) var(--space-18);
-  font-family: var(--font-mono);
-  font-size: var(--type-code-size);
-  line-height: var(--type-code-leading);
-  color: var(--color-ink);
-  background: var(--color-sunken);
-  border: none;
+/* ---- a step ---- */
+
+.tvo-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 40px;
+  animation: tpi-fade-in var(--d-fade) ease both;
+}
+
+.tvo-step-main {
+  flex: 1;
+  min-width: 360px;
+}
+
+.tvo-title {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-family: var(--font-content);
+  font-size: var(--fs-hero);
+  font-weight: 400;
+  line-height: var(--lh-hero);
+}
+
+.tvo-text {
+  max-width: 520px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+  line-height: 1.9;
+}
+
+.tvo-text p {
+  margin: 0 0 6px;
+}
+
+.tvo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 40px;
+  margin-top: 26px;
+}
+
+.tvo-said {
+  color: var(--ink-body);
+  font-size: var(--fs-label);
+}
+
+.tvo-hint {
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: var(--lh-cjk);
+}
+
+.tvo-keys {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 10px;
+}
+
+.tvo-keys .tpi-key {
+  --tpi-key-paper: var(--paper-0);
+  padding: 6px 12px;
+  font-size: 15px;
+}
+
+/* ---- the first words ---- */
+
+.tvo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.tvo-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+}
+
+.tvo-line-label {
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}
+
+.tvo-line input {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1.5px solid var(--line);
+  background: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: var(--fs-option);
+  outline: none;
+  transition: border-color var(--d-tap);
+}
+
+.tvo-line input:focus {
+  border-bottom-color: var(--accent);
+}
+
+.tvo-line input::placeholder,
+.tvo-body::placeholder {
+  color: var(--ink-faint);
+}
+
+/* The only boxed field in the flow, like the editor's body. */
+.tvo-body {
+  min-height: 140px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-0);
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: 16px;
+  line-height: var(--lh-cjk);
+  outline: none;
   resize: vertical;
 }
 
-.tv-onb-editor-body:focus {
-  outline: none;
+.tvo-body:focus {
+  border-color: var(--accent-focus);
 }
 
-.tv-onb-error {
-  margin: var(--space-14) 0 0;
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-error);
-}
-
-.tv-onb-rail {
-  width: 300px;
-  flex: none;
-  padding-top: 96px;
-}
-
-.tv-onb-rail-label {
-  margin: 0 0 var(--space-14);
-  font-family: var(--font-mono);
-  font-size: var(--type-section-label-size);
-  font-weight: var(--type-section-label-weight);
-  letter-spacing: var(--type-section-label-tracking);
-  text-transform: uppercase;
-  color: var(--color-meta);
-}
-
-.tv-onb-rail-rows {
-  display: flex;
-  flex-direction: column;
-}
-
-.tv-onb-rail-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-11) 0;
-  border-bottom: 1px solid var(--color-hairline-quiet);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-ink);
-}
-
-.tv-onb-rail-row:last-child {
-  border-bottom: none;
-}
-
-.tv-onb-rail-sub {
-  font-size: var(--type-meta-size);
-  color: var(--color-meta);
-}
-
-/* Step 4 — shortcut rehearsal */
-
-.tv-onb-shortcut {
+.tvo-note {
   max-width: 520px;
+  margin-top: 32px;
 }
 
-.tv-onb-shortcut-keys {
-  display: flex;
-  gap: var(--space-9);
-  margin-bottom: var(--space-22);
-}
+@media (max-width: 720px) {
+  .tvo-sheet {
+    padding: 32px 24px 40px;
+  }
 
-.tv-onb-keycap {
-  height: 52px;
-  min-width: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--space-14);
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--color-ink);
-  background: var(--color-paper);
-  border: 1px solid var(--color-edge);
-  border-bottom-width: 2.5px;
-  border-radius: var(--radius-field);
-}
-
-.tv-onb-keycap.is-accent {
-  background: var(--color-accent-tint-bg);
-  border-color: var(--color-accent);
-}
-
-.tv-onb-shortcut-note {
-  margin: 0 0 var(--space-14);
-  max-width: 280px;
-  font-family: var(--font-sans);
-  font-size: var(--type-body-size);
-  line-height: 1.7;
-  color: var(--color-secondary);
-  text-wrap: pretty;
-}
-
-.tv-onb-shortcut-state {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-ink);
-}
-
-.tv-onb-help {
-  margin-top: var(--space-22);
-  max-width: 520px;
-  padding: var(--space-14) var(--space-18);
-  background: var(--color-sunken);
-  border-radius: var(--radius-card);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--color-secondary);
-}
-
-.tv-onb-help p {
-  margin: 0;
-  text-wrap: pretty;
-}
-
-.tv-onb-help p + p {
-  margin-top: var(--space-9);
-}
-
-/* Step 5 — done */
-
-.tv-onb-done-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-13);
-  margin-bottom: var(--space-40);
-}
-
-.tv-onb-done-bar {
-  width: 3px;
-  height: 34px;
-  background: var(--color-accent);
-}
-
-.tv-onb-done-head .tv-onb-title {
-  margin-bottom: 0;
-}
-
-.tv-onb-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-width: 900px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-}
-
-.tv-onb-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-14);
-  padding: var(--space-18) var(--space-22);
-  border-bottom: 1px solid var(--color-hairline-quiet);
-}
-
-.tv-onb-row:last-child {
-  border-bottom: none;
-}
-
-.tv-onb-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.tv-onb-dot.is-ok {
-  background: var(--color-success);
-}
-
-.tv-onb-dot.is-pending {
-  background: var(--color-warning);
-}
-
-/* Security state gets a different shape, not just a colour (square outline). */
-.tv-onb-dot.is-secure {
-  border-radius: 2px;
-  border: 1.5px solid var(--color-accent);
-  background: none;
-}
-
-.tv-onb-row-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tv-onb-row-title {
-  font-family: var(--font-sans);
-  font-size: 14.5px;
-  color: var(--color-ink);
-}
-
-.tv-onb-row-sub {
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-secondary);
-}
-
-.tv-onb-row-chip {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--color-secondary);
-  background: var(--color-sunken);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-chip);
-  padding: 5px 8px;
-}
-
-.tv-onb-row-later {
-  flex: none;
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-secondary);
-}
-
-.tv-onb-finish-error {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-13);
-  padding: var(--space-13) var(--space-40);
-  border-top: 1px solid var(--color-error-border);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  color: var(--color-error);
-}
-
-.tv-onb-escape:focus-visible,
-.tv-onb-primary:focus-visible,
-.tv-onb-ghost:focus-visible,
-.tv-onb-skip:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
+  .tvo-step-main {
+    min-width: 0;
+  }
 }

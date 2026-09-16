@@ -4,11 +4,13 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-// Formal Typvia IME library module. Included by the committed
-// apps/mobile/src-tauri/gen/android/settings.gradle so the InputMethodService
-// ships inside the main app APK, where sharing the app's UID lets it read the
-// KeyboardSnapshot directly. AGP/Kotlin plugin versions come from that root
-// project's buildscript classpath.
+// Formal Typvia IME library module. It ships inside the main app APK, where
+// sharing the app's UID lets the InputMethodService read the KeyboardSnapshot
+// directly, and it takes its AGP/Kotlin plugin versions from the including
+// root project's buildscript classpath. No such root exists right now: the
+// Tauri mobile shell that provided one was retired, and the native Android
+// app that replaces it has not been built yet, so this module currently has
+// no host to be included by.
 
 plugins {
     id("com.android.library")
@@ -18,32 +20,11 @@ plugins {
 // Resolved from this module's own location (native/android-ime) so the wiring
 // does not depend on which Gradle root includes the module.
 val repoRoot: File = projectDir.parentFile.parentFile
-val ffiOut = File(repoRoot, "target/mobile-ffi-android")
-// The host library carries the build host's extension, not the target's: a
-// macOS workstation produces .dylib, a Linux CI runner .so. Both load through
-// the same JNA path in the host-JVM unit tests.
-val hostLib = if (System.getProperty("os.name").startsWith("Mac")) "dylib" else "so"
-val hostDylib = File(repoRoot, "target/release/libtypvia_mobile_ffi.$hostLib")
 
-// The module consumes the mobile-ffi build products (generated Kotlin bindings
-// + per-ABI .so + host dylib for JVM unit tests). They are never committed;
-// this task regenerates them when missing or stale so a clean checkout
-// builds reproducibly. Inputs cover the FFI crate only — a deeper workspace
-// change requires a manual `crates/mobile-ffi/build-android.sh` run.
-val buildMobileFfi = tasks.register<Exec>("buildMobileFfi") {
-    workingDir = repoRoot
-    commandLine("bash", "crates/mobile-ffi/build-android.sh")
-    inputs.files(
-        fileTree(File(repoRoot, "crates/mobile-ffi/src")),
-        File(repoRoot, "crates/mobile-ffi/Cargo.toml"),
-        File(repoRoot, "crates/mobile-ffi/build-android.sh"),
-        File(repoRoot, "crates/mobile-ffi/smoke/Main.kt"),
-    )
-    outputs.dir(File(ffiOut, "generated"))
-    outputs.dir(File(ffiOut, "jniLibs"))
-    outputs.file(hostDylib)
-}
-
+// The FFI is no longer produced here. `:core-ffi` builds it, owns the one
+// task that does, and hands the bindings on — two modules generating the same
+// files into the same directory is a build Gradle refuses to plan, and it was
+// only ever this way because there was no `:core-ffi` to defer to.
 android {
     namespace = "dev.typvia.ime"
     compileSdk = 36
@@ -57,17 +38,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    sourceSets.getByName("main") {
-        java.srcDir(File(ffiOut, "generated"))
-        jniLibs.srcDirs(File(ffiOut, "jniLibs"))
-    }
-
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        // Eleven, matching every other module the panel is built out of; the
+        // design system it now reads is compiled at that level.
+        jvmTarget = "11"
     }
 
     testOptions {
@@ -82,15 +60,13 @@ android {
     }
 }
 
-tasks.named("preBuild") {
-    dependsOn(buildMobileFfi)
-}
-
 dependencies {
-    // UniFFI-generated Kotlin requires JNA at runtime; it is taken under the
-    // Apache-2.0 option of its Apache-2.0/LGPL-2.1 dual license, which is
-    // MPL-2.0 compatible. The @aar variant carries Android libjnidispatch.
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
+    // The bindings, the .so files and JNA all arrive through this one door.
+    implementation(project(":core-ffi"))
+    // The design system: the panel's palette, its type ladder and the four
+    // band heights come from the same table the app reads, so the keyboard's
+    // paper cannot drift from the app's without something failing.
+    implementation(project(":core-ui"))
     testImplementation("junit:junit:4.13.2")
     // Plain jar for host-JVM unit tests (loads the host dylib, not the .so).
     testImplementation("net.java.dev.jna:jna:5.17.0")

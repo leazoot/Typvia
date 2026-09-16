@@ -7,11 +7,12 @@
 // @vitest-environment jsdom
 import type { Snippet, VaultStatus } from '@typvia/shared';
 import type * as SharedModule from '@typvia/shared';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { I18nProvider } from '@typvia/ui';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VaultProvider } from '../../vault/vault-context';
+import { UndoProvider } from '../../workspace/undo';
 import { VaultPage } from './vault-page';
 
 const mocks = vi.hoisted(() => ({
@@ -29,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   vaultReset: vi.fn(),
   panelCopySecret: vi.fn(),
   trashSnippet: vi.fn(),
+  restoreSnippet: vi.fn(),
+  masterPasswordMinLength: vi.fn(),
 }));
 
 vi.mock('@typvia/shared', async (importOriginal) => {
@@ -42,10 +45,13 @@ function status(overrides: Partial<VaultStatus>): VaultStatus {
     unlocked: false,
     unlockedAt: null,
     lastActivityAt: null,
-    idleTimeoutMs: 300_000,
+    idleTimeoutMs: 600_000,
     ...overrides,
   };
 }
+
+const unlocked = () =>
+  status({ unlocked: true, unlockedAt: Date.now(), lastActivityAt: Date.now() });
 
 function secret(id: string, title: string): Snippet {
   return {
@@ -56,7 +62,7 @@ function secret(id: string, title: string): Snippet {
     securityLevel: 'sensitive',
     description: null,
     folderId: null,
-    trigger: null,
+    trigger: `/${id}`,
     triggerMode: null,
     language: null,
     isFavorite: false,
@@ -71,13 +77,18 @@ function secret(id: string, title: string): Snippet {
   };
 }
 
-function renderVault() {
+function renderVault(locale: 'en' | 'zh' = 'en') {
+  mocks.masterPasswordMinLength.mockResolvedValue(8);
   return render(
-    <MemoryRouter initialEntries={['/vault']}>
-      <VaultProvider>
-        <VaultPage />
-      </VaultProvider>
-    </MemoryRouter>,
+    <I18nProvider locale={locale}>
+      <MemoryRouter initialEntries={['/vault']}>
+        <VaultProvider>
+          <UndoProvider>
+            <VaultPage />
+          </UndoProvider>
+        </VaultProvider>
+      </MemoryRouter>
+    </I18nProvider>,
   );
 }
 
@@ -86,55 +97,56 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('VaultPage', () => {
-  it('shows the set-up form when no vault exists', async () => {
+describe('VaultPage — locked and not set up', () => {
+  it('shows the set-up lines when no vault exists', async () => {
     mocks.vaultStatus.mockResolvedValue(status({ initialized: false }));
     renderVault();
-    expect(await screen.findByText('Set up the vault')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Set up the vault' })).toBeTruthy();
+    expect(screen.getByLabelText('Confirm master password')).toBeTruthy();
   });
 
-  it('locks in place: the page keeps its shape and lists nothing', async () => {
-    mocks.vaultStatus.mockResolvedValue(status({ initialized: true, unlocked: false }));
+  it('locks in place with the count, the caret in the password line, and no titles', async () => {
+    mocks.vaultStatus.mockResolvedValue(status({ unlocked: false }));
     mocks.vaultList.mockResolvedValue([secret('a', 'Prod DB'), secret('b', 'Stripe')]);
     renderVault();
-    expect(await screen.findByText('2 secrets are kept safe on this Mac.')).toBeTruthy();
-    // The vault heading stays; the lock is a state of the page, not a modal.
-    expect(screen.getByRole('heading', { level: 1, name: 'Vault' })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: '2 snippets are locked in here.' }),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByLabelText('Master password'));
     expect(screen.queryByRole('dialog')).toBeNull();
-    // Titles are not listed while locked, and no secret value appears.
     expect(screen.queryByText('Prod DB')).toBeNull();
+    expect(screen.getByText(/locks itself again after 10 minutes idle/)).toBeTruthy();
   });
 
   it('resets the vault from the lost-password flow with the real count', async () => {
-    mocks.vaultStatus.mockResolvedValue(status({ initialized: true, unlocked: false }));
+    mocks.vaultStatus.mockResolvedValue(status({ unlocked: false }));
     mocks.vaultList.mockResolvedValue([secret('a', 'Prod DB')]);
     mocks.vaultResetPreview.mockResolvedValue(3);
     mocks.vaultReset.mockResolvedValue(status({ initialized: false, unlocked: false }));
     renderVault();
 
-    fireEvent.click(await screen.findByText('Forgot the master password?'));
-    // Two steps: the first names the action, the confirm names the real count.
+    fireEvent.click(await screen.findByRole('button', { name: 'Forgot the master password?' }));
+    // Two presses: the first names the act, the second names the real count.
     fireEvent.click(await screen.findByRole('button', { name: 'Reset the vault' }));
-    fireEvent.click(await screen.findByText('Destroy 3 secret snippets forever'));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Destroy 3 secret snippets forever' }),
+    );
 
     await waitFor(() => expect(mocks.vaultReset).toHaveBeenCalled());
-    // The fresh uninitialized status drops straight into first-run setup.
-    expect(await screen.findByText('Set up the vault')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Set up the vault' })).toBeTruthy();
   });
 
   it('unlocks with the master password and then lists secrets', async () => {
     mocks.vaultStatus.mockResolvedValue(status({ unlocked: false }));
     mocks.vaultList.mockResolvedValue([secret('a', 'Prod read replica')]);
-    mocks.vaultUnlockPassword.mockResolvedValue(
-      status({ unlocked: true, unlockedAt: 1000, lastActivityAt: 1000 }),
-    );
+    mocks.vaultUnlockPassword.mockResolvedValue(unlocked());
     renderVault();
 
-    fireEvent.click(await screen.findByText('Master password'));
-    fireEvent.change(screen.getByLabelText('Master password'), {
-      target: { value: 'correct horse battery staple' },
-    });
-    fireEvent.click(screen.getByText('Unlock'));
+    const field = await screen.findByLabelText('Master password');
+    fireEvent.change(field, { target: { value: 'correct horse battery staple' } });
+    const form = field.closest('form');
+    if (form === null) throw new Error('the password line is not in a form');
+    fireEvent.submit(form);
 
     await waitFor(() =>
       expect(mocks.vaultUnlockPassword).toHaveBeenCalledWith('correct horse battery staple'),
@@ -142,41 +154,43 @@ describe('VaultPage', () => {
     expect(await screen.findByText('Prod read replica')).toBeTruthy();
   });
 
-  it('reveals a secret only on request and hides it otherwise', async () => {
-    mocks.vaultStatus.mockResolvedValue(
-      status({ unlocked: true, unlockedAt: 1000, lastActivityAt: 1000 }),
-    );
+  it('renders a single language (zh)', async () => {
+    mocks.vaultStatus.mockResolvedValue(status({ initialized: false }));
+    renderVault('zh');
+    expect(await screen.findByText('设置保险库')).toBeTruthy();
+    expect(screen.queryByText('Set up the vault')).toBeNull();
+  });
+});
+
+describe('VaultPage — unlocked', () => {
+  it('peeks at a secret only on request and covers it again', async () => {
+    mocks.vaultStatus.mockResolvedValue(unlocked());
     mocks.vaultList.mockResolvedValue([secret('a', 'Stripe test key')]);
     mocks.vaultReveal.mockResolvedValue('sk_test_51NfEXAMPLEONLY');
     renderVault();
 
-    // Before reveal, the plaintext is absent from the DOM.
     await screen.findByText('Stripe test key');
     expect(screen.queryByText('sk_test_51NfEXAMPLEONLY')).toBeNull();
+    expect(screen.getByText(/^Unlocked \d+:\d\d$/)).toBeTruthy();
 
-    fireEvent.click(screen.getByText('Reveal'));
+    fireEvent.click(screen.getByRole('button', { name: 'Peek' }));
     expect(await screen.findByText('sk_test_51NfEXAMPLEONLY')).toBeTruthy();
+    expect(screen.getByText('covers again in 10s')).toBeTruthy();
     expect(mocks.vaultReveal).toHaveBeenCalledWith('a');
 
-    // Hiding removes it again.
-    fireEvent.click(screen.getByText('Hide'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cover' }));
     await waitFor(() => expect(screen.queryByText('sk_test_51NfEXAMPLEONLY')).toBeNull());
   });
 
   it('edits an existing secret by decrypting it into the form', async () => {
-    mocks.vaultStatus.mockResolvedValue(
-      status({ unlocked: true, unlockedAt: 1000, lastActivityAt: 1000 }),
-    );
+    mocks.vaultStatus.mockResolvedValue(unlocked());
     mocks.vaultList.mockResolvedValue([secret('a', 'Stripe test key')]);
     mocks.vaultReveal.mockResolvedValue('sk_test_old');
     mocks.vaultUpdateSecret.mockResolvedValue(secret('a', 'Stripe test key'));
     renderVault();
 
-    // Editing lives behind ··· , never as a permanent button on the row.
-    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
-    // The edit session decrypts the current value into the field.
-    const bodyField = (await screen.findByLabelText('Secret value')) as HTMLTextAreaElement;
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const bodyField = await screen.findByLabelText<HTMLTextAreaElement>('Secret value');
     await waitFor(() => expect(bodyField.value).toBe('sk_test_old'));
 
     fireEvent.change(bodyField, { target: { value: 'sk_test_new' } });
@@ -189,30 +203,8 @@ describe('VaultPage', () => {
     );
   });
 
-  it('offers Touch ID once and then stops asking', async () => {
-    localStorage.removeItem('tv.ui.vaultTouchIdAsked');
-    mocks.vaultStatus.mockResolvedValue(
-      status({ unlocked: true, unlockedAt: 1000, lastActivityAt: 1000 }),
-    );
-    mocks.vaultList.mockResolvedValue([]);
-    mocks.vaultEnableBiometric.mockResolvedValue(undefined);
-    renderVault();
-
-    fireEvent.click(await screen.findByText('Use Touch ID next time?'));
-    fireEvent.click(screen.getByRole('button', { name: 'Enable' }));
-    await waitFor(() => expect(mocks.vaultEnableBiometric).toHaveBeenCalled());
-    // The offer is gone for good; the setting still lives in Security.
-    await waitFor(() => expect(screen.queryByText('Use Touch ID next time?')).toBeNull());
-    expect(localStorage.getItem('tv.ui.vaultTouchIdAsked')).toBe('true');
-
-    fireEvent.click(screen.getByRole('button', { name: /Security/ }));
-    expect(screen.getByText('Touch ID can unlock this vault.')).toBeTruthy();
-  });
-
   it('copies a secret with the clipboard-clear promise, and never shows it', async () => {
-    mocks.vaultStatus.mockResolvedValue(
-      status({ unlocked: true, unlockedAt: 1000, lastActivityAt: 1000 }),
-    );
+    mocks.vaultStatus.mockResolvedValue(unlocked());
     mocks.vaultList.mockResolvedValue([secret('a', 'Stripe test key')]);
     mocks.panelCopySecret.mockResolvedValue(30_000);
     renderVault();
@@ -220,42 +212,61 @@ describe('VaultPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copy' }));
     await waitFor(() => expect(mocks.panelCopySecret).toHaveBeenCalledWith('a'));
     expect(await screen.findByText('Clipboard clears in 30s')).toBeTruthy();
-    // Copying never decrypts into the page.
     expect(mocks.vaultReveal).not.toHaveBeenCalled();
   });
 
-  it('renders a single language (zh) under I18nProvider', async () => {
-    mocks.vaultStatus.mockResolvedValue(status({ initialized: false }));
-    render(
-      <MemoryRouter initialEntries={['/vault']}>
-        <VaultProvider>
-          <I18nProvider locale="zh">
-            <VaultPage />
-          </I18nProvider>
-        </VaultProvider>
-      </MemoryRouter>,
-    );
-    expect(await screen.findByText('设置保险库')).toBeTruthy();
-    // The retired bilingual twin never renders alongside it.
-    expect(screen.queryByText('Set up the vault')).toBeNull();
+  it('deletes from the right-click menu and offers it back on a note', async () => {
+    mocks.vaultStatus.mockResolvedValue(unlocked());
+    mocks.vaultList.mockResolvedValue([secret('a', 'Stripe test key')]);
+    mocks.trashSnippet.mockResolvedValue(undefined);
+    mocks.restoreSnippet.mockResolvedValue(undefined);
+    renderVault();
+
+    fireEvent.contextMenu(await screen.findByRole('listitem', { name: 'Stripe test key' }), {
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    await waitFor(() => expect(mocks.trashSnippet).toHaveBeenCalledWith('a'));
+
+    const note = await screen.findByRole('status', { name: 'Deleted “Stripe test key”.' });
+    fireEvent.click(within(note).getByRole('button', { name: 'Undo ⌘Z' }));
+    await waitFor(() => expect(mocks.restoreSnippet).toHaveBeenCalledWith('a'));
+  });
+
+  it('offers Touch ID once and then stops asking', async () => {
+    localStorage.removeItem('tv.ui.vaultTouchIdAsked');
+    mocks.vaultStatus.mockResolvedValue(unlocked());
+    mocks.vaultList.mockResolvedValue([]);
+    mocks.vaultEnableBiometric.mockResolvedValue(undefined);
+    renderVault();
+
+    expect(await screen.findByText('Use Touch ID next time?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Enable' }));
+    await waitFor(() => expect(mocks.vaultEnableBiometric).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText('Use Touch ID next time?')).toBeNull());
+    expect(localStorage.getItem('tv.ui.vaultTouchIdAsked')).toBe('true');
+    expect(screen.getByText('Touch ID can unlock this vault.')).toBeTruthy();
   });
 
   it('creates a secret through the New secret form', async () => {
-    mocks.vaultStatus.mockResolvedValue(
-      status({ unlocked: true, unlockedAt: 1000, lastActivityAt: 1000 }),
-    );
+    mocks.vaultStatus.mockResolvedValue(unlocked());
     mocks.vaultList.mockResolvedValue([]);
     mocks.vaultCreateSecret.mockResolvedValue(secret('new', 'API key'));
     renderVault();
 
     fireEvent.click(await screen.findByRole('button', { name: 'New secret' }));
     fireEvent.change(screen.getByLabelText('Secret title'), { target: { value: 'API key' } });
-    fireEvent.change(screen.getByLabelText('Secret value'), { target: { value: 's3cr3t' } });
+    fireEvent.change(screen.getByLabelText('Secret value'), { target: { value: 'FAKE_s3cr3t' } });
     fireEvent.click(screen.getByText('Save secret'));
 
     await waitFor(() =>
       expect(mocks.vaultCreateSecret).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'API key', body: 's3cr3t', snippetType: 'sensitive' }),
+        expect.objectContaining({
+          title: 'API key',
+          body: 'FAKE_s3cr3t',
+          snippetType: 'sensitive',
+        }),
       ),
     );
   });

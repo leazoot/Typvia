@@ -1,0 +1,213 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* Paper & Ink — the desktop's colour, type, space and motion values, taken
+   literally. Every neutral is warm; there is one accent and two functional
+   colours, and neither functional colour may be louder than the accent. */
+
+/* `.tpi-theme-light` / `.tpi-theme-dark` pin one card to a theme whatever the
+   window is in, for the appearance specimen. */
+:root,
+.tpi-theme-light {
+  /* paper: three layers in use, the desk is whatever sits behind the app */
+  --paper-0: #fcf9f3;
+  --paper-1: #f5efe5;
+  --paper-2: #efe7da;
+  --paper-desk: #eae2d2;
+  --paper-desk-deep: #e9e0cc;
+
+  /* hairlines: 1px / 1.2px / 1.5px only */
+  --line-soft: #efe7da;
+  --line-fade: #e2d7c4;
+  --line: #ddd3c5;
+  --line-strong: #d2c7b4;
+  --line-gradient: linear-gradient(90deg, var(--line-fade), transparent);
+
+  /* ink: the smaller the text, the lighter the ink — never the reverse */
+  --ink: #292724;
+  --ink-2: #4a453e;
+  --ink-body: #625d56;
+  --ink-body-hover: #6b655c;
+  --ink-muted: #928a80;
+  --ink-muted-2: #a79e90;
+  --ink-faint: #b9b0a2;
+  --ink-ghost: #c7beb0;
+
+  /* the one accent; text under 13px uses the ink variant for contrast */
+  --accent-light: #f28a4b;
+  --accent: #ed6547;
+  --accent-hover: #d95538;
+  --accent-ink: #c4502f;
+  --accent-dark: #b95b48;
+  --accent-wash: #fce5de;
+  --accent-focus: #e5a88f;
+  --accent-face: #a93e22;
+  --accent-gradient: linear-gradient(90deg, var(--accent-light), var(--accent));
+  /* text on the one solid accent fill a destructive row gets on hover */
+  --on-accent: #fcf9f3;
+  --on-accent-soft: rgba(252, 249, 243, 0.8);
+  /* behind the one dialog the desktop has */
+  --scrim: rgba(41, 39, 36, 0.18);
+  /* Paper laid thin over the system blur, for the Quick Bar. */
+  --panel-glass: rgba(252, 249, 243, 0.12);
+  --panel-pick: rgba(234, 226, 210, 0.45);
+  --panel-line: rgba(60, 45, 25, 0.1);
+  --panel-edge: rgba(255, 255, 255, 0.4);
+  --panel-key: rgba(255, 255, 255, 0.35);
+
+  --ok: #6f8a5e;
+  --warn: #d49b35;
+
+  /* the translucent title bar: paper-0 at 60% over whatever scrolls beneath */
+  --titlebar-veil: rgba(252, 249, 243, 0.42);
+  --titlebar-glass: blur(30px) saturate(1.8);
+
+  --font-content:
+    'Source Serif 4', 'Source Serif 4 Variable', 'Noto Serif SC', 'Noto Serif SC Variable', serif;
+  --font-ui: 'MiSans', 'Noto Sans SC', 'Noto Sans SC Variable', sans-serif;
+  --font-meta: 'IBM Plex Sans', sans-serif;
+  --font-code: 'IBM Plex Mono', monospace;
+  --font-brand: 'Instrument Sans', 'Instrument Sans Variable', sans-serif;
+
+  /* One notch under the reference scale, so the three library columns fit a
+     1100px window; the three smallest sizes stay where they are. */
+  --fs-hero: 25px;
+  --fs-title: 20px;
+  --fs-lead: 16.5px;
+  --fs-item: 15px;
+  --fs-action: 14.5px;
+  --fs-card: 13.5px;
+  --fs-option: 13.5px;
+  --fs-body: 13px;
+  --fs-body-2: 12.5px;
+  --fs-label: 12px;
+  --fs-meta: 11.5px;
+  --fs-caps: 11px;
+  --fs-eyebrow: 10.5px;
+
+  --lh-hero: 1.3;
+  --lh-tight: 1.5;
+  --lh-cjk: 1.85;
+  --lh-loose: 1.95;
+
+  --ls-caps: 0.22em;
+  --ls-eyebrow: 0.16em;
+  --ls-field: 0.14em;
+  --ls-brand: 0.18em;
+
+  --label-col: 118px;
+
+  --r-mark: 2px;
+  --r-note: 3px;
+  --r-key: 4px;
+  --r-code: 6px;
+  --r-row: 12px;
+  --r-window: 14px;
+  --r-panel: 17px;
+
+  --shadow-hairline: 0 2px 6px rgba(41, 39, 36, 0.05);
+  --shadow-note: 0 10px 26px -14px rgba(41, 39, 36, 0.18);
+  --shadow-float: 0 14px 34px -18px rgba(41, 39, 36, 0.2);
+  /* the summoned panel floats highest of all */
+  --shadow-panel: 0 46px 100px -46px rgba(41, 39, 36, 0.5), 0 4px 14px rgba(41, 39, 36, 0.08);
+
+  --ease-move: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --d-tap: 0.22s;
+  --d-fade: 0.25s;
+  --d-trace: 0.3s;
+}
+
+/* Dark is the same paper turned over: still warm, never pure black or grey.
+   Shadows barely read on dark paper, so a 1px line carries the layering that
+   a shadow carries in light. Values the inversion table leaves out (the
+   in-between inks, hover and focus accents, the functional colours) sit on
+   the same ramp as their neighbours. */
+:root[data-theme='dark'],
+.tpi-theme-dark {
+  --paper-0: #201f1c;
+  --paper-1: #191817;
+  --paper-2: #262420;
+  --paper-desk: #121110;
+  --paper-desk-deep: #0e0d0c;
+
+  --line-soft: #2b2925;
+  --line-fade: #302d28;
+  --line: #34312b;
+  --line-strong: #3e3a33;
+
+  --ink: #f2eee6;
+  --ink-2: #d6d0c5;
+  --ink-body: #b7b0a4;
+  --ink-body-hover: #a59e92;
+  --ink-muted: #8e877c;
+  --ink-muted-2: #7c766c;
+  --ink-faint: #6a645b;
+  --ink-ghost: #57524a;
+
+  --accent-light: #f6936a;
+  --accent: #f2795c;
+  --accent-hover: #f48e74;
+  --accent-ink: #f2795c;
+  --accent-dark: #c9644f;
+  --accent-wash: rgba(242, 121, 92, 0.18);
+  --accent-focus: #8f4e3e;
+  --accent-face: #b43e21;
+
+  --ok: #86a574;
+  --warn: #dda94a;
+
+  --titlebar-veil: rgba(32, 31, 28, 0.48);
+  --scrim: rgba(0, 0, 0, 0.5);
+  --panel-glass: rgba(32, 31, 28, 0.16);
+  --panel-pick: rgba(52, 49, 43, 0.5);
+  --panel-line: rgba(255, 255, 255, 0.08);
+  --panel-edge: rgba(255, 255, 255, 0.14);
+  --panel-key: rgba(255, 255, 255, 0.08);
+
+  --shadow-hairline: 0 0 0 1px var(--line);
+  --shadow-note: 0 0 0 1px var(--line);
+  --shadow-float: 0 0 0 1px var(--line), 0 14px 34px -18px rgba(0, 0, 0, 0.6);
+  --shadow-panel: 0 0 0 1px var(--line), 0 46px 100px -46px rgba(0, 0, 0, 0.7);
+}
+
+::selection {
+  background: var(--accent-wash);
+}
+
+@keyframes tpi-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Background text fragments drift in pairs of different lengths so they
+   never move in step. */
+@keyframes tpi-drift-a {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-7deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-7deg);
+  }
+}
+
+@keyframes tpi-drift-b {
+  0%,
+  100% {
+    transform: translateY(0) rotate(6deg);
+  }
+  50% {
+    transform: translateY(5px) rotate(6deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.09s !important;
+    transition-duration: 0.09s !important;
+  }
+}

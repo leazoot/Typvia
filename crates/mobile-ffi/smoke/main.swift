@@ -39,6 +39,9 @@ do {
     if overview.recentTotal != 2 || overview.favoriteTotal != 1 {
         failures.append("counts=\(overview.recentTotal)/\(overview.favoriteTotal)")
     }
+    // Three entries, two of them recent: the denominator an extension prints
+    // is the entry count, never one of the usage counts.
+    if overview.entryTotal != 3 { failures.append("entries=\(overview.entryTotal)") }
     if overview.folderTitles != ["Email", "Shell"] {
         failures.append("titles=\(overview.folderTitles)")
     }

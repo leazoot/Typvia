@@ -36,7 +36,7 @@ pub use app_rule_repo::AppRuleRepo;
 pub use device_repo::DeviceRepo;
 pub use embedding_repo::{EmbeddingRepo, PendingEmbedding, StoredEmbedding};
 pub use folder_repo::FolderRepo;
-pub use snippet_repo::{ListScope, SnippetRepo, TRASH_RETENTION_MS};
+pub use snippet_repo::{ListOrder, ListScope, SnippetRepo, TRASH_RETENTION_MS};
 pub use sync_outbox_repo::SyncOutboxRepo;
 pub use sync_state_repo::SyncStateRepo;
 pub use tag_repo::TagRepo;

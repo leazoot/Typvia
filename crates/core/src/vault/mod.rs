@@ -14,7 +14,9 @@
 mod session;
 mod throttle;
 
-pub use session::{BIOMETRIC_MK_ENTRY, UnlockStatus, VaultError, VaultSession};
+pub use session::{
+    BIOMETRIC_MK_ENTRY, MASTER_PASSWORD_MIN_LEN, UnlockStatus, VaultError, VaultSession,
+};
 pub use typvia_crypto::{SecureStore, SecureStoreError};
 
 #[cfg(test)]
@@ -120,6 +122,33 @@ mod tests {
         let mut session = initialized_session(&conn);
         let err = session.initialize(&conn, PASSWORD, NOW).unwrap_err();
         assert!(matches!(err, VaultError::AlreadyInitialized));
+    }
+
+    /// The floor is the vault's, not a setup form's. A host that never
+    /// checked would otherwise build a vault on a two-character password and
+    /// nothing downstream would ever notice.
+    #[test]
+    fn a_password_below_the_floor_builds_no_vault() {
+        let conn = db();
+        let mut session = VaultSession::new();
+        let short = vec![b'x'; MASTER_PASSWORD_MIN_LEN - 1];
+
+        let err = session.initialize(&conn, &short, NOW).unwrap_err();
+
+        assert!(matches!(err, VaultError::PasswordTooShort));
+        assert!(!session.is_unlocked());
+        assert!(!VaultSession::is_initialized(&conn).unwrap());
+    }
+
+    #[test]
+    fn a_password_at_the_floor_builds_one() {
+        let conn = db();
+        let mut session = VaultSession::new();
+        let exact = vec![b'x'; MASTER_PASSWORD_MIN_LEN];
+
+        session.initialize(&conn, &exact, NOW).unwrap();
+
+        assert!(session.is_unlocked());
     }
 
     #[test]

@@ -1,7 +1,9 @@
 name: Build Android
 
-# Manual only. The APK is unsigned: no release keystore exists yet, and a
-# keystore must never be committed. Tag-triggered releases come later.
+# Manual only, and unsigned for the same reason the iOS one is: no keystore
+# exists yet, and none may ever live in the repository. What this produces is
+# a debug APK — installable on a device or an emulator as it stands, which is
+# what makes it worth building at all.
 on:
   workflow_dispatch:
 
@@ -19,43 +21,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Same JDK baseline as the Gradle project.
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      # Two ABIs, not one: the app itself is built for arm64, but the IME
-      # module consumes an FFI chain that also produces the x86_64 emulator
-      # library.
+      # The two ABIs the FFI script builds: the device and the emulator.
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, x86_64-linux-android
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      # The Tauri CLI reads NDK_HOME; the FFI build script reads
-      # ANDROID_NDK_HOME. The runner image ships the NDK under a versioned
-      # path exposed as ANDROID_NDK_LATEST_HOME.
-      - name: Build APK
-        run: |
-          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
-          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
-          pnpm --dir apps/mobile tauri android build --apk --target aarch64
+      - uses: android-actions/setup-android@v3
 
-      - name: Upload APK
+      # The version the build script expects a toolchain from. It is pinned
+      # rather than taken as whatever the image ships, because a different NDK
+      # is a different libc and the .so files are the product.
+      - name: Install the NDK
+        run: sdkmanager --install "ndk;27.0.12077973"
+
+      # Gradle's own task would run this, but doing it here keeps the two
+      # halves of a failure apart: a Rust cross-compile that fails is not an
+      # Android build that fails.
+      - name: Build the FFI libraries
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
+        run: bash crates/mobile-ffi/build-android.sh
+
+      - name: Design system and room rules
+        working-directory: apps/android
+        run: ./gradlew :core-ui:testDebugUnitTest :app:testDebugUnitTest --console=plain
+
+      - name: Assemble the debug APK
+        working-directory: apps/android
+        run: ./gradlew :app:assembleDebug --console=plain
+
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: typvia-android
-          path: apps/mobile/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          name: typvia-android-debug
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

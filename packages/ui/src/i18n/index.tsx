@@ -7,8 +7,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 /**
- * UI language. The product renders exactly one language at a time (DEC: the
- * bilingual "EN label + CN subtitle" pattern is retired). Every user-facing
+ * UI language. The product renders exactly one language at a time — never an
+ * English label with a Chinese subtitle beside it. Every user-facing
  * string is written inline at its call site as an (en, zh) pair and resolved
  * through `useTr`, so translations live next to the code they belong to.
  */
@@ -34,4 +34,19 @@ export function useTr(): Tr {
 /** Non-hook variant for helpers that receive the locale as a value. */
 export function trFor(locale: Locale): Tr {
   return locale === 'zh' ? (_en: string, zh: string) => zh : (en: string) => en;
+}
+
+/**
+ * A count and the noun it counts, with English's plural decided in one place.
+ *
+ * English has a plural and Chinese does not, so the Chinese half is passed
+ * whole and only the English half branches. Written out at each call site the
+ * branch gets forgotten — "1 results", "1 weeks", "1 years ago" — which is the
+ * kind of mistake a reader reads as carelessness about everything else.
+ *
+ * Sentences whose verb also agrees branch at their call site instead: this
+ * decides a noun, not a grammar.
+ */
+export function counted(tr: Tr, count: number, one: string, many: string, zh: string): string {
+  return tr(`${String(count)} ${count === 1 ? one : many}`, zh);
 }

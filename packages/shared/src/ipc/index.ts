@@ -15,6 +15,7 @@ export type {
   FolderCount,
   FolderCreateInput,
   FolderUpdateInput,
+  InsertionPause,
   LibraryCounts,
   LibraryView,
   MobileBootstrap,

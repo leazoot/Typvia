@@ -26,5 +26,4 @@ paths = [
   '''^target/''',
   '''dist/''',
   '''\.pnpm/''',
-  '''src-tauri/gen/''',
 ]

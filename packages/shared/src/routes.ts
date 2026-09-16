@@ -17,8 +17,7 @@ export interface AppRoute {
 }
 
 export const APP_ROUTES: readonly AppRoute[] = [
-  { path: '/', labelEn: 'Home', labelCn: '首页' },
-  { path: '/library', labelEn: 'Library', labelCn: '片段库' },
+  { path: '/', labelEn: 'Library', labelCn: '资料库' },
   { path: '/editor', labelEn: 'Snippet editor', labelCn: '片段编辑' },
   { path: '/templates', labelEn: 'Template builder', labelCn: '模板编辑器' },
   { path: '/vault', labelEn: 'Vault', labelCn: '保险库' },

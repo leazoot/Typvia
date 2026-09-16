@@ -139,6 +139,70 @@ impl fmt::Display for SyncError {
 
 impl std::error::Error for SyncError {}
 
+/// Why the last round did not finish, in the only form allowed to leave this
+/// crate.
+///
+/// It is a fieldless enum on purpose. The errors it is derived from carry
+/// text — the HTTP stack's message, the server's own error code — and that
+/// text can name the server, the account, or the path. A category tells the
+/// reader what to do next, which is the whole reason to surface anything;
+/// the string underneath tells them nothing more and travels much further.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncFailure {
+    /// The server could not be reached at all: no network, no DNS, no TLS.
+    Unreachable,
+    /// The configured address is not usable as a sync server.
+    ServerAddress,
+    /// The server would not accept this device's session.
+    Auth,
+    /// No protocol version in common. Never downgraded silently, so it
+    /// surfaces here instead.
+    ProtocolVersion,
+    /// The server asked to be left alone for a while, or a recent failure
+    /// put the engine in backoff. Not a fault — a wait.
+    Busy,
+    /// The server answered, and its answer was a refusal.
+    ServerRefused,
+    /// The server answered something that does not fit the protocol: a
+    /// malformed body, or a cursor that went backwards.
+    ServerUnexpected,
+    /// A certificate did not verify against the pinned trust root. This one
+    /// is not a network problem and should never be retried past.
+    Trust,
+    /// Sync is not set up on this device.
+    NotSetUp,
+    /// Something on this side: the keyring, the database, a record that
+    /// would not seal. The server is fine.
+    ThisDevice,
+}
+
+impl SyncError {
+    /// The category a host is allowed to show.
+    pub fn failure(&self) -> SyncFailure {
+        match self {
+            Self::NotEnabled => SyncFailure::NotSetUp,
+            Self::HostGone => SyncFailure::ThisDevice,
+            Self::BackedOff { .. } => SyncFailure::Busy,
+            Self::CursorViolation => SyncFailure::ServerUnexpected,
+            Self::Trust(_) => SyncFailure::Trust,
+            Self::Transport(e) => match e {
+                TransportError::InvalidServerUrl => SyncFailure::ServerAddress,
+                TransportError::Network(_) => SyncFailure::Unreachable,
+                TransportError::SessionExpired => SyncFailure::Auth,
+                TransportError::ProtocolUnsupported => SyncFailure::ProtocolVersion,
+                TransportError::RateLimited => SyncFailure::Busy,
+                TransportError::Api { .. } => SyncFailure::ServerRefused,
+                TransportError::MalformedResponse => SyncFailure::ServerUnexpected,
+            },
+            // The keyring, the repositories, sealing, pairing and recovery all
+            // fail on this side of the wire. Splitting them further would ask
+            // the reader to act on a distinction they cannot act on.
+            Self::Keyring(_) | Self::Record(_) | Self::Repo(_) => SyncFailure::ThisDevice,
+            Self::Pairing(_) | Self::Recovery(_) => SyncFailure::ThisDevice,
+        }
+    }
+}
+
 impl From<TransportError> for SyncError {
     fn from(e: TransportError) -> Self {
         Self::Transport(e)
@@ -232,8 +296,9 @@ pub fn enqueue_change(
                 match payload::build_document(conn, change.entity_type, &change.entity_id) {
                     Ok(Some(document)) => document,
                     Ok(None) => return Ok(false),
-                    // No local build path (ai_action): nothing to queue in v1 —
-                    // no write use case produces these yet.
+                    // An entity with no local build path (ai_action) has
+                    // nothing to seal; skipping keeps the outbox drainable
+                    // instead of failing it forever.
                     Err(PayloadError::UnsupportedEntity) => return Ok(false),
                     Err(PayloadError::Repo(e)) => return Err(e.into()),
                     Err(_) => return Err(SyncError::Record(RecordError::MalformedPayload)),
@@ -1625,4 +1690,79 @@ pub(crate) fn open_own_document(wire: &WireRecord, keys: &SyncKeys) -> Result<Ve
     let document = typvia_crypto::open(key, &aad, &wire.ciphertext)
         .map_err(|_| SyncError::Record(RecordError::DecryptFailed))?;
     Ok(document.to_vec())
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+
+    /// Each engine failure lands on the category a reader can act on. The
+    /// transport ones are the whole point: "cannot reach it", "it would not
+    /// take my session" and "it refused" ask for three different next moves,
+    /// and a single "sync failed" asks for none.
+    #[test]
+    fn every_failure_maps_to_the_category_a_reader_can_act_on() {
+        let cases = [
+            (SyncError::NotEnabled, SyncFailure::NotSetUp),
+            (SyncError::HostGone, SyncFailure::ThisDevice),
+            (SyncError::BackedOff { until: 1 }, SyncFailure::Busy),
+            (SyncError::CursorViolation, SyncFailure::ServerUnexpected),
+            (
+                SyncError::Trust(CertificateError::UnknownRoot),
+                SyncFailure::Trust,
+            ),
+            (
+                SyncError::Record(RecordError::DecryptFailed),
+                SyncFailure::ThisDevice,
+            ),
+            (
+                TransportError::InvalidServerUrl.into(),
+                SyncFailure::ServerAddress,
+            ),
+            (
+                TransportError::Network("connection refused".into()).into(),
+                SyncFailure::Unreachable,
+            ),
+            (TransportError::SessionExpired.into(), SyncFailure::Auth),
+            (
+                TransportError::ProtocolUnsupported.into(),
+                SyncFailure::ProtocolVersion,
+            ),
+            (TransportError::RateLimited.into(), SyncFailure::Busy),
+            (
+                TransportError::Api {
+                    code: "QUOTA_EXCEEDED".into(),
+                    status: 507,
+                }
+                .into(),
+                SyncFailure::ServerRefused,
+            ),
+            (
+                TransportError::MalformedResponse.into(),
+                SyncFailure::ServerUnexpected,
+            ),
+        ];
+
+        for (error, expected) in cases {
+            assert_eq!(error.failure(), expected, "{error}");
+        }
+    }
+
+    /// The category is derived from errors that carry text — the HTTP
+    /// stack's message names hosts, the server's own error names its codes.
+    /// None of it survives the mapping, and the type is what guarantees it:
+    /// there is nowhere in `SyncFailure` for a string to go.
+    #[test]
+    fn the_category_cannot_carry_the_underlying_text() {
+        let error: SyncError = TransportError::Network(
+            "failed to lookup address information for sync.example.com".into(),
+        )
+        .into();
+
+        let failure = error.failure();
+
+        assert_eq!(failure, SyncFailure::Unreachable);
+        assert_eq!(format!("{failure:?}"), "Unreachable");
+        assert!(!format!("{failure:?}").contains("example.com"));
+    }
 }

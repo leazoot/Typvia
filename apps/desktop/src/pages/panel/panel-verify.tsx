@@ -7,6 +7,8 @@
 import { vaultUnlockBiometric, vaultUnlockPassword, type Snippet } from '@typvia/shared';
 import { useTr } from '@typvia/ui';
 import { useState } from 'react';
+import { KeyCap, TextAction } from '../../paper/kit';
+import { Mascot } from '../../paper/mascot';
 
 interface PanelVerifyProps {
   snippet: Snippet;
@@ -18,12 +20,10 @@ interface PanelVerifyProps {
 }
 
 /**
- * Panel sensitive-verification entry. Calling a vault snippet from
- * the panel requires an unlocked vault: this replaces the results list with the
- * unlock prompt (Touch ID + master password) — the same sanctioned vault-unlock
- * surface as the main window, rendered inline in the panel. A failed unlock is
- * undifferentiated (never says which part was wrong) and leads with what is
- * still safe. ESC returns to the list.
+ * A vault snippet asked for while the vault is locked: the unlock takes the
+ * list's place inside the panel (Touch ID or the master password). A failed
+ * unlock never says which part was wrong and leads with what is still safe.
+ * esc goes back to the list.
  */
 export function PanelVerify({
   snippet,
@@ -36,6 +36,7 @@ export function PanelVerify({
   const [password, setPassword] = useState('');
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const inserting = action === 'insert';
 
   const unlock = async (run: () => Promise<unknown>) => {
     if (busy) return;
@@ -69,72 +70,55 @@ export function PanelVerify({
   };
 
   return (
-    <div className="tv-panel-verify" onKeyDown={onKeyDown}>
-      <div className="tv-panel-verify-head">
-        <span className="tv-panel-verify-title">
-          {tr(
-            `Unlock to ${action === 'insert' ? 'insert' : 'copy'} · ${snippet.title}`,
-            `解锁以${action === 'insert' ? '插入' : '复制'} · ${snippet.title}`,
-          )}
-        </span>
-        {destination !== null && <span className="tv-panel-dest">→ {destination}</span>}
-      </div>
-      <p className="tv-panel-verify-sub">
-        {tr(
-          `Unlock the vault to ${action === 'insert' ? 'insert' : 'copy'} this secret.`,
-          `解锁保险库后${action === 'insert' ? '插入' : '复制'}此密文。`,
-        )}
-      </p>
-
-      <button
-        type="button"
-        className="tv-panel-verify-touch"
-        disabled={busy}
-        onClick={() => void unlock(() => vaultUnlockBiometric())}
-      >
-        {tr('Use Touch ID', '使用 Touch ID')}
-      </button>
-
-      <label className="tv-panel-verify-field">
-        <span className="tv-panel-verify-key">{tr('Master password', '主密码')}</span>
-        <input
-          type="password"
-          className="tv-panel-verify-input"
-          aria-label={tr('Master password', '主密码')}
-          value={password}
-          autoFocus
-          onChange={(event) => setPassword(event.target.value)}
-        />
-      </label>
-
-      <div className="tv-panel-verify-actions">
-        <button
-          type="button"
-          className="tv-panel-verify-go"
-          disabled={busy || password.trim() === ''}
-          onClick={submitPassword}
-        >
-          {tr('Unlock', '解锁')}
-        </button>
+    <div className="tvq-fill" onKeyDown={onKeyDown}>
+      <div className="tvq-head">
+        <Mascot state="locked" size={22} />
+        <span className="tvq-head-title">{snippet.title}</span>
+        <span className="tvq-spacer" />
+        {destination !== null && <span className="tvq-foot-note">→ {destination}</span>}
       </div>
 
-      {/* Generic in both languages: never says which factor was wrong. */}
-      {failed && (
-        <p className="tv-panel-verify-error" role="alert">
-          {tr(
-            'Your vault is still safe — that didn’t unlock it. Try again.',
-            '你的保险库仍然安全——这次尝试未能解锁，请重试。',
-          )}
+      <div className="tvq-fields">
+        <p className="tvq-lead">
+          {inserting
+            ? tr('Unlock the vault to insert this secret.', '解锁保险库后插入这条密文。')
+            : tr('Unlock the vault to copy this secret.', '解锁保险库后复制这条密文。')}
         </p>
-      )}
+        <label className="tvq-field">
+          <span className="tvq-field-label">{tr('Master password', '主密码')}</span>
+          <input
+            type="password"
+            className="tvq-field-line"
+            aria-label={tr('Master password', '主密码')}
+            value={password}
+            autoFocus
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+        {/* Generic in both languages: never says which factor was wrong. */}
+        {failed && (
+          <p className="tvq-notice" role="alert">
+            {tr(
+              'Your vault is still safe — that didn’t unlock it. Try again.',
+              '你的保险库仍然安全——这次没能解锁,再试一次。',
+            )}
+          </p>
+        )}
+        <div className="tvq-actions">
+          <TextAction primary disabled={busy || password.trim() === ''} onClick={submitPassword}>
+            {tr('Unlock', '解锁')}
+          </TextAction>
+          <TextAction disabled={busy} onClick={() => void unlock(() => vaultUnlockBiometric())}>
+            {tr('Use Touch ID', '使用 Touch ID')}
+          </TextAction>
+        </div>
+      </div>
 
-      <footer className="tv-panel-footer">
-        <span className="tv-panel-keys">
-          <kbd>↵</kbd>
-          <span className="tv-panel-key-word">{tr('unlock', '解锁')}</span>
-          <kbd>esc</kbd>
-          <span className="tv-panel-key-word">{tr('back', '返回')}</span>
-        </span>
+      <footer className="tvq-foot is-bare">
+        <KeyCap>⏎</KeyCap>
+        <span className="tvq-foot-word">{tr('unlock', '解锁')}</span>
+        <span className="tvq-spacer" />
+        <span className="tvq-foot-note">{tr('esc to go back', 'esc 返回')}</span>
       </footer>
     </div>
   );

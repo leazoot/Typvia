@@ -19,7 +19,8 @@ tauri-build = { version = "2", features = [] }
 # private setBackgroundColor API per Tauri's docs; noted caveat: private API
 # use is not App Store eligible, which is accepted because distribution is a
 # direct .dmg.
-tauri = { version = "2", features = ["macos-private-api"] }
+# tray-icon: the resident menu-bar / tray entry.
+tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
 # IPC DTO (de)serialization at the WebView boundary; already in the tree.
 serde = { version = "1", features = ["derive"] }
 # The Rust core this host exposes over IPC (commands parse, call, map errors).
@@ -36,6 +37,10 @@ zeroize = "1"
 # Registers the global summon shortcut ⌘⇧V for the command panel.
 # Official Tauri plugin, MIT/Apache-2.0; no third-party hotkey stack needed.
 tauri-plugin-global-shortcut = "2"
+# Launch at login for the tray's start-up checkbox. Official Tauri plugin
+# (MIT/Apache-2.0): a login item on macOS, the Run key on Windows — no
+# platform registry or LaunchAgent code of our own.
+tauri-plugin-autostart = "2"
 # Espanso integration: detection/status and config compilation. The host owns
 # the CLI process boundary and wires the compiler to the snippet store (GPL
 # isolation: separate process + config file only, no espanso linkage).

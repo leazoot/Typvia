@@ -33,10 +33,19 @@ use crate::writer::write_config;
 
 /// Managed baseline `config/default.yml`. Regenerated whenever it drifts, so
 /// the engine can never end up with an icon or notifications enabled.
+///
+/// Expansions paste instead of typing the replacement key by key, matching
+/// how Typvia itself inserts. Editors that handle a backspace slower than a
+/// character (Typora, other web-view editors) otherwise apply some of the
+/// trigger's backspaces after the replacement: the trigger's first characters
+/// survive and the replacement loses as many from its end. espanso restores
+/// the clipboard afterwards, and only non-sensitive snippets are ever compiled
+/// into its matches.
 const DEFAULT_CONFIG: &str = "\
 # Managed by Typvia. This file is regenerated on engine start; edits are lost.
 show_icon: false
 show_notifications: false
+backend: Clipboard
 ";
 
 /// First-run marker files espanso keeps in `<runtime>/kvs/`. Pre-seeding them
@@ -256,6 +265,7 @@ mod tests {
         let config = fs::read_to_string(dirs.default_config_path()).expect("default.yml");
         assert!(config.contains("show_icon: false"));
         assert!(config.contains("show_notifications: false"));
+        assert!(config.contains("backend: Clipboard"));
         assert!(dirs.config_root().join("match").is_dir());
         assert!(dirs.package_dir().is_dir());
         for marker in KVS_MARKERS {

@@ -1,0 +1,147 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* The tray window is transparent: only the rounded card paints. */
+.tv-window-tray,
+.tv-window-tray body {
+  background: transparent;
+}
+
+.tvr {
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.tvr-card {
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--paper-0);
+}
+
+.tvr[data-chrome='windows'] .tvr-card {
+  border-radius: 8px;
+}
+
+/* ---- sync · count · time ---- */
+
+.tvr-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 14px 22px 13px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-meta);
+}
+
+.tvr-dot {
+  width: 6px;
+  height: 6px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.tvr-dot[data-tone='ok'] {
+  background: var(--ok);
+}
+
+.tvr-dot[data-tone='warn'] {
+  background: var(--warn);
+}
+
+.tvr-sep {
+  color: var(--ink-faint);
+}
+
+/* ---- recent snippets ---- */
+
+.tvr-rows {
+  margin: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  list-style: none;
+}
+
+.tvr-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tvr-row:hover,
+.tvr-row:focus-visible {
+  background: var(--paper-2);
+  outline: none;
+}
+
+.tvr-row-words {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-content);
+  font-size: var(--fs-action);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tvr-row .tpi-key {
+  flex: none;
+}
+
+/* ---- things to do ---- */
+
+.tvr-actions {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 8px;
+}
+
+.tvr-action {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tvr-action:hover,
+.tvr-action:focus-visible {
+  background: var(--paper-2);
+  outline: none;
+}
+
+.tvr-action.is-quiet {
+  color: var(--ink-muted);
+}
+
+.tvr-check {
+  padding: 7px 12px;
+  font-size: var(--fs-body);
+}
+
+.tvr-notice {
+  margin: 0;
+  padding: 0 22px 12px;
+  color: var(--accent-ink);
+  font-size: var(--fs-meta);
+}

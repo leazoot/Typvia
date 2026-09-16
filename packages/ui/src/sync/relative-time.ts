@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-import { trFor, type Locale } from '../i18n';
+import { counted, trFor, type Locale } from '../i18n';
 
 /**
  * Route labels read like the design's ("2 min ago", "yesterday", "Mar 4").
@@ -34,14 +34,10 @@ export function ageLabel(at: number, now: number, locale: Locale): string {
   const tr = trFor(locale);
   const days = Math.floor(Math.max(0, now - at) / 86_400_000);
   if (days < 1) return tr('today', '今天');
-  if (days < 30) return tr(`${String(days)} days ago`, `${String(days)} 天前`);
+  if (days < 30) return counted(tr, days, 'day ago', 'days ago', `${String(days)} 天前`);
   const months = Math.floor(days / 30);
-  if (months < 12) {
-    return tr(
-      `${String(months)} ${months === 1 ? 'month' : 'months'} ago`,
-      `${String(months)} 个月前`,
-    );
-  }
+  if (months < 12)
+    return counted(tr, months, 'month ago', 'months ago', `${String(months)} 个月前`);
   const years = Math.floor(months / 12);
-  return tr(`${String(years)} years ago`, `${String(years)} 年前`);
+  return counted(tr, years, 'year ago', 'years ago', `${String(years)} 年前`);
 }

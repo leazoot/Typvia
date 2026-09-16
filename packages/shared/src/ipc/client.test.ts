@@ -15,6 +15,10 @@ import {
   backupExport,
   backupExportFile,
   backupRestore,
+  browserIntegrationDisable,
+  browserIntegrationEnable,
+  browserIntegrationStatus,
+  browserIntegrationSync,
   clipboardReadText,
   copySnippet,
   createSnippet,
@@ -30,7 +34,14 @@ import {
   injectSnippet,
   libraryCounts,
   listSnippetPage,
+  mainInsert,
+  mainInsertTemplate,
+  aboutShow,
+  accessibilityStatus,
+  openAccessibilitySettings,
+  mergeFolders,
   mobileBootstrap,
+  reorderFolders,
   onboardingComplete,
   onboardingStatus,
   openKeyboardSettings,
@@ -40,17 +51,13 @@ import {
   panelInsertTemplate,
   panelReady,
   panelResults,
-  searchSnippets,
-  shareInboxIngest,
-  browserIntegrationDisable,
   searchLibraryDeep,
+  searchSnippets,
   semanticModelDelete,
   semanticModelDownload,
   semanticStatus,
   semanticSync,
-  browserIntegrationEnable,
-  browserIntegrationStatus,
-  browserIntegrationSync,
+  shareInboxIngest,
   snapshotRefresh,
   snippetsImport,
   templateFields,
@@ -188,17 +195,89 @@ describe('typed IPC client', () => {
     const page = await listSnippetPage('folder', 'f-1', 'command', 200, 400);
     expect(page).toHaveLength(1);
     expect(seen[0]?.cmd).toBe('snippet_list_page');
+    // No order asked for travels as an explicit null: the view keeps its own.
     expect(seen[0]?.args).toEqual({
       view: 'folder',
       folderId: 'f-1',
       snippetType: 'command',
+      order: null,
       limit: 200,
       offset: 400,
     });
 
+    await listSnippetPage('all', null, null, 200, 0, 'added');
+    expect(seen[1]?.args).toEqual({
+      view: 'all',
+      folderId: null,
+      snippetType: null,
+      order: 'added',
+      limit: 200,
+      offset: 0,
+    });
+
     const counts = await libraryCounts();
     expect(counts.total).toBe(1);
-    expect(seen[1]?.cmd).toBe('library_counts');
+    expect(seen[2]?.cmd).toBe('library_counts');
+  });
+
+  it('sends the main-window insert with the wire contract', async () => {
+    const seen: Array<{ cmd: string; args: unknown }> = [];
+    mockIPC((cmd, args) => {
+      seen.push({ cmd, args });
+      return null;
+    });
+    await mainInsert('s-1');
+    expect(seen).toEqual([{ cmd: 'main_insert', args: { id: 's-1', method: null } }]);
+  });
+
+  it('sends the filled template insert with its values and method', async () => {
+    const seen: Array<{ cmd: string; args: unknown }> = [];
+    mockIPC((cmd, args) => {
+      seen.push({ cmd, args });
+      return null;
+    });
+    await mainInsertTemplate('t-1', { date: 'Sep 14' }, 'keystrokes');
+    expect(seen).toEqual([
+      {
+        cmd: 'main_insert_template',
+        args: { id: 't-1', values: { date: 'Sep 14' }, method: 'keystrokes' },
+      },
+    ]);
+  });
+
+  it('asks the host to bring up the About window', async () => {
+    const seen: string[] = [];
+    mockIPC((cmd) => {
+      seen.push(cmd);
+      return null;
+    });
+    await aboutShow();
+    expect(seen).toEqual(['about_show']);
+  });
+
+  it('reads the accessibility grant and opens its settings page', async () => {
+    const seen: string[] = [];
+    mockIPC((cmd) => {
+      seen.push(cmd);
+      return cmd === 'accessibility_status' ? true : null;
+    });
+    expect(await accessibilityStatus()).toBe(true);
+    await openAccessibilitySettings();
+    expect(seen).toEqual(['accessibility_status', 'open_accessibility_settings']);
+  });
+
+  it('sends folder merge and reorder with the wire contract', async () => {
+    const seen: Array<{ cmd: string; args: unknown }> = [];
+    mockIPC((cmd, args) => {
+      seen.push({ cmd, args });
+      return cmd === 'folder_merge' ? ['s-1', 's-2'] : null;
+    });
+    expect(await mergeFolders('f-1', 'f-2')).toEqual(['s-1', 's-2']);
+    await reorderFolders(['f-2', 'f-3']);
+    expect(seen).toEqual([
+      { cmd: 'folder_merge', args: { sourceId: 'f-1', targetId: 'f-2' } },
+      { cmd: 'folder_reorder', args: { ids: ['f-2', 'f-3'] } },
+    ]);
   });
 
   it('sends inject and copy requests with the wire contract', async () => {

@@ -24,7 +24,7 @@ export type { StatusKind } from './components/status-dot';
 export { Toast } from './components/toast';
 export { markForType, TypeMark } from './components/type-mark';
 export { PlaceholderPage } from './placeholder-page';
-export { I18nProvider, trFor, useLocale, useTr } from './i18n';
+export { I18nProvider, counted, trFor, useLocale, useTr } from './i18n';
 export type { Locale, Tr } from './i18n';
 export {
   applyStoredUiPrefs,

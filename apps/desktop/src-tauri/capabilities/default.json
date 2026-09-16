@@ -1,7 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window baseline. Tauri 2 ACL is an allow-list: every WebView API a window uses must be granted here explicitly.",
+  "description": "Main window baseline. Tauri 2 ACL is an allow-list: every WebView API a window uses must be granted here explicitly. The window controls are for the title bar the page draws on Windows, and dragging for every title bar the page draws.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ]
 }

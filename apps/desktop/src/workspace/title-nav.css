@@ -1,0 +1,83 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* The places and the way back, as words in the title bar: no boxes, no fills;
+   the place the window is in is ink over a coral wave. */
+.tvtn-tabs {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  align-self: stretch;
+  gap: 2px;
+}
+
+.tvtn-tab,
+.tvtn-back {
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-label);
+  white-space: nowrap;
+  cursor: default;
+  transition: color var(--d-tap);
+}
+
+.tvtn-tab {
+  position: relative;
+  padding: 0 9px;
+}
+
+.tvtn-tab:hover,
+.tvtn-back:hover {
+  color: var(--ink);
+}
+
+.tvtn-tab[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tvtn-wave {
+  position: absolute;
+  right: 7px;
+  bottom: 5px;
+  left: 7px;
+  width: calc(100% - 14px);
+  height: 6px;
+  overflow: visible;
+  transform-origin: left center;
+  animation: tvtn-trace var(--d-trace) var(--ease-move);
+}
+
+@keyframes tvtn-trace {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.tvtn-back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 3px 0 3px 12px;
+  border-left: 1px solid var(--line-soft);
+  transition:
+    color var(--d-tap),
+    gap var(--d-tap);
+}
+
+.tvtn-back:hover {
+  gap: 9px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tvtn-wave {
+    animation: none;
+  }
+}

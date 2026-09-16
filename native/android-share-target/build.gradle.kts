@@ -4,14 +4,12 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-// Formal Typvia share-target library module. Included by the
-// committed apps/mobile/src-tauri/gen/android/settings.gradle so the
-// ACTION_SEND Activity ships inside the main app APK (same UID -> direct
-// write into the app-private share inbox the host drains; iOS counterpart is
-// native/ios-share-ext). Deliberately dependency-free at runtime: the module
-// only renders a native card and lands one JSON file — no Rust bindings, no
-// AndroidX. AGP/Kotlin plugin versions come from the including root
-// project's buildscript classpath.
+// Formal Typvia share-target library module. It ships inside the main app APK
+// so the ACTION_SEND Activity shares the app's UID and can write straight into
+// the app-private share inbox the host drains. Deliberately dependency-free at
+// runtime: the module only renders a native card and lands one JSON file — no
+// Rust bindings, no AndroidX. Like the IME module beside it, it has no
+// including root project at the moment; the native Android app will bring one.
 
 plugins {
     id("com.android.library")

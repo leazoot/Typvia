@@ -1,0 +1,284 @@
+name: Typvia
+options:
+  bundleIdPrefix: dev.typvia.mobile
+  # Product OS baseline. The technical floor (iOS 14) is kept only as
+  # documented fallback room, never in the shipped project.
+  deploymentTarget:
+    iOS: '16.0'
+  createIntermediateGroups: true
+configs:
+  debug: debug
+  release: release
+
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: '0.1.0'
+    # Signing is supplied by the build environment (developer machine or CI
+    # `CODE_SIGNING_ALLOWED=NO`); the project pins no team so a clean
+    # checkout builds for the simulator without an account.
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ''
+
+packages: {}
+
+targets:
+  # Shared module for the app and all three extensions: the mobile design
+  # system plus the typed wrapper over the Rust core. Built as a static
+  # framework on purpose — a dynamic one would cost the keyboard extension a
+  # dylib load and an @rpath hop on every summon, and the extension runs
+  # under a hard memory ceiling.
+  #
+  # The UniFFI xcframework cannot be consumed through a local SwiftPM package:
+  # a `binaryTarget` must resolve at package-resolution time and its artifact
+  # must sit inside the package root, while this one is a build product under
+  # target/ that a clean checkout does not have yet.
+  TypviaKit:
+    type: framework
+    platform: iOS
+    sources:
+      - path: TypviaKit/Sources
+      # UniFFI-generated Swift bindings, produced together with the
+      # xcframework by crates/mobile-ffi/build-xcframework.sh. Build outputs
+      # are never committed; `optional` lets xcodegen run before the first
+      # FFI build, but xcodebuild still needs them present (see below).
+      - path: ../../target/mobile-ffi/generated/typvia_mobile_ffi.swift
+        optional: true
+    settings:
+      base:
+        PRODUCT_NAME: TypviaKit
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.mobile.kit
+        MACH_O_TYPE: staticlib
+        SKIP_INSTALL: true
+        DEFINES_MODULE: true
+        # A static framework still goes through the signing phase, and signing
+        # refuses a bundle with no Info.plist. Without this the whole project
+        # only builds with signing switched off — and an unsigned app carries
+        # no entitlements, which silently takes the App Group away from the
+        # keyboard, the widget and the share sheet.
+        GENERATE_INFOPLIST_FILE: true
+        # The generated bindings import the clang module
+        # `typvia_mobile_ffiFFI`; Xcode wires it up from the linked
+        # xcframework slice headers (modulemap included), so no extra
+        # SWIFT_INCLUDE_PATHS entry is needed — adding one redefines the
+        # module.
+    dependencies:
+      - framework: ../../target/mobile-ffi/TypviaMobileFFI.xcframework
+        embed: false
+    preBuildScripts:
+      # Convenience only. Xcode resolves framework paths *before* any build
+      # phase runs, so on a clean checkout this script fires too late for the
+      # dependency above — the supported chain is
+      #   bash crates/mobile-ffi/build-xcframework.sh && xcodegen generate && xcodebuild
+      # This phase keeps incremental builds honest when the bindings file is
+      # deleted but the xcframework survives.
+      - script: |
+          FFI_OUT="$SRCROOT/../../target/mobile-ffi"
+          if [ ! -d "$FFI_OUT/TypviaMobileFFI.xcframework" ] || [ ! -f "$FFI_OUT/generated/typvia_mobile_ffi.swift" ]; then
+            cd "$SRCROOT/../.." && bash crates/mobile-ffi/build-xcframework.sh
+          fi
+        name: Ensure TypviaMobileFFI
+        basedOnDependencyAnalysis: false
+
+  Typvia:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+      # The bundled mono face. TypviaKit is linked statically, so its own
+      # bundle is never copied into a product and cannot carry resources;
+      # each product ships its own copy and TypviaKit registers whichever one
+      # it finds. OFL.txt travels with the font because the licence requires
+      # it to.
+      - path: Resources/Fonts
+        buildPhase: resources
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Typvia
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Background sync: BGAppRefreshTask registration surface.
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [dev.typvia.mobile.refresh]
+        # Deep-link channel: the typvia:// custom scheme.
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.typvia.mobile.deeplink
+            CFBundleURLSchemes: [typvia]
+    entitlements:
+      path: App/Typvia.entitlements
+      properties:
+        # The main app writes the snapshot the extensions read, so it needs
+        # the group as much as they do. The retired shell shipped an empty
+        # entitlements dict here, which would have denied it the shared
+        # container on device.
+        com.apple.security.application-groups:
+          - group.dev.typvia.mobile
+    settings:
+      base:
+        PRODUCT_NAME: Typvia
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.mobile
+    dependencies:
+      - target: TypviaKit
+        embed: false
+      - framework: ../../target/mobile-ffi/TypviaMobileFFI.xcframework
+        embed: false
+      - target: TypviaKeyboard
+      - target: TypviaShare
+      - target: TypviaWidget
+      - sdk: Security.framework
+
+  TypviaKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: KeyboardExtension/Sources
+      - path: Resources/Fonts
+        buildPhase: resources
+    info:
+      path: KeyboardExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Typvia Keyboard
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            # Red line: the keyboard never requests full access; the App
+            # Group snapshot channel works without it.
+            RequestsOpenAccess: false
+    entitlements:
+      path: KeyboardExtension/TypviaKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.typvia.mobile
+    settings:
+      base:
+        PRODUCT_NAME: Typvia Keyboard
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.mobile.keyboard
+    dependencies:
+      - target: TypviaKit
+        embed: false
+      - framework: ../../target/mobile-ffi/TypviaMobileFFI.xcframework
+        embed: false
+
+  # Write-only channel: the extension drops one JSON document into the App
+  # Group inbox and never opens the database or reads the snapshot; the main
+  # app ingests on launch. Pure Swift — no FFI needed.
+  TypviaShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension/Sources
+      - path: Resources/Fonts
+        buildPhase: resources
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Typvia
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # Text-only activation: the sheet appears for shared text and for
+            # nothing else. Attachment-count keys would also activate it for
+            # images and files it cannot save.
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+    entitlements:
+      path: ShareExtension/TypviaShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.typvia.mobile
+    settings:
+      base:
+        PRODUCT_NAME: Typvia Share
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.mobile.share
+    dependencies:
+      - target: TypviaKit
+        embed: false
+      - framework: ../../target/mobile-ffi/TypviaMobileFFI.xcframework
+        embed: false
+
+  TypviaWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: WidgetExtension/Sources
+      - path: Resources/Fonts
+        buildPhase: resources
+    info:
+      path: WidgetExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Typvia
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: WidgetExtension/TypviaWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.typvia.mobile
+    settings:
+      base:
+        PRODUCT_NAME: Typvia Widget
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.mobile.widget
+    dependencies:
+      - target: TypviaKit
+        embed: false
+      - framework: ../../target/mobile-ffi/TypviaMobileFFI.xcframework
+        embed: false
+      - sdk: SwiftUI.framework
+      - sdk: WidgetKit.framework
+
+  # Runs without a host app: the shared module is pure logic over a database
+  # directory the test supplies, so nothing here needs an app container.
+  TypviaKitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: TypviaKit/Tests
+      # The tests carry the face too, so the design system is exercised on the
+      # path the products take rather than on its fallback.
+      - path: Resources/Fonts
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.typvia.mobile.kit.tests
+        GENERATE_INFOPLIST_FILE: true
+    dependencies:
+      - target: TypviaKit
+        embed: false
+      - framework: ../../target/mobile-ffi/TypviaMobileFFI.xcframework
+        embed: false
+
+schemes:
+  # One-command run:
+  #   xcodebuild test -project Typvia.xcodeproj -scheme TypviaKitTests \
+  #     -destination 'platform=iOS Simulator,name=iPhone 16'
+  TypviaKitTests:
+    build:
+      targets:
+        TypviaKit: all
+        TypviaKitTests: [test]
+    test:
+      targets: [TypviaKitTests]

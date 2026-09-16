@@ -117,7 +117,27 @@ tasks.named<JavaExec>("run") {
 }
 EOF
 
-GRADLEW="$ROOT/apps/mobile/src-tauri/gen/android/gradlew"
-"$GRADLEW" -p "$SMOKE" --no-daemon --console=plain -q run
+# Skipped when the Android build is the caller: it compiles these same
+# bindings a few tasks later, which is the stronger check, and a Gradle build
+# that starts another Gradle build inside itself is a slow way to learn that.
+if [[ "${TYPVIA_FFI_SMOKE:-run}" == "skip" ]]; then
+  echo "==> Kotlin smoke skipped (the caller compiles these bindings itself)"
+else
+  # The native Android app brings its own wrapper, so the smoke uses that
+  # rather than requiring a Gradle install; a plain `gradle` still works for
+  # anyone who has one.
+  WRAPPER="$ROOT/apps/android/gradlew"
+  if [[ -x "$WRAPPER" ]]; then
+    GRADLE=("$WRAPPER")
+  elif command -v gradle >/dev/null; then
+    GRADLE=(gradle)
+  else
+    echo "error: no Gradle wrapper at apps/android/gradlew and none on PATH," >&2
+    echo "       so the Kotlin smoke cannot run; the .so files and bindings" >&2
+    echo "       above are built, the smoke is not" >&2
+    exit 1
+  fi
+  "${GRADLE[@]}" -p "$SMOKE" --no-daemon --console=plain -q run
+fi
 
 echo "==> Done: $OUT/jniLibs (arm64-v8a + x86_64), bindings in $GEN"

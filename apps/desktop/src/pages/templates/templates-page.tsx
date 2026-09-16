@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { listSnippetPage, type Snippet } from '@typvia/shared';
-import { Caret, useTr } from '@typvia/ui';
+import { useTr } from '@typvia/ui';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import './templates.css';
@@ -15,8 +15,7 @@ type LoadState = 'loading' | 'ready' | 'error';
 /**
  * Templates index — the list of template snippets, each linking to its
  * Builder. The design covers the Builder, not a distinct index layout, so
- * this follows the design system's list language (52px rows, caret empty
- * state, no icons).
+ * this follows the design system's list language: words, no icons, no cards.
  */
 export function TemplatesPage() {
   const tr = useTr();
@@ -59,7 +58,6 @@ export function TemplatesPage() {
       )}
       {load === 'ready' && templates.length === 0 && (
         <p className="tv-templates-empty">
-          <Caret height={15} />
           {tr('No templates yet. Give a snippet the ', '还没有模板。将片段设为')}
           <strong>{tr('Template', '模板')}</strong>
           {tr(' type, then mark what changes.', '类型,然后标记会变化的部分。')}

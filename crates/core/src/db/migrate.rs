@@ -106,6 +106,18 @@ const MIGRATIONS: &[Migration] = &[
         up: include_str!("../../migrations/0013_snippet_embedding.up.sql"),
         down: include_str!("../../migrations/0013_snippet_embedding.down.sql"),
     },
+    Migration {
+        version: 14,
+        name: "snippet_usage_order",
+        up: include_str!("../../migrations/0014_snippet_usage_order.up.sql"),
+        down: include_str!("../../migrations/0014_snippet_usage_order.down.sql"),
+    },
+    Migration {
+        version: 15,
+        name: "snippet_list_order",
+        up: include_str!("../../migrations/0015_snippet_list_order.up.sql"),
+        down: include_str!("../../migrations/0015_snippet_list_order.down.sql"),
+    },
 ];
 
 /// Highest schema version known to this build.
@@ -146,6 +158,18 @@ fn run_migrations(
     }
 
     let current = schema_version(conn)?;
+    // An older binary opening a newer database used to fall through here in
+    // silence: the downgrade branch would look for steps between `current`
+    // and `target`, find none it has ever heard of, and return Ok — after
+    // which the app would run against a schema it does not understand.
+    // The check is on the database's own version, not on the caller's target,
+    // because no target is reachable from a schema this build cannot see.
+    if current > latest {
+        return Err(DbError::DatabaseFromNewerBuild {
+            found: current,
+            supported: latest,
+        });
+    }
 
     if target > current {
         for m in migrations
@@ -188,6 +212,48 @@ mod tests {
             .unwrap();
         let rows = stmt.query_map([], |row| row.get::<_, String>(0)).unwrap();
         rows.map(|r| r.unwrap()).collect()
+    }
+
+    /// The case an old install hits after a new one has touched the same
+    /// file: the schema is ahead of this binary. It has to refuse and say so.
+    /// Returning Ok here means the app then reads and writes a shape it has
+    /// never seen, which is how the newer install's data gets damaged by the
+    /// older one.
+    #[test]
+    fn a_database_from_a_newer_build_is_refused_rather_than_silently_accepted() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let ahead = latest_version() + 3;
+        conn.pragma_update(None, "user_version", ahead).unwrap();
+
+        let error = migrate_to_latest(&mut conn).unwrap_err();
+
+        assert!(matches!(
+            error,
+            DbError::DatabaseFromNewerBuild { found, supported }
+                if found == ahead && supported == latest_version()
+        ));
+        // The refusal changes nothing: the file is left exactly as the newer
+        // build left it, so that build can still open it.
+        assert_eq!(schema_version(&conn).unwrap(), ahead);
+    }
+
+    /// Rolling back is refused for the same reason. The down scripts that
+    /// would undo the unknown versions shipped with the build that added
+    /// them, so a rollback from here would strip the schema down past tables
+    /// it cannot recreate.
+    #[test]
+    fn a_rollback_from_a_newer_schema_is_refused_too() {
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        let ahead = latest_version() + 1;
+        conn.pragma_update(None, "user_version", ahead).unwrap();
+
+        assert!(matches!(
+            migrate_to(&mut conn, 0),
+            Err(DbError::DatabaseFromNewerBuild { .. })
+        ));
+        assert_eq!(schema_version(&conn).unwrap(), ahead);
     }
 
     #[test]
@@ -326,6 +392,45 @@ mod tests {
         migrate_to_latest(&mut conn).unwrap();
         assert!(record_columns(&conn).contains(&"state".to_string()));
         assert!(table_names(&conn).contains(&"sync_config".to_string()));
+    }
+
+    #[test]
+    fn list_order_indexes_exist_only_from_version_fifteen() {
+        let indexes = |conn: &Connection| -> Vec<String> {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'snippet'",
+                )
+                .unwrap();
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+        let wanted = ["idx_snippet_last_used_order", "idx_snippet_created_order"];
+
+        let mut conn = open_in_memory().unwrap();
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(
+            wanted
+                .iter()
+                .all(|name| indexes(&conn).contains(&name.to_string()))
+        );
+
+        migrate_to(&mut conn, 14).unwrap();
+        assert!(
+            wanted
+                .iter()
+                .all(|name| !indexes(&conn).contains(&name.to_string()))
+        );
+        // The usage index belongs to version 14 and must survive the rollback.
+        assert!(indexes(&conn).contains(&"idx_snippet_usage_count".to_string()));
+
+        // Re-upgrading restores both (idempotent up path).
+        migrate_to_latest(&mut conn).unwrap();
+        assert!(
+            wanted
+                .iter()
+                .all(|name| indexes(&conn).contains(&name.to_string()))
+        );
     }
 
     #[test]

@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   syncResume: vi.fn(),
   syncEnable: vi.fn(),
   syncEnableWebdav: vi.fn(),
+  webdavCredentials: vi.fn(),
 }));
 
 vi.mock('@typvia/shared', async (importOriginal) => {
@@ -109,6 +110,8 @@ beforeEach(() => {
   mocks.syncStatus.mockResolvedValue(status());
   mocks.syncDevices.mockResolvedValue([device()]);
   mocks.syncConflicts.mockResolvedValue([]);
+  // The core composes the credential string; the page only carries it.
+  mocks.webdavCredentials.mockResolvedValue('basic:FAKE_user:FAKE_dav_pw');
 });
 
 afterEach(() => {
@@ -151,6 +154,13 @@ describe('Sync & devices', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start an account here' }));
 
+    // The page hands on whatever the core composed. It is deliberately not
+    // asserted to be `basic:user:pass` here: that shape belongs beside the
+    // parser that reads it back, and a screen that restated it would keep
+    // passing this test after the real one changed.
+    await waitFor(() =>
+      expect(mocks.webdavCredentials).toHaveBeenCalledWith('FAKE_user', 'FAKE_dav_pw'),
+    );
     await waitFor(() =>
       expect(mocks.syncEnableWebdav).toHaveBeenCalledWith(
         'https://dav.example.com/typvia',

@@ -27,24 +27,17 @@ Thumbs.db
 # Typvia is MPL-2.0 and keeps Espanso at arm's length.
 /espanso/
 
-# Tauri generated artifacts. The formal mobile app's generated Xcode project
-# is tracked (un-ignored below): it carries signing, entitlements, App Group
-# and extension-target configuration that cannot be regenerated. Its build
-# products stay ignored.
+# Tauri generated artifacts (capability schemas and platform scaffolding).
 **/src-tauri/gen/
-!apps/mobile/src-tauri/gen/
-apps/mobile/src-tauri/gen/apple/build/
-apps/mobile/src-tauri/gen/apple/DerivedData/
-apps/mobile/src-tauri/gen/apple/Externals/
-apps/mobile/src-tauri/gen/apple/*.xcodeproj/xcuserdata/
-# Android Gradle project sources are tracked; build products and the
-# machine-local SDK path stay out (gen/android also ships nested .gitignore
-# files covering the CLI-regenerated tauri.* build inputs).
-apps/mobile/src-tauri/gen/android/.gradle/
-apps/mobile/src-tauri/gen/android/build/
-apps/mobile/src-tauri/gen/android/app/build/
-apps/mobile/src-tauri/gen/android/buildSrc/build/
-apps/mobile/src-tauri/gen/android/local.properties
+
+# Native iOS app: apps/ios/project.yml is the source of truth and xcodegen
+# derives the Xcode project, the Info.plists and the entitlements from it.
+# Tracking the derived copies would give a reader two answers to the same
+# question about signing and App Group membership.
+apps/ios/*.xcodeproj/
+apps/ios/DerivedData/
+apps/ios/**/Info.plist
+apps/ios/**/*.entitlements
 
 # FFI spike build products and regenerable bindings
 spikes/ffi/kotlin/.gradle/
@@ -60,6 +53,14 @@ native/ios-keyboard/build/
 # merger and manifest reports, so these must never reach the repository.
 native/*/.gradle/
 native/*/build/
+
+# The Android host's build products, and the one file that is about this
+# machine rather than about the project: local.properties names an SDK path
+# that is nobody else's.
+apps/android/.gradle/
+apps/android/build/
+apps/android/*/build/
+apps/android/local.properties
 
 apps/desktop/src-tauri/binaries/
 vendor/

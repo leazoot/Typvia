@@ -1,0 +1,90 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* The window itself: the paper the rooms lie on, and the way a room arrives —
+   opacity and a few pixels of travel, never a page slide. */
+.tvw-shell {
+  --tvw-bar: 38px;
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.tvw-shell[data-chrome='windows'] {
+  --tvw-bar: 32px;
+}
+
+/* Pages scroll here, beneath the title bar, so the glass always has something
+   to blur; the padding keeps their first line clear of it. */
+.tvw-main {
+  box-sizing: border-box;
+  height: 100vh;
+  padding-top: var(--tvw-bar);
+  overflow-y: auto;
+  scroll-padding-top: var(--tvw-bar);
+}
+
+.tvw-enter {
+  animation: tvw-enter 0.17s var(--ease-move);
+}
+
+@keyframes tvw-enter {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tvw-enter {
+    animation-duration: 0.09s;
+  }
+}
+
+/* The title bar floats over the page as frosted glass: a thin veil of paper and
+   a wide blur, so whatever scrolls beneath shows through as soft colour. The
+   native window buttons sit over its left end, ahead of the places. */
+.tpi-titlebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 38px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--titlebar-veil);
+  -webkit-backdrop-filter: var(--titlebar-glass);
+  backdrop-filter: var(--titlebar-glass);
+  font-family: var(--font-ui);
+  user-select: none;
+}
+
+/* Clears the three native window buttons, which sit 20px in and span 52, and
+   leaves a clear gap before the first place. */
+.tpi-titlebar-lead {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  min-width: 0;
+  padding-left: 76px;
+}
+
+.tpi-titlebar-summon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}

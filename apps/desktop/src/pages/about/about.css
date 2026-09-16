@@ -1,0 +1,117 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+.tvab {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.tvab-bar {
+  flex: none;
+  height: 34px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--titlebar-veil);
+  backdrop-filter: blur(8px);
+}
+
+.tvab-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  padding: 32px 36px 30px;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.tvab-mascot {
+  margin-bottom: 18px;
+}
+
+.tvab-mark {
+  margin-bottom: 8px;
+  font-family: var(--font-brand);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: var(--ls-brand);
+}
+
+.tvab-version {
+  margin-bottom: 22px;
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: var(--ls-eyebrow);
+}
+
+.tvab-facts {
+  margin: 0 0 22px;
+  color: var(--ink-body);
+  font-size: var(--fs-body-2);
+  line-height: var(--lh-cjk);
+}
+
+.tvab-rule {
+  flex: none;
+  align-self: stretch;
+  height: 1px;
+  margin-bottom: 20px;
+  background: var(--line-soft);
+}
+
+.tvab-links {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  margin-bottom: 18px;
+}
+
+.tvab-link {
+  margin: -12px 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  cursor: pointer;
+}
+
+.tvab-link:hover,
+.tvab-link[aria-expanded='true'] {
+  color: var(--accent-ink);
+}
+
+.tvab-text {
+  flex: none;
+  align-self: stretch;
+  max-height: 180px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-0);
+  color: var(--ink-body);
+  font-family: var(--font-code);
+  font-size: var(--fs-caps);
+  line-height: 1.7;
+  text-align: left;
+  white-space: pre-wrap;
+  animation: tpi-fade-in var(--d-fade) ease both;
+}
+
+.tvab-foot {
+  margin: auto 0 0;
+  color: var(--ink-faint);
+  font-size: var(--fs-caps);
+}

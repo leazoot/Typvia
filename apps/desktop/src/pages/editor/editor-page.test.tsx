@@ -6,9 +6,9 @@
 
 // @vitest-environment jsdom
 import { IpcError } from '@typvia/shared';
-import type { Snippet } from '@typvia/shared';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import type { Snippet, TemplateField } from '@typvia/shared';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SharedModule from '@typvia/shared';
 import { VaultProvider } from '../../vault/vault-context';
@@ -37,11 +37,25 @@ const EXISTING: Snippet = {
   deletedAt: null,
 };
 
+const NAME_FIELD: TemplateField = {
+  id: 'tf-1',
+  name: 'name',
+  label: 'name',
+  fieldType: 'single_line_text',
+  defaultValue: 'Ada',
+  options: [],
+  validation: null,
+  isRequired: false,
+  sortOrder: 0,
+  platformOverrides: null,
+};
+
 const createSnippet = vi.fn();
 const updateSnippet = vi.fn();
 const detectSensitive = vi.fn();
 const convertToSensitive = vi.fn();
 const vaultStatusMock = vi.fn();
+const templatePreview = vi.fn();
 
 vi.mock('@typvia/shared', async (importOriginal) => {
   const actual = await importOriginal<typeof SharedModule>();
@@ -66,6 +80,8 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     snippetConvertToSensitive: (...args: unknown[]) =>
       convertToSensitive(...args) as Promise<Snippet>,
     vaultStatus: () => vaultStatusMock() as Promise<SharedModule.VaultStatus>,
+    templateFields: () => Promise.resolve([NAME_FIELD]),
+    templatePreview: (...args: unknown[]) => templatePreview(...args) as Promise<string>,
     listFolderChildren: (parentId: string | null) =>
       Promise.resolve(
         parentId === null
@@ -75,32 +91,19 @@ vi.mock('@typvia/shared', async (importOriginal) => {
   };
 });
 
-function renderNew() {
-  return render(
-    <MemoryRouter initialEntries={['/editor']}>
-      <Routes>
-        <Route path="/editor" element={<EditorPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+function HistoryLanding() {
+  const { id } = useParams();
+  return <div>History of {id}</div>;
 }
 
-function renderExisting() {
+function renderAt(path: string, state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={['/editor/s-1']}>
-      <Routes>
-        <Route path="/editor/:id" element={<EditorPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
-
-function renderExistingWithVault() {
-  return render(
-    <MemoryRouter initialEntries={['/editor/s-1']}>
+    <MemoryRouter initialEntries={[{ pathname: path, state }]}>
       <VaultProvider>
         <Routes>
+          <Route path="/editor" element={<EditorPage />} />
           <Route path="/editor/:id" element={<EditorPage />} />
+          <Route path="/editor/:id/history" element={<HistoryLanding />} />
           <Route path="/vault" element={<div>Vault landing</div>} />
         </Routes>
       </VaultProvider>
@@ -137,6 +140,10 @@ beforeEach(() => {
     Promise.resolve({ ...EXISTING, ...input, version: 4, updatedAt: Date.now() }),
   );
   detectSensitive.mockResolvedValue([]);
+  templatePreview.mockImplementation(
+    (body: string, _fields: unknown, values: Record<string, string>) =>
+      Promise.resolve(body.replace('{{name}}', values.name ?? '')),
+  );
   vaultStatusMock.mockResolvedValue({
     initialized: true,
     unlocked: false,
@@ -152,9 +159,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('EditorPage', () => {
-  it('auto-saves a new draft once a title exists, then shows Saved', async () => {
-    renderNew();
+describe('EditorPage — writing without a save button', () => {
+  it('auto-saves a new draft once a title exists, then says it is saved', async () => {
+    renderAt('/editor');
     fireEvent.change(screen.getByLabelText('Snippet title'), {
       target: { value: 'Deploy checklist' },
     });
@@ -172,10 +179,7 @@ describe('EditorPage', () => {
   });
 
   it('keeps the caret in the body field across a quiet auto-save', async () => {
-    // The auto-save fires mid-typing, so
-    // it must never remount the editor — a remount steals focus and forces
-    // a click back into the field after every save.
-    renderNew();
+    renderAt('/editor');
     fireEvent.change(screen.getByLabelText('Snippet title'), {
       target: { value: 'Deploy checklist' },
     });
@@ -186,7 +190,6 @@ describe('EditorPage', () => {
 
     expect(createSnippet).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(screen.getByLabelText('Snippet body'));
-    // A second save cycle (the update path) must hold focus too.
     fireEvent.change(screen.getByLabelText('Snippet body'), {
       target: { value: 'kubectl get pods -A' },
     });
@@ -195,7 +198,7 @@ describe('EditorPage', () => {
   });
 
   it('does not try to save while the title is blank', async () => {
-    renderNew();
+    renderAt('/editor');
     fireEvent.change(screen.getByLabelText('Snippet body'), { target: { value: 'body only' } });
     await settleAutosave();
     expect(createSnippet).not.toHaveBeenCalled();
@@ -203,10 +206,10 @@ describe('EditorPage', () => {
   });
 
   it('auto-saves edits to an existing snippet and reflects the bumped version', async () => {
-    renderExisting();
+    renderAt('/editor/s-1');
     await flush();
-    const title = screen.getByLabelText('Snippet title');
-    expect((title as HTMLInputElement).value).toBe('Existing snippet');
+    const title = screen.getByLabelText<HTMLInputElement>('Snippet title');
+    expect(title.value).toBe('Existing snippet');
 
     fireEvent.change(title, { target: { value: 'Existing snippet, renamed' } });
     await settleAutosave();
@@ -219,36 +222,120 @@ describe('EditorPage', () => {
     expect(screen.getByRole('status').textContent).toContain('Saved · v4');
   });
 
-  it('renders {{variables}} as inline tokens and lists them in the Fields tab', async () => {
-    const { container } = renderExisting();
-    await flush();
-    const tokens = container.querySelectorAll('.tv-ed-token');
-    expect(tokens.length).toBeGreaterThan(0);
-    expect(tokens[0]?.textContent).toBe('{{name}}');
+  it('starts a new snippet from words handed over by the clipboard', async () => {
+    renderAt('/editor', { draftBody: 'Pasted words' });
+    expect(screen.getByRole('button', { name: 'Edit snippet body' }).textContent).toBe(
+      'Pasted words',
+    );
   });
 
+  it('puts the caret in the trigger when asked to change the trigger', async () => {
+    renderAt('/editor/s-1', { focus: 'trigger' });
+    await flush();
+    expect(document.activeElement).toBe(screen.getByLabelText('Trigger'));
+  });
+});
+
+describe('EditorPage — variables and the specimen', () => {
+  it('washes {{variables}} in the body and describes each one', async () => {
+    const { container } = renderAt('/editor/s-1');
+    await flush();
+    const tokens = container.querySelectorAll('.tve-token');
+    expect(tokens[0]?.textContent).toBe('{{name}}');
+    expect(
+      screen.getByText('1 variables. Tab through them when inserting; any left empty stay empty.'),
+    ).toBeDefined();
+    expect(screen.getByText('Defaults to “Ada”')).toBeDefined();
+    expect(screen.getByText('One line of text')).toBeDefined();
+  });
+
+  it('renders the specimen through the template engine and switches value modes', async () => {
+    renderAt('/editor/s-1');
+    await flush();
+    await flush();
+    const specimen = screen.getByRole('complementary', { name: 'What it inserts' });
+    expect(specimen.textContent).toContain('Hello Ada, welcome.');
+    expect(specimen.textContent).toContain('All 1 variables have defaults');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Left blank' }));
+    await flush();
+    expect(templatePreview).toHaveBeenLastCalledWith('Hello {{name}}, welcome.', [NAME_FIELD], {
+      name: '',
+    });
+    expect(screen.getByRole('complementary', { name: 'What it inserts' }).textContent).toContain(
+      'Hello , welcome.',
+    );
+  });
+
+  it('keeps each tool beside what it acts on instead of in a group at the bottom', async () => {
+    renderAt('/editor/s-1');
+    await flush();
+    await flush();
+    const specimen = screen.getByRole('complementary', { name: 'What it inserts' });
+    expect(within(specimen).getByRole('button', { name: 'Test insert' })).toBeDefined();
+    expect(within(specimen).queryByRole('button', { name: 'Organize' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Organize' })).toBeDefined();
+    expect(screen.queryByText('Tools')).toBeNull();
+
+    fireEvent.click(within(specimen).getByRole('button', { name: 'Version history' }));
+    await flush();
+    expect(screen.getByText('History of s-1')).toBeDefined();
+  });
+
+  it('offers no version history before the first save', async () => {
+    renderAt('/editor');
+    await flush();
+    const specimen = screen.getByRole('complementary', { name: 'What it inserts' });
+    expect(within(specimen).queryByRole('button', { name: 'Version history' })).toBeNull();
+  });
+});
+
+describe('EditorPage — the rest of a snippet', () => {
   it('shows the sensitive hint as advice while the save still succeeds', async () => {
     detectSensitive.mockResolvedValue(['jwt', 'api_key']);
-    renderExisting();
+    renderAt('/editor/s-1');
     await flush();
-    const title = screen.getByLabelText('Snippet title');
-    fireEvent.change(title, { target: { value: 'Now with a token' } });
+    fireEvent.change(screen.getByLabelText('Snippet title'), {
+      target: { value: 'Now with a token' },
+    });
     await settleAutosave();
 
     expect(screen.getByRole('status').textContent).toContain('Saved');
-    fireEvent.click(screen.getByRole('tab', { name: 'Security' }));
     expect(screen.getByText(/Looks like this may contain: JWT · API key/)).toBeDefined();
     expect(screen.getByText(/only a suggestion/)).toBeDefined();
   });
 
-  it('renders only the open property tab', async () => {
-    renderExisting();
+  it('chooses collection and expansion as trace options and saves them', async () => {
+    renderAt('/editor/s-1');
     await flush();
-    // Fields is open by default; the usage tab's fields are not in the DOM.
-    expect(screen.queryByLabelText('Trigger')).toBeNull();
-    fireEvent.click(screen.getByRole('tab', { name: 'Where it can be used' }));
-    expect(screen.getByLabelText('Trigger')).toBeDefined();
-    expect(screen.queryByText(/Field settings/)).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'Infra' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'At once' }));
+    fireEvent.click(screen.getByLabelText('Pinned'));
+    await settleAutosave();
+    expect(updateSnippet.mock.calls.at(-1)?.[0]).toMatchObject({
+      folderId: 'f-1',
+      triggerMode: 'immediate',
+      isPinned: true,
+    });
+  });
+
+  it('keeps the no-clash note steady while other settings autosave', async () => {
+    renderAt('/editor/s-1');
+    await flush();
+    const note = 'Type these 3 characters and it expands. No other snippet uses them.';
+    expect(screen.getByText(note)).toBeDefined();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'At once' }));
+    expect(screen.getByText(note)).toBeDefined();
+    await settleAutosave();
+    expect(screen.getByText(note)).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: ';hey' } });
+    expect(screen.getByText('Type these 4 characters and it expands.')).toBeDefined();
+    await settleAutosave();
+    expect(
+      screen.getByText('Type these 4 characters and it expands. No other snippet uses them.'),
+    ).toBeDefined();
   });
 
   it('moves a saved snippet into the vault once the vault is unlocked', async () => {
@@ -265,53 +352,41 @@ describe('EditorPage', () => {
       securityLevel: 'sensitive',
       body: null,
     });
-    renderExistingWithVault();
+    renderAt('/editor/s-1');
     await flush();
     await flush();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Security' }));
     fireEvent.click(screen.getByText('Move to the vault'));
     // Confirmation is inline — no modal.
     fireEvent.click(screen.getByText('Move to vault'));
     await flush();
 
     expect(convertToSensitive).toHaveBeenCalledWith('s-1');
-    // Landed on the vault after the move.
     expect(screen.getByText('Vault landing')).toBeDefined();
   });
 
   it('will not offer the vault move while the vault is locked', async () => {
-    renderExistingWithVault();
+    renderAt('/editor/s-1');
     await flush();
     await flush();
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Security' }));
     expect(screen.queryByText('Move to the vault')).toBeNull();
     expect(screen.getByText(/Unlock the vault to move this in/)).toBeDefined();
   });
 
-  it('surfaces a trigger conflict as a business error without losing the draft', async () => {
+  it('surfaces a trigger conflict under the trigger without losing the draft', async () => {
     updateSnippet.mockRejectedValue(new IpcError('conflict', 'trigger already in use'));
-    renderExisting();
+    renderAt('/editor/s-1');
     await flush();
-    fireEvent.click(screen.getByRole('tab', { name: 'Where it can be used' }));
     fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: ';taken' } });
     await settleAutosave();
 
     expect(screen.getByRole('status').textContent).toBe('Not saved');
-    expect(screen.getByText('trigger already in use')).toBeDefined();
-    expect((screen.getByLabelText('Trigger') as HTMLInputElement).value).toBe(';taken');
+    expect(screen.getByRole('alert').textContent).toBe('trigger already in use');
+    expect(screen.getByLabelText<HTMLInputElement>('Trigger').value).toBe(';taken');
   });
 
   it('locks sensitive snippets out of the editor and points to the vault', async () => {
-    render(
-      <MemoryRouter initialEntries={['/editor/s-sec']}>
-        <Routes>
-          <Route path="/editor/:id" element={<EditorPage />} />
-          <Route path="/vault" element={<div>Vault landing</div>} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderAt('/editor/s-sec');
     await flush();
     expect(
       screen.getByText(

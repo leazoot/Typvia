@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "about",
+  "description": "The About window: baseline core access to read the app version and the library count. Tauri 2 ACL is an allow-list, so this window is granted on its own.",
+  "windows": ["about"],
+  "permissions": ["core:default"]
+}

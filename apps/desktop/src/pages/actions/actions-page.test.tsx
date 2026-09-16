@@ -63,7 +63,7 @@ async function renderPage() {
   await act(async () => {});
 }
 
-/** Opens the folded test bench, which is where a run lives now. */
+/** Opens the folded test bench, where a run is started. */
 async function openBench() {
   fireEvent.click(screen.getByRole('button', { name: /Test action/ }));
   return screen.getByLabelText('Test input');
@@ -117,10 +117,10 @@ describe('ActionsPage — the studio', () => {
     const advanced = screen.getByRole('button', { name: /Advanced/ });
     expect(advanced.getAttribute('aria-expanded')).toBe('false');
     // Nothing technical is on the surface: the fold holds it, closed.
-    expect(screen.getByText('Temperature').closest('.tvw-fold')).not.toBeNull();
+    expect(screen.getByText('Temperature').closest('.tva-fold')).not.toBeNull();
     fireEvent.click(advanced);
     expect(advanced.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('button', { name: '0.7' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: '0.7' })).toBeTruthy();
   });
 
   it('saves itself after an edit, with the exact payload', async () => {
@@ -176,7 +176,7 @@ describe('ActionsPage — the studio', () => {
     aiActionSave.mockResolvedValue(action({ id: 'new-1', name: 'Summarize' }));
     await renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: '＋' }));
+    fireEvent.click(screen.getByRole('button', { name: 'New' }));
     expect(screen.getByText('What should this action do?')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }));
     // The template seeds a real draft that saves itself.

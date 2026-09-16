@@ -47,8 +47,6 @@ interface EditorDraft {
   savedAt: number | null;
   /** Advisory sensitive-pattern codes from the last save's body scan. */
   sensitiveKinds: string[];
-  /** Bumps on every successful save — drives the 140ms save motion. */
-  savePulse: number;
 }
 
 function draftFrom(snippet: Snippet): Draft {
@@ -85,19 +83,20 @@ const EMPTY_DRAFT: Draft = {
 
 /**
  * Draft state with debounced auto-save (create on first save, update after).
- * Saving is quiet by design: no toast — the status word and the 140ms body
- * settle are the only feedback. The sensitive scan runs on every successful
+ * Saving is quiet by design: no toast — the status word beside the specimen
+ * is the only feedback. The sensitive scan runs on every successful
  * save and only ever advises; it never blocks the save.
  */
 export function useEditorDraft(
   initial: Snippet | null,
   initialTitle = '',
   initialTrigger: string | null = null,
+  initialBody = '',
 ): EditorDraft {
   const tr = useTr();
   const [draft, setDraft] = useState<Draft>(
     initial === null
-      ? { ...EMPTY_DRAFT, title: initialTitle, trigger: initialTrigger }
+      ? { ...EMPTY_DRAFT, title: initialTitle, trigger: initialTrigger, body: initialBody }
       : draftFrom(initial),
   );
   const [status, setStatus] = useState<SaveStatus>(initial === null ? 'draft' : 'saved');
@@ -105,7 +104,6 @@ export function useEditorDraft(
   const [version, setVersion] = useState<number | null>(initial?.version ?? null);
   const [savedAt, setSavedAt] = useState<number | null>(initial?.updatedAt ?? null);
   const [sensitiveKinds, setSensitiveKinds] = useState<string[]>([]);
-  const [savePulse, setSavePulse] = useState(0);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(draft);
@@ -133,7 +131,9 @@ export function useEditorDraft(
               description: current.description,
               folderId: current.folderId,
               trigger: current.trigger,
-              triggerMode: current.trigger === null ? null : (current.triggerMode ?? 'delimiter'),
+              // No opinion is sent as none: what an unqualified trigger
+              // means is the shared layer's answer, not this form's.
+              triggerMode: current.trigger === null ? null : current.triggerMode,
               language: current.language,
             })
           : await updateSnippet({
@@ -144,7 +144,9 @@ export function useEditorDraft(
               description: current.description,
               folderId: current.folderId,
               trigger: current.trigger,
-              triggerMode: current.trigger === null ? null : (current.triggerMode ?? 'delimiter'),
+              // No opinion is sent as none: what an unqualified trigger
+              // means is the shared layer's answer, not this form's.
+              triggerMode: current.trigger === null ? null : current.triggerMode,
               language: current.language,
               isFavorite: current.isFavorite,
               isPinned: current.isPinned,
@@ -157,7 +159,6 @@ export function useEditorDraft(
       setSavedAt(saved.updatedAt);
       setStatus('saved');
       setErrorMessage(null);
-      setSavePulse((n) => n + 1);
       // Advisory only: the save above already succeeded.
       detectSensitive(current.body)
         .then(setSensitiveKinds)
@@ -197,5 +198,5 @@ export function useEditorDraft(
     [],
   );
 
-  return { draft, patch, status, errorMessage, version, savedAt, sensitiveKinds, savePulse };
+  return { draft, patch, status, errorMessage, version, savedAt, sensitiveKinds };
 }

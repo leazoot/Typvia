@@ -15,9 +15,10 @@ function Probe() {
   return <p>at {location.pathname}</p>;
 }
 
-function renderShell(path = '/') {
+function renderShell(path: string | string[] = '/') {
+  const entries = typeof path === 'string' ? [path] : path;
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
       <WorkspaceShell>
         <Routes>
           <Route path="*" element={<Probe />} />
@@ -29,38 +30,49 @@ function renderShell(path = '/') {
 
 afterEach(cleanup);
 
-describe('workspace navigation', () => {
-  it('shows three destinations and names the room the user is in', () => {
-    renderShell('/vault');
-    expect(screen.getByRole('button', { name: 'Home' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Settings' })).toBeDefined();
-    // The switcher wears the current room's name, not a generic label.
-    const switcher = screen.getByRole('button', { name: 'Vault', expanded: false });
-    expect(switcher.getAttribute('aria-haspopup')).toBe('menu');
-  });
-
-  it('falls back to the workspace label outside the four rooms', () => {
+describe('window title bar', () => {
+  it('carries the places and the summon shortcut, with no room title', () => {
     renderShell('/');
-    expect(screen.getByRole('button', { name: 'Workspace' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBe('page');
+    const bar = screen.getByRole('banner');
+    expect(within(bar).getByText('⌘⇧V')).toBeDefined();
+    expect(within(bar).queryByText('Typvia — Library')).toBeNull();
+    const snippets = within(bar).getByRole('button', { name: 'Snippets' });
+    expect(snippets.getAttribute('aria-current')).toBe('page');
   });
 
-  it('switches rooms from the popover and marks the current one', async () => {
-    renderShell('/library');
-    fireEvent.click(screen.getByRole('button', { name: 'Library', expanded: false }));
-    const menu = screen.getByRole('menu', { name: 'Workspace' });
-    const items = within(menu).getAllByRole('menuitem');
-    expect(items).toHaveLength(4);
-    expect(
-      ['TX', 'SC', 'AI', '↺'].every((mark, index) => items[index]?.textContent?.startsWith(mark)),
-    ).toBe(true);
-    // The room the user is in shows a dot instead of its shortcut.
-    expect(within(items[0]!).getByRole('img', { name: 'Current' })).toBeDefined();
-    expect(within(items[1]!).getByText('⌘2')).toBeDefined();
+  it('keeps a place marked on the pages that belong to it', () => {
+    renderShell('/sync/pair');
+    const bar = screen.getByRole('banner');
+    expect(within(bar).getByRole('button', { name: 'Settings' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(within(bar).getByRole('button', { name: 'Snippets' }).getAttribute('aria-current')).toBe(
+      null,
+    );
+  });
 
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /AI Actions/ }));
-    expect(await screen.findByText('at /ai')).toBeDefined();
+  it('goes straight to a place on click, without a menu', async () => {
+    renderShell('/');
+    fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Vault' }));
+    expect(await screen.findByText('at /vault')).toBeDefined();
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('offers no way back on the library itself', () => {
+    renderShell('/');
+    expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Back' })).toBeNull();
+  });
+
+  it('steps back to the page the window came from', async () => {
+    renderShell(['/trash', '/settings']);
+    fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('at /trash')).toBeDefined();
+  });
+
+  it('goes to the library from a page with nothing behind it', async () => {
+    renderShell('/settings');
+    fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('at /')).toBeDefined();
   });
 });
 
@@ -69,14 +81,18 @@ describe('workspace keyboard map', () => {
     renderShell('/');
     fireEvent.keyDown(document, { key: '2', metaKey: true });
     expect(await screen.findByText('at /vault')).toBeDefined();
+    fireEvent.keyDown(document, { key: '1', metaKey: true });
+    expect(await screen.findByText('at /')).toBeDefined();
     fireEvent.keyDown(document, { key: ',', metaKey: true });
     expect(await screen.findByText('at /settings')).toBeDefined();
   });
 
-  it('opens the editor for a new snippet with ⌘N', async () => {
+  it('opens the editor with ⌘⇧N and the trash with ⌘⇧⌫', async () => {
     renderShell('/');
-    fireEvent.keyDown(document, { key: 'n', metaKey: true });
+    fireEvent.keyDown(document, { key: 'N', metaKey: true, shiftKey: true });
     expect(await screen.findByText('at /editor')).toBeDefined();
+    fireEvent.keyDown(document, { key: 'Backspace', metaKey: true, shiftKey: true });
+    expect(await screen.findByText('at /trash')).toBeDefined();
   });
 });
 
@@ -111,10 +127,22 @@ describe('command palette', () => {
   });
 
   it('keeps the template builder reachable even though it is not a room', async () => {
-    renderShell('/');
+    renderShell('/vault');
     fireEvent.keyDown(document, { key: 'k', metaKey: true });
     const palette = await screen.findByRole('dialog', { name: 'Search Typvia' });
     fireEvent.click(within(palette).getByRole('button', { name: /Template builder/ }));
     expect(await screen.findByText('at /templates')).toBeDefined();
+  });
+
+  it('keeps sync and the shortcut table reachable without a menu', async () => {
+    renderShell('/');
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+    let palette = await screen.findByRole('dialog', { name: 'Search Typvia' });
+    fireEvent.click(within(palette).getByRole('button', { name: /Sync & devices/ }));
+    expect(await screen.findByText('at /sync')).toBeDefined();
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+    palette = await screen.findByRole('dialog', { name: 'Search Typvia' });
+    fireEvent.click(within(palette).getByRole('button', { name: /All shortcuts/ }));
+    expect(await screen.findByText('at /shortcuts')).toBeDefined();
   });
 });

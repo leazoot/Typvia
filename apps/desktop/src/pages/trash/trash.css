@@ -4,214 +4,268 @@
  *
  * SPDX-License-Identifier: MPL-2.0 */
 
-/* Trash — a quiet recovery space. Compact by design: no
-   page of white, no permanent destructive buttons, no illustration. */
-
 .tvt {
-  max-width: 960px;
-  padding: 48px 48px 80px;
+  min-height: calc(100vh - 38px);
+  padding: 28px 32px 32px;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.tvt-sheet {
+  max-width: 920px;
+  margin: 0 auto;
 }
 
 .tvt-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .tvt-head h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--fs-title);
+  font-weight: 500;
+}
+
+.tvt-count {
+  color: var(--ink-muted-2);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--ls-field);
 }
 
-.tvt-sub {
-  margin-top: 7px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
+.tvt-lede {
+  margin: 0 0 26px;
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+  line-height: 1.9;
 }
 
-.tvt-list {
-  margin-top: 18px;
+/* Rows without dividers: hover sinks into paper-2; the picked row rises onto
+   paper-0 only while the list has the keyboard. */
+.tvt-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -14px;
+  outline: none;
 }
 
 .tvt-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 52px;
+  gap: 18px;
+  padding: 14px;
+  border-radius: var(--r-row);
+  transition: background var(--d-tap);
 }
 
-/* A row that is on its way out shrinks in place — the feedback is spatial,
-   never a toast. */
-.tvt-row.is-leaving {
+.tvt-row:hover {
+  background: var(--paper-2);
+}
+
+.tvt-rows:focus .tvt-row[aria-selected='true'] {
+  background: var(--paper-0);
+  box-shadow: var(--shadow-hairline);
+}
+
+.tvt-trigger {
+  flex: none;
+  width: 54px;
+  padding: 2px 7px;
   overflow: hidden;
-  animation: tvt-leave 220ms var(--tvw-ease) forwards;
+  border: 1px solid var(--line);
+  border-radius: var(--r-key);
+  background: var(--paper-0);
+  color: var(--ink-2);
+  font-family: var(--font-code);
+  font-size: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@keyframes tvt-leave {
-  to {
-    min-height: 0;
-    height: 0;
-    opacity: 0;
-    transform: translateX(-10px);
-  }
+.tvt-rows:focus .tvt-row[aria-selected='true'] .tvt-trigger {
+  background: var(--paper-1);
 }
 
-.tvt-row.is-selected {
-  background: var(--tvw-pressed);
+.tvt-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.tvt-row.is-selected::before {
-  opacity: 0.6;
+.tvt-body {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--font-content);
+  font-size: var(--fs-item);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tvt-when {
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
+.tvt-meta {
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
 }
 
-.tvt-tail {
-  position: relative;
+/* Under a week left: an amber dot, always beside the number it warns about. */
+.tvt-soon {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.tvt-left {
+  flex: none;
+  width: 76px;
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  text-align: right;
+}
+
+.tvt-restore {
+  flex: none;
+  width: 52px;
+  margin: -12px 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  text-align: right;
+  cursor: pointer;
+  transition: color var(--d-tap);
+}
+
+.tvt-restore:hover {
+  color: var(--accent-ink);
+}
+
+.tvt-rule {
+  height: 1px;
+  margin: 28px 0 22px;
+  background: var(--line-soft);
+}
+
+.tvt-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 32px;
+}
+
+/* A destructive word is plain until the pointer is on it. */
+.tvt-destroy {
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-code);
+  background: none;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  cursor: pointer;
+  transition:
+    background var(--d-tap),
+    color var(--d-tap);
+}
+
+.tvt-destroy:hover,
+.tvt-destroy:focus-visible {
+  background: var(--accent-dark);
+  color: var(--on-accent);
+}
+
+.tvt-foot-note {
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+}
+
+.tvt-state {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-width: 190px;
+  gap: 16px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
 }
 
-/* The remaining life of a row: a hairline, faint, and a number. */
-.tvt-life {
+.tvt-state p {
+  margin: 0;
+}
+
+/* Nothing to list: one card on its own, centred like the vault's. */
+.tvt-empty-state {
+  max-width: 428px;
+  margin: 12px auto 0;
+  padding: 34px 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-0);
+}
+
+.tvt-empty-state .tpi-eyebrow {
+  margin-bottom: 18px;
+}
+
+.tvt-empty-line {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--tvw-tertiary);
-  font-size: 11.5px;
-  transition: opacity var(--tvw-micro) var(--tvw-ease);
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.tvt-life .tvw-thread {
-  width: 58px;
-  opacity: 0.7;
+.tvt-empty-title {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--fs-title);
+  font-weight: 400;
+  line-height: 1.4;
 }
 
-.tvt-life .tvw-thread span {
-  background: var(--tvw-tertiary);
+.tvt-empty-body {
+  margin: 0;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+  line-height: 1.9;
 }
 
-.tvt-row:hover .tvt-life,
-.tvt-row:focus-within .tvt-life {
-  opacity: 0;
+.tvt-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--scrim);
+  animation: tpi-fade-in var(--d-fade) ease both;
 }
 
-.tvt-actions {
-  position: absolute;
-  right: 0;
-}
-
-/* Restored: the word appears where the row was, for a moment. */
-.tvt-restored {
-  padding: 14px 12px;
-  color: var(--tvw-ok);
-  font-size: 12.5px;
-  animation: tvt-fade-out 1200ms var(--tvw-ease) forwards;
-}
-
-@keyframes tvt-fade-out {
-  70% {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-/* Inline confirmation, centred as a small sheet — never a system alert. */
 .tvt-confirm {
   position: fixed;
+  top: 50%;
   left: 50%;
-  top: 32vh;
-  z-index: 62;
-  width: min(420px, calc(100vw - 80px));
-  margin-left: min(-210px, calc(-50vw + 40px));
-  padding: 20px 22px;
-  border: 1px solid var(--tvw-divider);
+  z-index: 61;
+  width: min(420px, calc(100vw - 32px));
+  padding: 26px 28px;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: var(--tvw-sheet);
-  box-shadow: var(--tvw-shadow-sheet);
-  animation: tvt-sheet-in 220ms var(--tvw-ease);
-}
-
-@keyframes tvt-sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-  }
-}
-
-.tvt-confirm-title {
-  font-size: 14.5px;
-}
-
-.tvt-confirm-note {
-  margin-top: 6px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
+  background: var(--paper-0);
+  box-shadow: var(--shadow-float);
+  transform: translate(-50%, -50%);
+  animation: tpi-fade-in var(--d-fade) ease both;
 }
 
 .tvt-confirm-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 6px;
+  align-items: center;
+  gap: 26px;
   margin-top: 18px;
-}
-
-.tvt-danger {
-  border: 0;
-  background: none;
-  color: var(--tvw-danger);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 7px;
-}
-
-.tvt-danger:hover {
-  background: var(--tvw-hover);
-}
-
-/* The empty trash: words, then a hairline that fades out. */
-.tvt-empty {
-  padding: 34px 2px 0;
-  max-width: 460px;
-  color: var(--tvw-secondary);
-  font-size: 13.5px;
-  line-height: 1.8;
-}
-
-.tvt-empty strong {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--tvw-ink);
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.tvt-empty-rule {
-  height: 1px;
-  margin-top: 22px;
-  background: linear-gradient(to right, var(--tvw-divider), transparent);
-  animation: tvt-rule 1400ms var(--tvw-ease) forwards;
-}
-
-@keyframes tvt-rule {
-  from {
-    width: 0;
-  }
-  to {
-    width: 190px;
-  }
 }

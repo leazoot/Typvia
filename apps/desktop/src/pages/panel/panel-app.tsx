@@ -19,9 +19,12 @@ import {
   vaultStatus,
 } from '@typvia/shared';
 import type { Snippet, TemplateField } from '@typvia/shared';
-import { SearchLine, TypeMark, markForType, useTr } from '@typvia/ui';
+import { useTr } from '@typvia/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { KeyCap } from '../../paper/kit';
+import { loadInsertMethod } from '../../workspace/insert-method';
 import { PanelFill } from './panel-fill';
+import { PanelRow } from './panel-row';
 import { PanelVerify } from './panel-verify';
 import './panel.css';
 
@@ -31,29 +34,20 @@ export const PANEL_WINDOW_LABEL = 'panel';
 /** Max rows fetched for the recent list and each search (panel is a shortlist). */
 const RESULT_LIMIT = 20;
 
+/** Rows that get a ⌘-digit of their own. */
+const DIGIT_ROWS = 9;
+
 /** Focuses the search input; the resident WebView must re-focus on every show. */
 function focusSearch(root: HTMLElement | null): void {
   root?.querySelector('input')?.focus();
 }
 
-/** First non-empty line of the body — the row preview (kept aria-hidden).
- * Sensitive snippets carry a null body (their plaintext never crosses IPC). */
-function previewLine(body: string | null): string {
-  if (body === null) return '';
-  return (
-    body
-      .split('\n')
-      .find((line) => line.trim() !== '')
-      ?.trim() ?? ''
-  );
-}
-
 /**
- * Global command panel. The search
- * field is focused at frame 0 — you type through the enter animation. Summoned
- * by ⌘⇧V; the empty query shows recent snippets, typing replaces them with
- * ranked results (no debounce). ↑↓ moves, ↵ inserts into the app you came from,
- * ⇧↵ copies. Hides on ESC or blur.
+ * Quick Bar. The search line is focused at frame 0 — you type through the
+ * enter animation. Summoned by ⌘⇧V; the empty query shows recent snippets,
+ * typing replaces them with ranked results (no debounce). ↑↓ moves, ⏎ inserts
+ * into the app you came from, ⌥⏎ only copies, ⇥ opens a template's variables,
+ * ⌘1–⌘9 insert a row directly. Hides on esc or blur.
  */
 export function PanelApp() {
   const tr = useTr();
@@ -158,7 +152,7 @@ export function PanelApp() {
   const performSecret = (snippet: Snippet, action: 'insert' | 'copy') => {
     setVerifying(null);
     if (action === 'insert') {
-      panelInsertSecret(snippet.id).catch((error: unknown) => {
+      panelInsertSecret(snippet.id, loadInsertMethod()).catch((error: unknown) => {
         if (error instanceof IpcError && error.code === 'permission_denied') {
           setVerifying({ snippet, action: 'insert' });
         } else if (error instanceof IpcError && error.code === 'rule_blocked') {
@@ -196,7 +190,7 @@ export function PanelApp() {
       void templateFields(snippet.id)
         .then((fields) => {
           if (fields.length === 0) {
-            void panelInsertTemplate(snippet.id, {}).catch((error: unknown) => {
+            void panelInsertTemplate(snippet.id, {}, loadInsertMethod()).catch((error: unknown) => {
               if (error instanceof IpcError && error.code === 'rule_blocked') {
                 setRuleNotice(ruleBlockedNotice());
               }
@@ -216,7 +210,7 @@ export function PanelApp() {
     // The host hides the panel and restores focus before injecting; a denied
     // permission falls back to copying so the action is never silently lost.
     // A rule block happens before the hide, so the panel stays up to say so.
-    panelInsert(snippet.id).catch((error: unknown) => {
+    panelInsert(snippet.id, loadInsertMethod()).catch((error: unknown) => {
       if (error instanceof IpcError && error.code === 'permission_denied') {
         void copySnippet(snippet.id);
       } else if (error instanceof IpcError && error.code === 'rule_blocked') {
@@ -236,8 +230,9 @@ export function PanelApp() {
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
-    // In fill/verify mode the sub-view owns the keyboard (↵ acts, esc backs).
+    // In fill/verify mode the sub-view owns the keyboard (⏎ acts, esc backs).
     if (filling !== null || verifying !== null) return;
+    const picked = results[selected];
     if (event.key === 'Escape') {
       event.preventDefault();
       void hidePanel();
@@ -253,26 +248,30 @@ export function PanelApp() {
       setSelected((index) => Math.max(index - 1, 0));
       return;
     }
+    if (event.key === 'Tab') {
+      // ⇥ fills variables; on anything else it stays in the search line.
+      event.preventDefault();
+      if (picked?.snippetType === 'template') insert(picked);
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
+      const row = results[Number(event.key) - 1];
+      if (row === undefined) return;
+      event.preventDefault();
+      insert(row);
+      return;
+    }
     if (event.key === 'Enter') {
       event.preventDefault();
-      const snippet = results[selected];
-      if (snippet === undefined) return;
-      if (event.shiftKey) copy(snippet);
-      else insert(snippet);
+      if (picked === undefined) return;
+      if (event.altKey || event.shiftKey) copy(picked);
+      else insert(picked);
     }
   };
 
   return (
-    <div ref={rootRef} className="tv-panel" onKeyDown={onKeyDown}>
-      {/* 28% scrim, no backdrop blur (motion spec); clicking it dismisses. */}
-      <div
-        key={`scrim-${showId}`}
-        className="tv-panel-scrim"
-        aria-hidden="true"
-        data-testid="panel-scrim"
-        onMouseDown={() => void hidePanel()}
-      />
-      <div key={showId} className="tv-panel-card tv-panel-enter">
+    <div ref={rootRef} className="tpi tvq" onKeyDown={onKeyDown}>
+      <div key={showId} className="tvq-card">
         {filling !== null ? (
           <PanelFill
             snippet={filling.snippet}
@@ -290,59 +289,53 @@ export function PanelApp() {
           />
         ) : (
           <>
-            <div className="tv-panel-field">
-              <SearchLine
-                scale="panel"
+            <div className="tvq-search">
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="6" cy="6" r="4.6" stroke="currentColor" strokeWidth="1.3" />
+                <path
+                  d="M9.6 9.6L13 13"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <input
+                className="tvq-input"
                 value={query}
-                onChange={onQueryChange}
-                label={tr('Search snippets', '搜索片段')}
-                placeholder={tr('Search snippets…', '搜索片段…')}
-                trailing={
-                  destination !== null ? (
-                    <span className="tv-panel-dest">→ {destination}</span>
-                  ) : undefined
-                }
+                spellCheck={false}
+                autoComplete="off"
+                aria-label={tr('Search snippets', '搜索片段')}
+                placeholder={tr('Search snippets', '搜索片段')}
+                onChange={(event) => onQueryChange(event.target.value)}
               />
+              <span className="tvq-count" aria-live="polite">
+                {query.trim() === ''
+                  ? tr(`${String(results.length)} recent`, `最近 ${String(results.length)} 条`)
+                  : tr(`${String(results.length)} found`, `${String(results.length)} 条`)}
+              </span>
             </div>
 
-            <div className="tv-panel-body" role="listbox" aria-label={tr('Snippets', '片段')}>
+            <div className="tvq-list" role="listbox" aria-label={tr('Snippets', '片段')}>
               {results.length === 0 ? (
-                <p className="tv-panel-empty">
+                <p className="tvq-empty">
                   {query.trim() === ''
                     ? tr('No snippets yet', '还没有片段')
                     : tr('No matches', '没有匹配结果')}
                 </p>
               ) : (
                 results.map((snippet, index) => (
-                  <div
+                  <PanelRow
                     key={snippet.id}
-                    role="option"
-                    aria-selected={index === selected}
-                    data-selected={index === selected || undefined}
-                    className="tv-panel-row"
-                    onMouseEnter={() => setSelected(index)}
-                    onClick={() => insert(snippet)}
-                  >
-                    <TypeMark code={markForType(snippet.snippetType)} />
-                    <span className="tv-panel-row-main">
-                      <span className="tv-panel-row-title">{snippet.title}</span>
-                      <span className="tv-panel-row-preview" aria-hidden="true">
-                        {previewLine(snippet.body)}
-                      </span>
-                    </span>
-                    {snippet.trigger !== null && (
-                      <span className="tv-panel-row-trigger">{snippet.trigger}</span>
-                    )}
-                    {index === selected && (
-                      <span aria-hidden="true" className="tv-panel-row-enter">
-                        ↵
-                      </span>
-                    )}
-                  </div>
+                    snippet={snippet}
+                    selected={index === selected}
+                    shortcut={index < DIGIT_ROWS ? `⌘${String(index + 1)}` : null}
+                    onHover={() => setSelected(index)}
+                    onPick={() => insert(snippet)}
+                  />
                 ))
               )}
               {hiddenByRules > 0 && (
-                <p className="tv-panel-hidden">
+                <p className="tvq-hidden">
                   {tr(
                     `${hiddenByRules} hidden by app rules${destination !== null ? ` for ${destination}` : ''}`,
                     destination !== null
@@ -354,24 +347,23 @@ export function PanelApp() {
             </div>
 
             {ruleNotice !== null && (
-              <p className="tv-panel-notice" role="status">
+              <p className="tvq-notice" role="status">
                 {ruleNotice}
               </p>
             )}
 
-            <footer className="tv-panel-footer">
-              <span className="tv-panel-keys">
-                <kbd>↑</kbd>
-                <kbd>↓</kbd>
-                <span className="tv-panel-key-word">{tr('move', '移动')}</span>
-                <kbd>↵</kbd>
-                <span className="tv-panel-key-word">{tr('insert', '插入')}</span>
-                <kbd>⇧↵</kbd>
-                <span className="tv-panel-key-word">{tr('copy', '复制')}</span>
-                <kbd>/tp</kbd>
-                <span className="tv-panel-key-word">{tr('filter', '筛选')}</span>
-                <kbd>esc</kbd>
-                <span className="tv-panel-key-word">{tr('close', '关闭')}</span>
+            <footer className="tvq-foot">
+              <KeyCap>⏎</KeyCap>
+              <span className="tvq-foot-word">{tr('insert', '插入')}</span>
+              <KeyCap>⌥⏎</KeyCap>
+              <span className="tvq-foot-word">{tr('copy only', '只复制')}</span>
+              <KeyCap>⇥</KeyCap>
+              <span className="tvq-foot-word">{tr('fill variables', '填变量')}</span>
+              <span className="tvq-spacer" />
+              <span className="tvq-foot-note">
+                {destination !== null
+                  ? `→ ${destination}`
+                  : tr('Just opened · press ⏎', '刚打开 · 直接按 ⏎')}
               </span>
             </footer>
           </>

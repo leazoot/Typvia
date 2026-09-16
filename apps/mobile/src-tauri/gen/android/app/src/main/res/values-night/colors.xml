@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Widget surface tokens, dark theme (base palette).
-     Geometry is identical across themes - only pigment changes. -->
-<resources>
-    <color name="tv_paper">#FF141516</color>
-    <color name="tv_ink">#FFEDEDEB</color>
-    <color name="tv_secondary">#FF95979B</color>
-    <color name="tv_meta">#FF6A6C70</color>
-</resources>

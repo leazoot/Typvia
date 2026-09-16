@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * The four workspace rooms behind the switcher, in switcher order. Home and
- * Settings are not rooms — they are the two fixed ends of the navigation.
+ * The four workspace rooms, in menu and ⌘-digit order. The Library is the
+ * main window itself, so it lives at the root.
  */
 export interface Room {
   readonly path: string;
@@ -22,10 +22,10 @@ export interface Room {
 
 export const ROOMS: readonly Room[] = [
   {
-    path: '/library',
+    path: '/',
     mark: 'TX',
     labelEn: 'Library',
-    labelZh: '片段库',
+    labelZh: '资料库',
     descEn: 'Search and organise your snippets',
     descZh: '搜索与管理普通片段',
     digit: 1,
@@ -60,5 +60,7 @@ export const ROOMS: readonly Room[] = [
 ];
 
 export function roomFor(pathname: string): Room | undefined {
-  return ROOMS.find((room) => pathname === room.path || pathname.startsWith(`${room.path}/`));
+  return ROOMS.find(
+    (room) => pathname === room.path || (room.path !== '/' && pathname.startsWith(`${room.path}/`)),
+  );
 }

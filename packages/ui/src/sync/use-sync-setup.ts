@@ -9,7 +9,7 @@
  * WebDAV endpoint you own. Joining and recovering are navigations,
  * so they stay with the host that owns routing.
  */
-import { ipcErrorCopy, syncEnable, syncEnableWebdav } from '@typvia/shared';
+import { ipcErrorCopy, syncEnable, syncEnableWebdav, webdavCredentials } from '@typvia/shared';
 import { useCallback, useMemo, useState } from 'react';
 import { trFor, useLocale } from '../i18n';
 
@@ -33,13 +33,6 @@ export interface SyncSetupFlow {
   start: () => Promise<void>;
 }
 
-/** Composes the secure-store credential form; `null` = anonymous. */
-export function webdavCredentials(username: string, password: string): string | null {
-  const user = username.trim();
-  if (user === '' && password === '') return null;
-  return `basic:${user}:${password}`;
-}
-
 export function useSyncSetup(onDone: () => void): SyncSetupFlow {
   const locale = useLocale();
   const tr = useMemo(() => trFor(locale), [locale]);
@@ -55,7 +48,7 @@ export function useSyncSetup(onDone: () => void): SyncSetupFlow {
     setError(null);
     try {
       if (kind === 'webdav') {
-        await syncEnableWebdav(serverUrl.trim(), webdavCredentials(username, password));
+        await syncEnableWebdav(serverUrl.trim(), await webdavCredentials(username, password));
       } else {
         await syncEnable(serverUrl.trim());
       }

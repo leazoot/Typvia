@@ -45,6 +45,7 @@ pub struct PairingHandle {
     server_url: String,
     account_id: String,
     code: String,
+    expires_in_seconds: Option<u64>,
 }
 
 impl PairingHandle {
@@ -55,6 +56,14 @@ impl PairingHandle {
 
     pub fn session_id(&self) -> &str {
         &self.session_id
+    }
+
+    /// How long the server said this session is good for, when a server said
+    /// anything. A screen that prints "good for another N minutes" has to be
+    /// quoting this; `None` means nobody promised a window, and the honest
+    /// screen then says nothing about one rather than inventing a number.
+    pub fn expires_in_seconds(&self) -> Option<u64> {
+        self.expires_in_seconds
     }
 }
 
@@ -133,6 +142,7 @@ impl SyncEngine {
             server_url: server_url.to_string(),
             account_id: account_id.to_string(),
             code,
+            expires_in_seconds: Some(session.expires_in_seconds),
         })
     }
 
@@ -464,6 +474,9 @@ impl SyncEngine {
             server_url: server_url.to_string(),
             account_id: account_id.to_string(),
             code,
+            // Nothing on a WebDAV share expires this: the session id is made
+            // here and the offer waits in a folder. No window to promise.
+            expires_in_seconds: None,
         })
     }
 

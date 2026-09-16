@@ -41,5 +41,5 @@ export { useSyncOverview } from './use-sync-overview';
 export type { SyncOverview } from './use-sync-overview';
 export { backlogLabel, conflictCountLabel, syncBadge, useSyncSettings } from './use-sync-settings';
 export type { SyncSettings } from './use-sync-settings';
-export { useSyncSetup, webdavCredentials } from './use-sync-setup';
+export { useSyncSetup } from './use-sync-setup';
 export type { SyncBackendKind, SyncSetupFlow } from './use-sync-setup';

@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * IPC data shapes, mirroring the Rust DTOs in apps/desktop/src-tauri/src/dto.rs
+ * IPC data shapes, mirroring the Rust DTOs in crates/host-service/src/dto.rs
  * (serde camelCase). A sensitive snippet's `body` is always `null` on this side
  * of the boundary; its plaintext is only ever obtained through `vaultReveal` on
  * an unlocked session.
@@ -133,4 +133,9 @@ export interface VaultStatus {
 export interface MobileBootstrap {
   schemaVersion: number;
   snippetTotal: number;
+}
+
+/** How long automatic expansion stays paused; `null` when it is not paused. */
+export interface InsertionPause {
+  remainingMs: number | null;
 }

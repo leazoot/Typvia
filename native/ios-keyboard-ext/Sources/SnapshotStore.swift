@@ -14,9 +14,9 @@ import Foundation
 
 struct SnapshotStore {
     /// Must match the `com.apple.security.application-groups` entitlement of
-    /// both the host app and this extension (apps/mobile app_group.rs).
+    /// both the host app and this extension.
     static let appGroupId = "group.dev.typvia.mobile"
-    /// File name the host writes atomically (snapshot_file.rs).
+    /// File name the host writes atomically; the host side owns this name.
     static let snapshotFileName = "snapshot.json"
 
     /// The raw document, kept for follow-up FFI calls (search, body lookup).

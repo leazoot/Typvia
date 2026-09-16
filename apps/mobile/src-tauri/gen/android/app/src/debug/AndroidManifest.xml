@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Debug-only network access: `tauri android dev` serves the SPA from the
-     Vite dev server, which needs INTERNET. Release builds ship bundled
-     assets and merge WITHOUT this permission (local-first red line). -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET" />
-</manifest>

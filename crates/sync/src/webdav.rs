@@ -35,6 +35,23 @@ pub enum WebdavCredentials {
 }
 
 impl WebdavCredentials {
+    /// Builds the secure-store representation of a username and password.
+    ///
+    /// The counterpart of [`Self::parse`], and here for the same reason the
+    /// parser is: the string's shape belongs to this module. A host that spells
+    /// it out itself is a host that will still be spelling the old one out
+    /// after this changes — and the failure that produces is an account that
+    /// refuses a password the user typed correctly.
+    ///
+    /// - Returns: `None` when neither field was filled, which is a folder that
+    ///   needs no credentials — not a folder handed empty ones.
+    pub fn basic(username: &str, password: &str) -> Option<String> {
+        if username.is_empty() && password.is_empty() {
+            return None;
+        }
+        Some(format!("basic:{username}:{password}"))
+    }
+
     /// Parses the secure-store representation.
     pub fn parse(stored: &str) -> Result<Self, TransportError> {
         let parsed = if let Some(rest) = stored.strip_prefix("basic:") {
@@ -94,9 +111,6 @@ pub struct FetchedFile {
     pub etag: Option<String>,
 }
 
-/// Blocking WebDAV client over a validated base URL. Paths given to the
-/// methods are relative to the base and must already be percent-safe (the
-/// protocol's file names are `[a-z0-9./-]` only).
 impl std::fmt::Debug for FetchedFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FetchedFile")
@@ -106,6 +120,9 @@ impl std::fmt::Debug for FetchedFile {
     }
 }
 
+/// Blocking WebDAV client over a validated base URL. Paths given to the
+/// methods are relative to the base and must already be percent-safe (the
+/// protocol's file names are `[a-z0-9./-]` only).
 pub struct WebdavClient {
     agent: Agent,
     base_url: String,
@@ -308,14 +325,15 @@ mod tests {
 
     #[test]
     fn credentials_parse_both_forms_and_reject_the_rest() {
-        let basic = WebdavCredentials::parse("basic:alice:secret-pw").unwrap();
+        let basic = WebdavCredentials::parse("basic:alice:FAKE_PW_NOT_A_SECRET").unwrap();
         assert_eq!(
             basic.header_value(),
-            format!("Basic {}", BASE64.encode("alice:secret-pw"))
+            format!("Basic {}", BASE64.encode("alice:FAKE_PW_NOT_A_SECRET"))
         );
-        let bearer = WebdavCredentials::parse("bearer:tok123").unwrap();
-        assert_eq!(bearer.header_value(), "Bearer tok123");
-        assert!(WebdavCredentials::parse("alice:secret").is_err());
+        let bearer = WebdavCredentials::parse("bearer:FAKE_TOKEN_NOT_A_SECRET").unwrap();
+        assert_eq!(bearer.header_value(), "Bearer FAKE_TOKEN_NOT_A_SECRET");
+        // No scheme prefix: not a credential this parser accepts.
+        assert!(WebdavCredentials::parse("alice:FAKE_PW_NOT_A_SECRET").is_err());
         // Non-printable bytes would smuggle header injection: refused.
         assert!(WebdavCredentials::parse("bearer:bad\ntoken").is_err());
     }

@@ -20,9 +20,11 @@ use typvia_espanso_adapter::{
     CoexistenceChoice, EngineGate, EngineState, EspansoCli, EspansoVersion, ImportParseError,
     ImportedMatch, compile_snippets, parse_matches, write_config,
 };
-use typvia_host_service::dto::{EspansoImportDto, EspansoSkippedDto, EspansoStatusDto};
+use typvia_host_service::dto::{EspansoImportDto, EspansoSkippedDto, EspansoStatusDto, SnippetDto};
 use typvia_host_service::error::IpcError;
-use typvia_host_service::service::{commit_imported, entry_snippet, template_render};
+use typvia_host_service::service::{
+    commit_imported, current_platform, entry_snippet, panel_results, template_render,
+};
 use zeroize::Zeroizing;
 
 use crate::injector::{InjectionMethod, Injector, InjectorError};
@@ -56,9 +58,9 @@ pub fn template_inject(
     Ok(())
 }
 
-/// Loads a normal snippet's plaintext body for delivery. v1 injection covers
-/// normal snippets only; sensitive (ciphertext) injection arrives with the
-/// vault after unlock/verification.
+/// Loads a normal snippet's plaintext body for delivery. A ciphertext body is
+/// refused here: sensitive content reaches an app only through the vault path,
+/// which requires an unlocked session.
 fn deliverable_body(conn: &Connection, id: &str) -> Result<String, IpcError> {
     let snippet = SnippetRepo::new(conn)
         .get(id)?
@@ -292,6 +294,25 @@ pub fn snippet_copy_secret(
 /// auto-clear). Returns whether it actually cleared.
 pub fn clipboard_clear_secret(injector: &mut dyn Injector) -> Result<bool, IpcError> {
     injector.clear_guarded().map_err(injector_error)
+}
+
+/// Most rows the tray card lists.
+pub const TRAY_ROW_LIMIT: u32 = 9;
+
+/// The tray card's shortlist: the most recent snippets it can insert as they
+/// are. Vault rows carry no body and need the panel's verify step, so the
+/// card leaves them out; the read is widened so skipping them still fills it.
+pub fn tray_rows(conn: &Connection, limit: u32) -> Result<Vec<SnippetDto>, IpcError> {
+    if limit == 0 || limit > TRAY_ROW_LIMIT {
+        return Err(IpcError::validation("tray limit must be between 1 and 9"));
+    }
+    let page = panel_results(conn, "", limit * 4, current_platform(), None)?;
+    Ok(page
+        .rows
+        .into_iter()
+        .filter(|row| row.body.is_some())
+        .take(usize::try_from(limit).unwrap_or(usize::MAX))
+        .collect())
 }
 
 #[cfg(test)]

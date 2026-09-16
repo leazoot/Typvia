@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Merged into the main app manifest (same APK, same UID: the IME reads the
      KeyboardSnapshot from the app's private dir with no cross-process grant).
-     The module adds NO permissions: the IME never touches the network, logs
-     no keystrokes, and keeps no key history.
+     The module adds NO permissions. Read that for what it is: a fact about
+     this module, not a guarantee the system enforces — permissions are granted
+     per UID, and the app this merges into declares INTERNET so a library can
+     sync. What keeps the keyboard offline is the code, and only the code: it
+     links no networking API, depends on nothing that speaks HTTP, and reads a
+     snapshot file rather than a server. It also logs no keystrokes and keeps
+     no key history.
      android:process=":ime" gives the service its own process so its memory is
      accounted separately from the WebView-heavy main app (mirrors the iOS
      extension-process yardstick) and the keyboard never pays for the SPA. -->

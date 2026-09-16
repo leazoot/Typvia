@@ -1,0 +1,82 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+.tvk {
+  min-height: calc(100vh - 38px);
+  padding: 28px 32px 36px;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.tvk-sheet {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tvk-title {
+  margin: 0 0 8px;
+  font-size: var(--fs-title);
+  font-weight: 500;
+}
+
+.tvk-lede {
+  margin: 0 0 26px;
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+  line-height: 1.9;
+}
+
+/* The one place the desktop draws a table: hairlines come from the 1px gaps. */
+.tvk-table {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--line-fade);
+}
+
+.tvk-row {
+  display: grid;
+  grid-template-columns: 280px 1fr 1fr;
+  gap: 1px;
+}
+
+.tvk-row > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 26px;
+  background: var(--paper-0);
+  font-size: var(--fs-body);
+}
+
+.tvk-row.is-head > div {
+  padding: 14px 26px;
+  background: var(--paper-2);
+  color: var(--ink-muted-2);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: var(--ls-caps);
+}
+
+.tvk-note {
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}
+
+@media (max-width: 760px) {
+  .tvk {
+    padding: 28px 20px 40px;
+  }
+
+  .tvk-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -22,7 +22,7 @@ updates:
 
   # JavaScript/TypeScript workspace. The repo uses pnpm; Dependabot's npm
   # ecosystem reads pnpm-lock.yaml and pnpm-workspace.yaml, so this one entry
-  # covers apps/desktop, apps/mobile, apps/browser-extension, and packages/*.
+  # covers apps/desktop, apps/browser-extension, and packages/*.
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -64,25 +64,8 @@ updates:
           - minor
           - patch
 
-  # Android Gradle root: the committed settings.gradle plus the Android Gradle
-  # Plugin and Kotlin plugin classpath, and the app module's AndroidX and
-  # Material dependencies.
-  - package-ecosystem: gradle
-    directory: /apps/mobile/src-tauri/gen/android
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
-    groups:
-      gradle-android-minor-patch:
-        patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-
-  # Android IME library module. It is included by the Gradle root above but
-  # declares its own dependencies (JNA for the generated bindings, AndroidX
-  # Test for the instrumentation loop), so it needs its own entry.
+  # Android IME library module. It declares its own dependencies (JNA for the
+  # generated bindings, AndroidX Test for the instrumentation loop).
   - package-ecosystem: gradle
     directory: /native/android-ime
     schedule:

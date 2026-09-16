@@ -436,6 +436,15 @@ fn pair_via_protocol(
         .engine
         .begin_pairing(&n.conn, &server.url, account_id)
         .expect("begin pairing");
+    // The joining screen prints how long the code is good for, so the window
+    // has to come from the server that will stop honouring it — not from a
+    // constant on the screen's own side.
+    assert!(
+        handle
+            .expires_in_seconds()
+            .is_some_and(|seconds| seconds > 0),
+        "a server session must say how long it lasts"
+    );
     let code = PairingCode::decode(handle.code()).expect("decode pairing code");
     let sas_on_trusted = t.engine.pairing_sas(&t.conn, &code).expect("SAS on T");
     // The user confirmed the SAS on T: T offers.

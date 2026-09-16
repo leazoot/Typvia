@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 license.workspace = true
 repository.workspace = true
-description = "UniFFI surface exposing snapshot reads and template fill to the mobile keyboard extensions"
+description = "UniFFI surface bridging the shared host-service use cases and the snapshot reads to the native mobile layer"
 
 [lib]
 name = "typvia_mobile_ffi"
@@ -24,9 +24,24 @@ required-features = ["uniffi/cli"]
 workspace = true
 
 [dependencies]
+# The shared use cases this bridge forwards to: every rule the platform layer
+# must not re-implement lives behind this one dependency.
+typvia-host-service = { path = "../host-service" }
 # Snapshot read model and validation come from core (mobile-ffi → core is the
 # allowed dependency direction; core stays platform-free).
 typvia-core = { path = "../core" }
+# The host owns the Connection it hands to the shared use cases, so it needs
+# the type itself. Same version and features as core.
+rusqlite = { version = "0.38", features = ["bundled"] }
+# End-to-end encrypted sync client. host-service must not depend on it, so
+# each host assembles the engine itself; this is that assembly for mobile.
+typvia-sync = { path = "../sync" }
+# SymmetricKey appears in the revoke/rotate signatures the sync host calls.
+typvia-crypto = { path = "../crypto" }
+# AI provider assembly for the main app: the same egress gate and
+# un-disableable log the desktop host wires. The keyboard extension and the
+# widget never reach this module.
+typvia-ai = { path = "../ai" }
 # Keyboard template fill: variable extraction and substitution
 # stay single-sourced in the shared template engine (mobile-ffi sits beside
 # host-service as an adapter layer over core + template).
@@ -37,3 +52,18 @@ serde_json = "1"
 # library-mode bindgen, no UDL. Mozilla-maintained and MPL-2.0 (same license
 # as this project).
 uniffi = "0.30"
+# Wiped buffers on the SecureStore trait surface (retrieve returns
+# Zeroizing<Vec<u8>>); already in the tree via crypto/core and the desktop
+# host, same version. MIT/Apache-2.0.
+zeroize = "1"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+# Security.framework interop for the Keychain backend: CFString/CFData/
+# CFDictionary wrappers only, no higher-level abstraction. Already in the
+# tree, MIT/Apache-2.0.
+core-foundation = "0.10"
+
+[dev-dependencies]
+# Each test opens its own database directory: the object owns a real
+# connection, and tests must stay orderable and parallel.
+tempfile = "3"

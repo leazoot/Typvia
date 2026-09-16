@@ -127,7 +127,7 @@ pnpm build
 
 ```text
 apps/desktop            Tauri 2 桌面应用(Windows、macOS)
-apps/mobile             Tauri 2 移动应用(iOS、Android)
+apps/ios                原生 iOS 应用与扩展(Swift)
 apps/sync-server        Go 同步服务端 —— 只存密文,可自托管
 apps/browser-extension  浏览器扩展
 apps/browser-host       扩展的原生消息宿主

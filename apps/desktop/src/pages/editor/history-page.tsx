@@ -6,10 +6,11 @@
 
 import { getSnippet, historyGet, historyList, historyRestore, toIpcError } from '@typvia/shared';
 import type { Snippet, VersionBody, VersionMeta } from '@typvia/shared';
-import { useTr, type Tr } from '@typvia/ui';
+import { counted, useTr, type Tr } from '@typvia/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useEspanso } from '../../espanso/espanso-context';
+import { TextAction } from '../../paper/kit';
 import { diffLines, changedLineCount } from './line-diff';
 import './history.css';
 
@@ -24,25 +25,29 @@ function versionTime(createdAt: number, now: number, tr: Tr): string {
   const days = Math.floor((now - createdAt) / 86_400_000);
   if (days < 7) return `${then.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
   if (days < 60) {
-    const weeks = String(Math.floor(days / 7));
-    return tr(`${weeks} weeks`, `${weeks} 周`);
+    const weeks = Math.floor(days / 7);
+    return counted(tr, weeks, 'week', 'weeks', `${String(weeks)} 周`);
   }
   return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 /** "9 versions · 6 weeks" span label for the rail header. */
 function spanLabel(entries: VersionMeta[], now: number, tr: Tr): string {
-  const count = tr(
-    `${String(entries.length)} ${entries.length === 1 ? 'version' : 'versions'}`,
+  const count = counted(
+    tr,
+    entries.length,
+    'version',
+    'versions',
     `${String(entries.length)} 个版本`,
   );
   const oldest = entries.at(-1);
   if (oldest === undefined || entries.length < 2) return count;
   const days = Math.max(1, Math.floor((now - oldest.createdAt) / 86_400_000));
+  const weeks = Math.floor(days / 7);
   const span =
     days < 14
-      ? tr(`${String(days)} days`, `${String(days)} 天`)
-      : tr(`${String(Math.floor(days / 7))} weeks`, `${String(Math.floor(days / 7))} 周`);
+      ? counted(tr, days, 'day', 'days', `${String(days)} 天`)
+      : counted(tr, weeks, 'week', 'weeks', `${String(weeks)} 周`);
   return `${count} · ${span}`;
 }
 
@@ -215,7 +220,6 @@ export function HistoryPage() {
           historyList(id, HISTORY_PAGE_LIMIT, 0),
         ]);
         setState({ phase: 'ready', snippet, current: history.current, entries: history.entries });
-        // Default comparison: the newest non-current version, as in the design.
         const target =
           compare ?? history.entries.find((e) => e.version !== history.current)?.version;
         if (target !== undefined && history.entries.some((e) => e.version === history.current)) {
@@ -254,40 +258,13 @@ export function HistoryPage() {
   };
 
   const backToEditing = () => {
-    void navigate(id === undefined ? '/library' : `/editor/${id}`);
+    void navigate(id === undefined ? '/' : `/editor/${id}`);
   };
 
   return (
-    <main className="tv-hist">
-      <div className="tv-ed-top">
-        <nav aria-label={tr('Breadcrumb', '面包屑导航')} className="tv-ed-crumbs">
-          <button
-            type="button"
-            className="tv-ed-crumb-link"
-            onClick={() => void navigate('/library')}
-          >
-            {tr('Library', '片段库')}
-          </button>
-          <span aria-hidden="true" className="tv-ed-crumb-sep">
-            /
-          </span>
-          {state.phase === 'ready' && (
-            <>
-              <button type="button" className="tv-ed-crumb-link" onClick={backToEditing}>
-                {state.snippet.title === ''
-                  ? tr('Untitled snippet', '未命名片段')
-                  : state.snippet.title}
-              </button>
-              <span aria-hidden="true" className="tv-ed-crumb-sep">
-                /
-              </span>
-            </>
-          )}
-          <span className="tv-ed-crumb tv-ed-crumb-current">{tr('History', '历史')}</span>
-        </nav>
-        <button type="button" className="tv-hist-back" onClick={backToEditing}>
-          {tr('Back to editing', '返回编辑')}
-        </button>
+    <main className="tpi tv-hist">
+      <div className="tv-hist-top">
+        <TextAction onClick={backToEditing}>{tr('Back to editing', '返回编辑')}</TextAction>
       </div>
 
       {state.phase === 'loading' && (
@@ -348,12 +325,12 @@ export function HistoryPage() {
             )}
             <div className="tv-hist-actions">
               {diff !== null && (
-                <button type="button" className="tv-hist-restore" onClick={() => void restore()}>
+                <TextAction primary onClick={() => void restore()}>
                   {tr(
                     `Restore v${String(diff.compare.version)}`,
                     `恢复 v${String(diff.compare.version)}`,
                   )}
-                </button>
+                </TextAction>
               )}
               <span className="tv-hist-actions-note" role="status">
                 {restoredTo !== null

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Simplified-Chinese widget strings; everything else falls back to the
-     default locale resources. -->
-<resources>
-    <string name="widget_empty">打开 Typvia 保存第一条片段</string>
-    <string name="widget_description">主屏一点,直达你的片段</string>
-</resources>

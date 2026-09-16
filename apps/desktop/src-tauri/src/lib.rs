@@ -12,11 +12,14 @@ mod browser_integration;
 mod commands;
 mod espanso_cli;
 pub mod injector;
+mod main_window;
 mod panel;
+mod pause;
 pub mod secure_store;
 mod semantic;
 mod service;
 mod sync;
+mod tray;
 #[cfg(target_os = "macos")]
 mod vault_autolock;
 
@@ -26,6 +29,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use commands::AppState;
 use panel::{PANEL_LABEL, PanelState};
 use sync::{SyncHost, SyncScheduler, SyncState};
+use tray::{TRAY_LABEL, TrayState};
 
 /// Builds and runs the Tauri application; exits the process on startup
 /// failure since no UI exists yet to report into.
@@ -43,6 +47,10 @@ pub fn run() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -88,27 +96,39 @@ pub fn run() {
             app.manage(std::sync::Arc::clone(&semantic_state));
             app.manage(SyncState::new(sync_host, data_dir.clone()));
             app.manage(PanelState::default());
+            app.manage(TrayState::default());
             schedule_sync(app.handle().clone(), scheduler);
             if semantic::model_present(&data_dir) {
                 let conn_handle = app.state::<AppState>().inner().conn_handle();
                 semantic::spawn_embed_worker(semantic_state, conn_handle, data_dir);
             }
-            // The panel's 28% scrim needs the transparent window to cover
-            // the screen; the card centers itself in CSS. Sized once here —
-            // never per show — so summoning stays free of geometry work
-            // (<150ms budget). If the monitor cannot be read the window keeps
-            // its config size and the card fills it exactly (no scrim, same
-            // panel as before).
+            // The Quick Bar window is the card itself, under the system's
+            // frosted material, so the desktop blurs through it. It sits
+            // centred, 22% down the primary screen. Placed once here — never
+            // per show — so summoning stays free of geometry work (<150ms
+            // budget); if the monitor cannot be read it stays centred.
             if let Some(panel_window) = app.get_webview_window(PANEL_LABEL)
                 && let Ok(Some(monitor)) = panel_window.primary_monitor()
+                && let Ok(size) = panel_window.outer_size()
             {
-                let _ = panel_window.set_position(*monitor.position());
-                let _ = panel_window.set_size(*monitor.size());
+                let area = monitor.size();
+                let origin = monitor.position();
+                let x = origin.x
+                    + i32::try_from(area.width.saturating_sub(size.width) / 2).unwrap_or(0);
+                let y = origin.y + i32::try_from(area.height / 100 * 22).unwrap_or(0);
+                let _ = panel_window.set_position(tauri::PhysicalPosition::new(x, y));
             }
             // Sleep / screen-lock events drop the vault master key.
             #[cfg(target_os = "macos")]
             vault_autolock::register(app.handle());
+            // On Windows the page draws the title bar itself: the mark, the
+            // menus and the three window buttons.
+            #[cfg(target_os = "windows")]
+            if let Some(main) = app.get_webview_window(main_window::MAIN_LABEL) {
+                let _ = main.set_decorations(false);
+            }
             app.global_shortcut().register(summon)?;
+            tray::install(app.handle())?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -117,6 +137,19 @@ pub fn run() {
                 && let WindowEvent::Focused(false) = event
             {
                 panel::hide(window.app_handle());
+            }
+            // The tray card closes when it loses focus, as a menu does.
+            if window.label() == TRAY_LABEL
+                && let WindowEvent::Focused(false) = event
+            {
+                tray::hide(window.app_handle(), false);
+            }
+            // Closing About only puts it away; the menu brings the same window back.
+            if window.label() == main_window::ABOUT_LABEL
+                && let WindowEvent::CloseRequested { api, .. } = event
+            {
+                api.prevent_close();
+                let _ = window.hide();
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -139,6 +172,8 @@ pub fn run() {
             commands::folder_create,
             commands::folder_update,
             commands::folder_delete,
+            commands::folder_merge,
+            commands::folder_reorder,
             commands::folder_list_children,
             commands::tag_create,
             commands::tag_list,
@@ -149,6 +184,11 @@ pub fn run() {
             commands::snippet_inject,
             commands::snippet_copy,
             commands::panel_insert,
+            commands::main_insert,
+            commands::main_insert_template,
+            commands::about_show,
+            commands::accessibility_status,
+            commands::open_accessibility_settings,
             commands::panel_insert_secret,
             commands::panel_copy_secret,
             commands::detect_sensitive,
@@ -180,6 +220,8 @@ pub fn run() {
             commands::history_get,
             commands::history_restore,
             commands::vault_status,
+            commands::master_password_min_length,
+            commands::webdav_credentials,
             commands::vault_initialize,
             commands::vault_unlock_password,
             commands::vault_unlock_biometric,
@@ -237,6 +279,17 @@ pub fn run() {
             sync::sync_conflict_resolve,
             panel::panel_hide,
             panel::panel_ready,
+            commands::tray_results,
+            commands::tray_insert,
+            commands::insertion_pause_status,
+            commands::insertion_pause,
+            commands::insertion_resume,
+            tray::tray_present,
+            tray::tray_hide,
+            tray::tray_open_library,
+            tray::app_quit,
+            tray::autostart_status,
+            tray::autostart_set,
         ])
         .build(tauri::generate_context!());
     match result {

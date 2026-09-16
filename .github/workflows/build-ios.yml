@@ -23,13 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
       # Device plus both simulator architectures: the FFI xcframework is
       # assembled from all three before Xcode runs.
       - uses: dtolnay/rust-toolchain@stable
@@ -38,28 +31,47 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install XcodeGen
+        run: brew install xcodegen
 
-      # The keyboard and widget extensions reference the FFI xcframework as a
-      # framework dependency, and Xcode resolves that path before any build
-      # phase runs — so the project's own pre-build script cannot create it on
-      # a clean checkout. It has to exist before xcodebuild starts.
+      # Xcode resolves framework dependency paths before any build phase
+      # runs, so the project's own pre-build script cannot create the
+      # xcframework on a clean checkout. It has to exist first, and the
+      # generated Swift bindings are a source file of the shared module.
       - name: Build the FFI xcframework
         run: bash crates/mobile-ffi/build-xcframework.sh
 
-      # Driven through the Tauri CLI rather than xcodebuild: the Rust phase
-      # of the Xcode project depends on an option service the CLI hosts, so a
-      # standalone xcodebuild invocation cannot complete the build.
-      - name: Build unsigned device package
-        run: pnpm --dir apps/mobile tauri ios build --target aarch64 --no-sign --ci
+      - name: Generate the Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
 
-      # An unsigned build still reaches the .ipa: Payload/Typvia.app with the
-      # keyboard, share and widget extensions embedded, and no code signature.
-      # Re-sign it against an Apple ID to install it.
+      - name: Archive unsigned device build
+        working-directory: apps/ios
+        run: |
+          xcodebuild archive \
+            -project Typvia.xcodeproj \
+            -scheme Typvia \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Typvia.xcarchive \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      # Without a signing identity `xcodebuild -exportArchive` refuses to run,
+      # so the package is assembled from the archive by hand. The layout is
+      # the one an .ipa actually is: a zip with the app bundle under Payload/.
+      - name: Package unsigned .ipa
+        working-directory: apps/ios
+        run: |
+          mkdir -p build/Payload
+          cp -R build/Typvia.xcarchive/Products/Applications/Typvia.app build/Payload/
+          (cd build && zip -qry Typvia-unsigned.ipa Payload)
+
+      # The package carries Typvia.app with the keyboard, share and widget
+      # extensions embedded, and no code signature. Re-sign it against an
+      # Apple ID to install it.
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: typvia-ios-unsigned
-          path: apps/mobile/src-tauri/gen/apple/build/arm64/*.ipa
+          path: apps/ios/build/Typvia-unsigned.ipa
           if-no-files-found: error

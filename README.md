@@ -141,7 +141,7 @@ the code rules a review will hold you to.
 
 ```text
 apps/desktop            Tauri 2 desktop app (Windows, macOS)
-apps/mobile             Tauri 2 mobile app (iOS, Android)
+apps/ios                Native iOS app and extensions (Swift)
 apps/sync-server        Go sync server — ciphertext only, self-hostable
 apps/browser-extension  Browser extension
 apps/browser-host       Native-messaging host for the extension

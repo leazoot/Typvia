@@ -30,6 +30,10 @@ const templateFields = vi.fn((id: string) => {
   void id;
   return Promise.resolve<SharedModule.TemplateField[]>([]);
 });
+const templateVariables = vi.fn((body: string) => {
+  void body;
+  return Promise.resolve<string[]>([]);
+});
 const panelInsertTemplate = vi.fn((id: string, values: Record<string, string>) => {
   void id;
   void values;
@@ -67,6 +71,7 @@ vi.mock('@typvia/shared', async (importOriginal) => {
     copySnippet: (id: string) => copySnippet(id),
     panelResults: (...args: unknown[]) => panelResults(...(args as [])),
     templateFields: (id: string) => templateFields(id),
+    templateVariables: (body: string) => templateVariables(body),
     panelInsertTemplate: (id: string, values: Record<string, string>) =>
       panelInsertTemplate(id, values),
     vaultStatus: () => vaultStatusFn(),
@@ -151,6 +156,7 @@ afterEach(() => {
   showHandler = null;
   panelResults.mockResolvedValue({ rows: [], hiddenByRules: 0 });
   templateFields.mockResolvedValue([]);
+  templateVariables.mockResolvedValue([]);
   vaultStatusFn.mockResolvedValue(status(false));
   panelInsertSecret.mockResolvedValue(undefined);
   panelCopySecret.mockResolvedValue(30_000);
@@ -167,12 +173,6 @@ describe('PanelApp', () => {
   it('hides the panel on Escape', () => {
     render(<PanelApp />);
     fireEvent.keyDown(screen.getByLabelText('Search snippets'), { key: 'Escape' });
-    expect(hidePanel).toHaveBeenCalledTimes(1);
-  });
-
-  it('dismisses when the scrim around the card is clicked', () => {
-    render(<PanelApp />);
-    fireEvent.mouseDown(screen.getByTestId('panel-scrim'));
     expect(hidePanel).toHaveBeenCalledTimes(1);
   });
 
@@ -283,7 +283,6 @@ describe('PanelApp', () => {
     });
     expect(panelInsert).not.toHaveBeenCalled();
     const field = await screen.findByPlaceholderText('');
-    // Fill the required field, then ↵ renders + injects via the host.
     fireEvent.change(field, { target: { value: 'auth-service' } });
     await act(async () => {
       fireEvent.keyDown(field, { key: 'Enter' });
@@ -346,7 +345,6 @@ describe('PanelApp', () => {
     });
 
     expect(panelInsertSecret).toHaveBeenCalledWith('sec-2');
-    // No unlock prompt when the session is already open.
     expect(screen.queryByLabelText('Master password')).toBeNull();
   });
 
@@ -375,6 +373,63 @@ describe('PanelApp', () => {
     expect(screen.getByText('还没有片段')).toBeTruthy();
     // The English side never renders alongside the Chinese one.
     expect(screen.queryByText('No snippets yet')).toBeNull();
+  });
+
+  it('copies on ⌥⏎ instead of inserting', async () => {
+    panelResults.mockResolvedValue({ rows: [snip()], hiddenByRules: 0 });
+    render(<PanelApp />);
+    await summon();
+    await act(async () => {
+      fireEvent.keyDown(screen.getByLabelText('Search snippets'), { key: 'Enter', altKey: true });
+    });
+    expect(copySnippet).toHaveBeenCalledWith('s-1');
+    expect(panelInsert).not.toHaveBeenCalled();
+  });
+
+  it('inserts a row straight from its ⌘-digit', async () => {
+    panelResults.mockResolvedValue({
+      rows: [snip(), snip({ id: 's-2', title: 'Second' })],
+      hiddenByRules: 0,
+    });
+    render(<PanelApp />);
+    await summon();
+    expect(screen.getByText('⌘2')).toBeTruthy();
+    await act(async () => {
+      fireEvent.keyDown(screen.getByLabelText('Search snippets'), { key: '2', metaKey: true });
+    });
+    expect(panelInsert).toHaveBeenCalledWith('s-2');
+  });
+
+  it('opens a template’s variables on ⇥ and leaves other rows alone', async () => {
+    panelResults.mockResolvedValue({
+      rows: [snip(), snip({ id: 't-3', snippetType: 'template' })],
+      hiddenByRules: 0,
+    });
+    templateFields.mockResolvedValue([templateField()]);
+    render(<PanelApp />);
+    await summon();
+    const input = screen.getByLabelText('Search snippets');
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Tab' });
+    });
+    expect(templateFields).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Tab' });
+    });
+    expect(templateFields).toHaveBeenCalledWith('t-3');
+    expect(await screen.findByText('1 variable')).toBeTruthy();
+  });
+
+  it('says how many variables a template row waits on', async () => {
+    templateVariables.mockResolvedValue(['date', 'who']);
+    panelResults.mockResolvedValue({
+      rows: [snip({ id: 't-4', snippetType: 'template', body: 'On {{date}} with {{who}}' })],
+      hiddenByRules: 0,
+    });
+    render(<PanelApp />);
+    await summon();
+    expect(await screen.findByText('2 variables to fill')).toBeTruthy();
   });
 
   it('keeps the verify prompt with a generic message when an unlock fails', async () => {

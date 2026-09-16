@@ -6,7 +6,6 @@ exclude = ["spikes/injection", "spikes/ffi"]
 members = [
     "apps/browser-host",
     "apps/desktop/src-tauri",
-    "apps/mobile/src-tauri",
     "crates/ai",
     "crates/core",
     "crates/crypto",

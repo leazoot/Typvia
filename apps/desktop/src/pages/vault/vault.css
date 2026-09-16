@@ -4,434 +4,360 @@
  *
  * SPDX-License-Identifier: MPL-2.0 */
 
-/* Vault — the same room, one step quieter. No black
-   background, no lock illustration, no password-manager chrome: just a
-   surface that holds less light, contents that stay invisible by default,
-   and a lock state that keeps the page where it was. */
-
+/* The window stays on paper-1; the vault's cards drop one step to paper-2.
+   That step is the whole signal that this place is different. */
 .tvv {
-  max-width: 880px;
-  padding: 48px 48px 96px;
+  min-height: calc(100vh - 38px);
+  padding: 40px 32px;
+  background: var(--paper-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
 }
 
-.tvv-head {
+.tvv-sheet {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
-.tvv-head h1 {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+.tvv-card {
+  display: flex;
+  flex-direction: column;
+  padding: 34px 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-2);
 }
 
-.tvv-state {
+.tvv-card.is-open {
+  padding: 30px 36px;
+}
+
+.tvv-card-head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-top: 9px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.tvv-sub {
-  margin-top: 5px;
-  color: var(--tvw-tertiary);
-  font-size: 12px;
+.tvv-lead {
+  margin: 0 0 26px;
+  font-family: var(--font-content);
+  font-size: var(--fs-title);
+  font-weight: 400;
+  line-height: 1.4;
 }
 
-.tvv-timer {
-  display: inline-flex;
+.tvv-text {
+  margin: 0 0 22px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
+  line-height: 1.9;
+}
+
+/* A single line is the field: grey at rest, coral while it has the caret. */
+.tvv-line {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 2px 6px;
+  padding: 8px 0;
+  border-bottom: 1.5px solid var(--line);
+  transition: border-color var(--d-tap);
+}
+
+.tvv-line:focus-within {
+  border-bottom-color: var(--accent);
+}
+
+.tvv-line input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
   border: 0;
-  border-radius: 6px;
   background: none;
-  color: inherit;
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: var(--fs-lead);
+  outline: none;
 }
 
-.tvv-timer:hover {
-  background: var(--tvw-hover);
+.tvv-line.is-secret input {
+  letter-spacing: 0.18em;
 }
 
-.tvv-timer .tvw-thread {
-  width: 54px;
+.tvv-hint {
+  margin: 10px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.8;
 }
 
-.tvv-clock {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-}
-
-.tvv-actions {
+.tvv-card-foot {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 24px;
+  margin-top: 34px;
 }
 
-/* ---- search ---- */
+.tvv-grow {
+  flex: 1;
+}
+
+.tvv-quiet,
+.tvv-word {
+  flex: none;
+  margin: -12px 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: color var(--d-tap);
+}
+
+.tvv-quiet {
+  color: var(--ink-muted);
+  font-size: var(--fs-body-2);
+}
+
+.tvv-word {
+  color: var(--ink-body);
+  font-size: var(--fs-body-2);
+}
+
+.tvv-quiet:hover,
+.tvv-word:hover {
+  color: var(--accent-ink);
+}
+
+/* Destructive words are plain until the pointer is on them. */
+.tvv-destroy {
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-code);
+  background: none;
+  color: var(--ink-body);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  cursor: pointer;
+  transition:
+    background var(--d-tap),
+    color var(--d-tap);
+}
+
+.tvv-destroy:hover,
+.tvv-destroy:focus-visible {
+  background: var(--accent-dark);
+  color: var(--on-accent);
+}
+
+.tvv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.tvv-field-label {
+  color: var(--ink-muted);
+  font-family: var(--font-meta);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: var(--ls-field);
+}
+
+/* The one boxed field: a value may run to several lines. */
+.tvv-box {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-0);
+  box-shadow: var(--shadow-hairline);
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-code);
+  font-size: 14px;
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+}
+
+.tvv-box:focus {
+  border-color: var(--accent-focus);
+}
+
+.tvv-form {
+  padding: 4px 0 8px;
+}
+
+.tvv-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin-top: 8px;
+}
+
+.tvv-open-head {
+  margin-bottom: 20px;
+}
+
+.tvv-head-actions {
+  display: flex;
+  flex: none;
+  gap: 22px;
+}
 
 .tvv-search {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 26px;
-  padding-bottom: 8px;
-  border-bottom: 1.5px solid var(--tvw-ink);
+  margin-bottom: 20px;
+  padding: 8px 0;
+  border-bottom: 1.5px solid var(--line);
+}
+
+.tvv-search:focus-within {
+  border-bottom-color: var(--accent);
 }
 
 .tvv-search input {
   flex: 1;
   min-width: 0;
+  padding: 0;
   border: 0;
   background: none;
-  color: var(--tvw-ink);
-  caret-color: var(--tvw-ok);
-  font: inherit;
-  font-size: 16px;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: 15px;
   outline: none;
 }
 
 .tvv-search input::placeholder {
-  color: var(--tvw-tertiary);
+  color: var(--ink-faint);
 }
 
-/* The secure glyph: a square outline, never a filled circle, and its
-   explanation only when asked for. */
-.tvv-secure {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  border: 0;
-  background: none;
-  color: var(--tvw-tertiary);
-  cursor: default;
-  padding: 2px;
+.tvv-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-
-.tvv-secure-mark {
-  display: block;
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-}
-
-.tvv-secure-note {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 20;
-  width: 232px;
-  padding: 8px 10px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 8px;
-  background: var(--tvw-surface);
-  box-shadow: var(--tvw-shadow-menu);
-  color: var(--tvw-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: left;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--tvw-micro) var(--tvw-ease);
-}
-
-.tvv-secure:hover .tvv-secure-note,
-.tvv-secure:focus-visible .tvv-secure-note {
-  opacity: 1;
-}
-
-/* ---- rows ---- */
 
 .tvv-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 52px;
+  margin: -8px -12px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  transition: background var(--d-tap);
 }
 
-.tvv-value {
+.tvv-row:hover,
+.tvv-row:focus-within {
+  background: var(--paper-1);
+}
+
+.tvv-row-line {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.tvv-trigger {
+  flex: none;
+  color: var(--ink-2);
+  font-family: var(--font-code);
+  font-size: 12px;
+}
+
+.tvv-title {
   min-width: 0;
-}
-
-/* Default is not a masked copy of the secret — it is the word "Secret". */
-.tvv-secret-word {
-  color: var(--tvw-tertiary);
-  font-size: 12.5px;
-}
-
-.tvv-plain {
   overflow: hidden;
-  color: var(--tvw-ink);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+  color: var(--ink-body);
+  font-size: var(--fs-body-2);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tvv-ttl {
-  color: var(--tvw-warn);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.tvv-note {
-  color: var(--tvw-tertiary);
-  font-size: 11.5px;
-}
-
-/* ---- forms (new secret / edit) ---- */
-
-.tvv-form {
-  margin: 14px 0 6px;
-  padding: 16px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 10px;
-  background: var(--tvw-surface);
-}
-
-.tvv-field {
-  display: block;
-  margin-bottom: 12px;
-}
-
-.tvv-field span {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--tvw-tertiary);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.tvv-field input,
-.tvv-field textarea {
-  width: 100%;
-  padding: 5px 0;
-  border: 0;
-  border-bottom: 1px solid var(--tvw-divider);
-  background: none;
-  color: var(--tvw-ink);
-  caret-color: var(--tvw-ok);
-  font: inherit;
-  font-size: 13.5px;
-  outline: none;
-  resize: vertical;
-  transition: border-color var(--tvw-micro) var(--tvw-ease);
-}
-
-.tvv-field textarea {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-.tvv-field input:focus,
-.tvv-field textarea:focus {
-  border-bottom-color: var(--tvw-ink);
-}
-
-.tvv-form-actions {
+.tvv-row-more {
   display: flex;
-  justify-content: flex-end;
-  gap: 4px;
+  gap: 16px;
+  opacity: 0;
+  transition: opacity var(--d-tap);
 }
 
-.tvv-error {
-  margin-top: 10px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
+.tvv-row:hover .tvv-row-more,
+.tvv-row:focus-within .tvv-row-more {
+  opacity: 1;
 }
 
-/* ---- security fold ---- */
-
-.tvv-security {
-  margin-top: 30px;
-  padding-top: 16px;
-  border-top: 1px solid var(--tvw-divider-soft);
+.tvv-secret {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin-top: 6px;
+  color: var(--ink);
+  font-family: var(--font-code);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
 }
 
-.tvv-security-row {
+.tvv-secret code {
+  font-family: inherit;
+}
+
+.tvv-secret-note {
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-meta);
+  letter-spacing: 0;
+}
+
+.tvv-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 6px 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+  gap: 7px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-fade);
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
 }
 
-.tvv-security-line {
+.tvv-warn-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.tvv-offer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
-}
-
-.tvv-security-chev {
-  color: var(--tvw-tertiary);
-  transition: transform var(--tvw-standard) var(--tvw-ease);
-}
-
-.tvv-security-row[aria-expanded='true'] .tvv-security-chev {
-  transform: rotate(90deg);
+  gap: 12px 26px;
+  padding: 0 4px;
+  color: var(--ink-body);
+  font-size: var(--fs-body);
 }
 
 .tvv-policy {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 6px 0 2px;
-}
-
-.tvv-policy-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-/* Security state carries a square outline, never a filled dot (design rule). */
-.tvv-square {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin-top: 4px;
-  border: 1.5px solid var(--tvw-ok);
-  border-radius: 2px;
-}
-
-/* ---- Touch ID offer (asked once) ---- */
-
-.tvv-offer {
-  display: flex;
-  align-items: center;
   gap: 10px;
-  margin-top: 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--tvw-divider);
-  border-radius: 9px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
+  padding: 8px 4px 0;
 }
 
-/* ---- locked state: the page keeps its shape ---- */
-
-.tvv-locked {
-  margin-top: 26px;
-  padding: 30px 0 10px;
+.tvv-policy p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-cjk);
 }
 
-.tvv-locked-word {
-  color: var(--tvw-ink);
-  font-size: 19px;
-  letter-spacing: -0.01em;
-}
-
-.tvv-locked-sub {
-  margin-top: 8px;
-  color: var(--tvw-secondary);
-  font-size: 13px;
-}
-
-.tvv-locked-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-.tvv-locked-form {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 20px;
-  max-width: 420px;
-}
-
-.tvv-locked-form input {
-  flex: 1;
-  padding: 6px 0;
-  border: 0;
-  border-bottom: 1.5px solid var(--tvw-ink);
-  background: none;
-  color: var(--tvw-ink);
-  caret-color: var(--tvw-ok);
-  font: inherit;
-  font-size: 15px;
-  outline: none;
-}
-
-/* The ghost of the list: shape without content, so the room still reads as
-   the vault while it is closed. */
-.tvv-ghost {
-  margin-top: 34px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  opacity: 0.5;
-}
-
-.tvv-ghost span {
-  display: block;
-  height: 9px;
-  border-radius: 3px;
-  background: var(--tvw-divider);
-}
-
-.tvv-ghost span:nth-child(2) {
-  width: 62%;
-}
-
-.tvv-ghost span:nth-child(3) {
-  width: 44%;
-}
-
-.tvv-danger {
-  border: 0;
-  background: none;
-  color: var(--tvw-secondary);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.tvv-danger:hover {
-  color: var(--tvw-danger);
-}
-
-.tvv-reset {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--tvw-divider-soft);
-  max-width: 560px;
-  color: var(--tvw-secondary);
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-.tvv-reset-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
+.tvv-policy-action {
+  margin-left: 14px;
 }

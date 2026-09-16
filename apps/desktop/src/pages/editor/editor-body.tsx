@@ -46,7 +46,7 @@ function offsetFromPoint(container: HTMLElement, x: number, y: number): number |
 }
 
 /**
- * The body editor (design 1c): 14.5px / 2.05 reading typography. At rest the
+ * The body editor, in the content face at reading size. At rest the
  * text renders styled — `{{variable}}` runs become inline tokens whose
  * underline reads as a fill-in blank. Interacting swaps in a textarea over
  * the same text; the styled view's text content is the source verbatim, so
@@ -71,7 +71,7 @@ export function EditorBody({ value, onChange }: EditorBodyProps) {
   if (!editing) {
     return (
       <div
-        className="tv-ed-body tv-ed-body-view"
+        className="tve-body is-view"
         role="button"
         tabIndex={0}
         aria-label={tr('Edit snippet body', '编辑片段正文')}
@@ -87,7 +87,7 @@ export function EditorBody({ value, onChange }: EditorBodyProps) {
       >
         {splitTokens(value).map((part, index) =>
           part.token ? (
-            <span key={index} className="tv-ed-token">
+            <span key={index} className="tve-token">
               {part.text}
             </span>
           ) : (
@@ -101,7 +101,7 @@ export function EditorBody({ value, onChange }: EditorBodyProps) {
   return (
     <textarea
       ref={textareaRef}
-      className="tv-ed-body tv-ed-body-input"
+      className="tve-body is-input"
       aria-label={tr('Snippet body', '片段正文')}
       placeholder={tr('Write the snippet body…', '在此撰写片段正文…')}
       value={value}

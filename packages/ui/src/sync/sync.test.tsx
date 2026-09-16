@@ -189,6 +189,13 @@ describe('shared sync labels', () => {
     expect(ageLabel(NOW - 800 * 86_400_000, NOW, 'en')).toBe('2 years ago');
   });
 
+  /** A span of one is the case a written-out plural gets wrong. */
+  it('says the singular for a span of one', () => {
+    expect(ageLabel(NOW - 86_400_000, NOW, 'en')).toBe('1 day ago');
+    expect(ageLabel(NOW - 30 * 86_400_000, NOW, 'en')).toBe('1 month ago');
+    expect(ageLabel(NOW - 365 * 86_400_000, NOW, 'en')).toBe('1 year ago');
+  });
+
   it('renders the same labels in Chinese under the zh locale', () => {
     expect(headline(3, true, 'zh')).toBe('你的文本存放在 3 台设备上。');
     expect(roundNotice(2, 5, 0, 'zh')).toBe('已发送 2 条，接收 5 条。');

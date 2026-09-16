@@ -28,6 +28,15 @@ pub enum DbError {
     Sqlite(rusqlite::Error),
     /// A migration target version that does not exist.
     UnknownTargetVersion { requested: u32, latest: u32 },
+    /// The database was written by a newer build than this one.
+    ///
+    /// There is nothing safe to do with it: the schema contains tables and
+    /// columns this binary has never heard of, and the down scripts that
+    /// would undo them shipped with the build that made them. Refusing is the
+    /// only honest answer — carrying on would mean writing to a shape we do
+    /// not know, which is how a newer install's data gets quietly corrupted
+    /// by an older one.
+    DatabaseFromNewerBuild { found: u32, supported: u32 },
 }
 
 impl fmt::Display for DbError {
@@ -40,6 +49,12 @@ impl fmt::Display for DbError {
                     "unknown migration target version {requested} (latest is {latest})"
                 )
             }
+            Self::DatabaseFromNewerBuild { found, supported } => {
+                write!(
+                    f,
+                    "database schema version {found} is newer than this build supports ({supported})"
+                )
+            }
         }
     }
 }
@@ -48,7 +63,7 @@ impl std::error::Error for DbError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Sqlite(e) => Some(e),
-            Self::UnknownTargetVersion { .. } => None,
+            Self::UnknownTargetVersion { .. } | Self::DatabaseFromNewerBuild { .. } => None,
         }
     }
 }

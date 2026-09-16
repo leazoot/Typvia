@@ -6,17 +6,14 @@
 
 //! End-to-end encrypted synchronization client for Typvia.
 //!
-//! Covered so far: device identity — per-device Ed25519 + X25519 key pairs
-//! whose private halves live only in the platform
-//! [`typvia_crypto::SecureStore`], the fingerprint display format used
-//! during pairing, the trust-root statement and device certificate chain,
-//! and the local-device registration use case that keeps the device table
-//! in step with the stored identity — the E2EE change-set layer: sealing
-//! entity documents into wire records, the verify-and-open pipeline with
-//! per-class rejection reasons, and the replay/monotonicity checks — and
-//! the sync orchestration: the [`SyncTransport`] trait with its HTTP
-//! implementation, K_sync availability through the secure store, entity
-//! payload documents, and the [`SyncEngine`] outbox/push/pull loop.
+//! Device identity is per-device Ed25519 + X25519 key pairs whose private
+//! halves live only in the platform [`typvia_crypto::SecureStore`]; the
+//! fingerprint format, trust-root statement and certificate chain build on
+//! it, as do pairing, provisioning, recovery and key rotation. The change-set
+//! layer seals entity documents into wire records and opens them through a
+//! verify pipeline with per-class rejection reasons and replay checks.
+//! [`SyncTransport`] abstracts the server (HTTP and WebDAV), and
+//! [`SyncEngine`] drives the outbox/push/pull loop over it.
 
 mod base32;
 mod cert;
@@ -46,8 +43,8 @@ pub use directory::{
     root_statement_to_json,
 };
 pub use engine::{
-    AdoptedAccount, NewAccount, OutboxSealer, SyncDb, SyncEngine, SyncError, SyncReport,
-    enqueue_change,
+    AdoptedAccount, NewAccount, OutboxSealer, SyncDb, SyncEngine, SyncError, SyncFailure,
+    SyncReport, enqueue_change,
 };
 pub use error::{CertificateError, EnsureLocalDeviceError, IdentityError, RecordError};
 pub use http::{HttpTransport, PROTOCOL_VERSION};

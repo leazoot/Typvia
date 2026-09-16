@@ -18,7 +18,7 @@ const NON_TEXT_INPUT_TYPES = new Set([
   'submit',
 ]);
 
-function editsText(target: EventTarget | null): boolean {
+export function editsText(target: EventTarget | null): boolean {
   if (target instanceof HTMLTextAreaElement) return !target.disabled && !target.readOnly;
   if (target instanceof HTMLInputElement) {
     return !target.disabled && !target.readOnly && !NON_TEXT_INPUT_TYPES.has(target.type);

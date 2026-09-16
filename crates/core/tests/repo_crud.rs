@@ -16,7 +16,7 @@ use typvia_core::model::{
     Tag, TriggerMode,
 };
 use typvia_core::repo::{
-    AppRuleRepo, FolderRepo, ListScope, RepoError, SnippetRepo, TagRepo, new_id,
+    AppRuleRepo, FolderRepo, ListOrder, ListScope, RepoError, SnippetRepo, TagRepo, new_id,
 };
 
 fn fresh_db() -> Connection {
@@ -510,6 +510,15 @@ fn list_scoped_filters_each_scope_and_excludes_trash() {
         ["Used two", "Used one"]
     );
 
+    // Used = used at least once, most often used first — the reverse of
+    // Recent on this fixture, which is the point: a screen headed "most used"
+    // filled from Recent would print these two the wrong way round.
+    let most_used = repo.list_scoped(ListScope::Used, None, 50, 0).unwrap();
+    assert_eq!(
+        most_used.iter().map(|s| &s.title).collect::<Vec<_>>(),
+        ["Used one", "Used two"]
+    );
+
     let unsorted = repo.list_scoped(ListScope::Unsorted, None, 50, 0).unwrap();
     assert_eq!(unsorted.len(), 3, "folderless live rows only");
 
@@ -528,6 +537,62 @@ fn list_scoped_filters_each_scope_and_excludes_trash() {
     assert_eq!(
         texts.iter().map(|s| &s.title).collect::<Vec<_>>(),
         ["Text one"]
+    );
+}
+
+#[test]
+fn list_scoped_ordered_applies_one_order_inside_any_scope() {
+    let conn = fresh_db();
+    let folders = FolderRepo::new(&conn);
+    let mail = folder("Mail", None);
+    folders.insert(&mail).unwrap();
+    let repo = SnippetRepo::new(&conn);
+
+    let mut old_favourite = snippet("Old favourite", "body");
+    old_favourite.created_at = 1_000;
+    old_favourite.updated_at = 1_000;
+    old_favourite.last_used_at = Some(5_000);
+    old_favourite.usage_count = 9;
+    let mut just_used = snippet("Just used", "body");
+    just_used.created_at = 2_000;
+    just_used.updated_at = 2_000;
+    just_used.last_used_at = Some(8_000);
+    just_used.usage_count = 1;
+    let mut never_used = snippet("Never used", "body");
+    never_used.created_at = 3_000;
+    never_used.updated_at = 3_000;
+    for s in [&mut old_favourite, &mut just_used, &mut never_used] {
+        s.folder_id = Some(mail.id.clone());
+    }
+    // Outside the folder, newest and most used of all: it must not leak in.
+    let mut elsewhere = snippet("Elsewhere", "body");
+    elsewhere.created_at = 4_000;
+    elsewhere.updated_at = 4_000;
+    elsewhere.last_used_at = Some(9_000);
+    elsewhere.usage_count = 20;
+    for s in [&old_favourite, &just_used, &never_used, &elsewhere] {
+        repo.insert(s).unwrap();
+    }
+
+    let titles = |order: ListOrder| -> Vec<String> {
+        repo.list_scoped_ordered(ListScope::Folder(&mail.id), None, order, 50, 0)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.title)
+            .collect()
+    };
+    // Never used sorts after every used snippet, not before them.
+    assert_eq!(
+        titles(ListOrder::LastUsed),
+        ["Just used", "Old favourite", "Never used"]
+    );
+    assert_eq!(
+        titles(ListOrder::Created),
+        ["Never used", "Just used", "Old favourite"]
+    );
+    assert_eq!(
+        titles(ListOrder::UsageCount),
+        ["Old favourite", "Just used", "Never used"]
     );
 }
 

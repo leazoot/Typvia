@@ -22,10 +22,10 @@ import {
   pairingPoll,
   type PairingSas,
   pairingSas,
+  webdavCredentials,
 } from '@typvia/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { trFor, useLocale } from '../i18n';
-import { webdavCredentials } from './use-sync-setup';
 
 /** How often the joining device asks whether the offer has arrived. */
 const POLL_INTERVAL_MS = 2_000;
@@ -168,7 +168,7 @@ export function usePairJoin(onDone: () => void): PairJoin {
     try {
       const started =
         kind === 'webdav'
-          ? await pairingBeginWebdav(serverUrl.trim(), webdavCredentials(username, password))
+          ? await pairingBeginWebdav(serverUrl.trim(), await webdavCredentials(username, password))
           : await pairingBegin(serverUrl.trim(), accountId.trim());
       setCode(started.code);
     } catch (caught) {

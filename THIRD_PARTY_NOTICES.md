@@ -12,3 +12,18 @@ Espanso ships **unmodified, as a separate program**: Typvia starts it as its own
 process and speaks to it only through its command line and config files — never
 linking against, embedding, or altering its source. Typvia itself stays MPL-2.0;
 the sync server, AGPL-3.0.
+
+## JetBrains Mono
+
+The Typvia iOS app and its extensions bundle the **JetBrains Mono** typeface, in
+Regular and Bold, for trigger words, type marks, code and counts.
+
+- <https://www.jetbrains.com/lp/mono/> — © 2020 The JetBrains Mono Project Authors
+- SIL Open Font License 1.1 — full text in
+  [`apps/ios/Resources/Fonts/OFL.txt`](apps/ios/Resources/Fonts/OFL.txt), which ships
+  in every product that carries the font, as the licence requires
+- Upstream: <https://github.com/JetBrains/JetBrainsMono> — the font files are the
+  unmodified `ttf/` release artefacts
+
+The font files are data, not linked code: bundling them places no licence
+requirement on Typvia's own source, which stays MPL-2.0.

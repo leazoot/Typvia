@@ -1,0 +1,114 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0 */
+
+/* The ⌘K palette floats like Quick Bar: a line to type on, words to pick. */
+
+.tvc-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--scrim);
+  animation: tpi-fade-in 0.19s ease both;
+}
+
+.tvc {
+  position: fixed;
+  top: 14vh;
+  left: 50%;
+  z-index: 61;
+  width: min(560px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--paper-0);
+  box-shadow: var(--shadow-panel);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  transform: translateX(-50%);
+  animation: tvc-in 0.25s var(--ease-move) both;
+}
+
+@keyframes tvc-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+.tvc-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-muted);
+}
+
+.tvc-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-content);
+  font-size: var(--fs-lead);
+  outline: none;
+}
+
+.tvc-field input::placeholder {
+  color: var(--ink-faint);
+}
+
+.tvc-list {
+  max-height: 46vh;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.tvc-group {
+  padding: 10px 14px 6px;
+}
+
+.tvc-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tvc-item[aria-selected='true'],
+.tvc-item:hover {
+  background: var(--paper-1);
+}
+
+.tvc-item .tpi-key {
+  margin-left: auto;
+}
+
+.tvc-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tvc,
+  .tvc-scrim {
+    animation-duration: 0.09s;
+  }
+}

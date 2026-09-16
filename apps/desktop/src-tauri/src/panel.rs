@@ -132,6 +132,21 @@ pub fn show(app: &AppHandle) {
     let _ = app.emit("panel:summoned", ());
 }
 
+/// Bundle id of the app frontmost right now, for inserts that do not go
+/// through the panel. AppKit only answers on the main thread, so the read is
+/// posted there; callers must be off the main thread or this would deadlock.
+pub fn frontmost_bundle_id(app: &AppHandle) -> Option<String> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = sender.send(frontmost::frontmost_app().and_then(|front| front.bundle_id));
+    })
+    .ok()?;
+    receiver
+        .recv_timeout(std::time::Duration::from_millis(500))
+        .ok()
+        .flatten()
+}
+
 /// Delay after restoring the previous app before the insert paints, so the
 /// window server has brought it frontmost before the insert targets it.
 pub const FOCUS_SETTLE_MS: u64 = 100;
@@ -188,7 +203,7 @@ pub struct FrontmostApp {
 /// Frontmost-app tracking. macOS reads/reactivates via AppKit; other platforms
 /// are no-ops until their panel lands.
 #[cfg(target_os = "macos")]
-mod frontmost {
+pub(crate) mod frontmost {
     use objc2::MainThreadMarker;
     use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication, NSWorkspace};
 
@@ -228,7 +243,7 @@ mod frontmost {
 }
 
 #[cfg(not(target_os = "macos"))]
-mod frontmost {
+pub(crate) mod frontmost {
     use super::FrontmostApp;
 
     pub fn frontmost_app() -> Option<FrontmostApp> {

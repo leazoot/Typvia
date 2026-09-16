@@ -1,0 +1,60 @@
+name: Smoke Windows
+
+# Manual only. Launches the desktop app on the runner to capture what a
+# release build cannot report: the window subsystem swallows panics, so a
+# startup failure reaches the user as a silent exit.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Debug keeps the console subsystem, so panics and backtraces are visible.
+      - name: Build unbundled debug binary
+        run: pnpm --dir apps/desktop tauri build --debug --no-bundle
+
+      - name: Launch and capture startup output
+        shell: pwsh
+        env:
+          RUST_BACKTRACE: full
+        run: |
+          $exe = Get-ChildItem -Path target/debug -Filter 'typvia-desktop.exe' -File | Select-Object -First 1
+          if (-not $exe) { throw 'built binary not found' }
+          $p = Start-Process -FilePath $exe.FullName -PassThru -NoNewWindow `
+            -RedirectStandardOutput smoke-out.txt -RedirectStandardError smoke-err.txt
+          Start-Sleep -Seconds 25
+          if ($p.HasExited) {
+            Write-Host "EXITED EARLY with code $($p.ExitCode)"
+          } else {
+            Write-Host 'STILL RUNNING after 25s'
+            Stop-Process -Id $p.Id -Force
+          }
+          Write-Host '--- stdout ---'
+          Get-Content smoke-out.txt -ErrorAction SilentlyContinue
+          Write-Host '--- stderr ---'
+          Get-Content smoke-err.txt -ErrorAction SilentlyContinue

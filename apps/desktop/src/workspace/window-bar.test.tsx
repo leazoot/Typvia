@@ -7,8 +7,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as SharedModule from '@typvia/shared';
 import { WindowBar } from './window-bar';
+
+const summonShortcut = vi.fn();
+
+vi.mock('@typvia/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof SharedModule>();
+  return { ...actual, summonShortcut: () => summonShortcut() as Promise<string | null> };
+});
 
 const minimize = vi.fn(() => Promise.resolve());
 const toggleMaximize = vi.fn(() => Promise.resolve());
@@ -38,6 +46,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+beforeEach(() => {
+  summonShortcut.mockResolvedValue('Ctrl Alt V');
+});
+
 describe('WindowBar', () => {
   it('goes straight to a place and marks the one the window is in', async () => {
     renderBar('/');
@@ -53,6 +65,18 @@ describe('WindowBar', () => {
   it('offers the way back from a page other than the library', () => {
     renderBar('/settings');
     expect(screen.getByRole('button', { name: 'Back' })).toBeDefined();
+  });
+
+  it('names the summon key the host actually registered', async () => {
+    renderBar('/');
+    expect(await screen.findByText('Ctrl Alt V')).toBeDefined();
+  });
+
+  it('offers no summon key when the system granted none', async () => {
+    summonShortcut.mockResolvedValue(null);
+    renderBar('/');
+    expect(await screen.findByRole('button', { name: 'Minimize' })).toBeDefined();
+    expect(screen.queryByText('Summon')).toBeNull();
   });
 
   it('works the window from its own three buttons', () => {

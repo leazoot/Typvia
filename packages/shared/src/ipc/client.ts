@@ -721,6 +721,15 @@ export function panelResults(query: string, limit: number): Promise<PanelResults
   return call('panel_results', { query, limit });
 }
 
+/**
+ * Which keys summon Quick Bar on this machine, or null when the system granted
+ * none. Only the host knows: a system may refuse the wanted combination and
+ * the app then takes the next one it can get.
+ */
+export function summonShortcut(): Promise<string | null> {
+  return call('summon_shortcut');
+}
+
 // --- Onboarding -------------------------------------------------------------
 
 /**

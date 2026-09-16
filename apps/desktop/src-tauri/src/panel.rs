@@ -169,6 +169,32 @@ pub fn hide(app: &AppHandle) {
 
 /// Hides the panel in response to a WebView action (ESC). Kept out of the IPC
 /// data layer since it only drives window lifecycle, not core state.
+/// The summon keys the system actually granted, in the words the UI shows.
+/// Empty when every candidate was refused, so the UI can say the summon key is
+/// unavailable rather than name one that does nothing.
+#[derive(Default)]
+pub struct SummonShortcut {
+    words: std::sync::Mutex<Option<String>>,
+}
+
+impl SummonShortcut {
+    pub fn set(&self, words: &str) {
+        if let Ok(mut guard) = self.words.lock() {
+            *guard = Some(words.to_owned());
+        }
+    }
+
+    fn words(&self) -> Option<String> {
+        self.words.lock().ok().and_then(|guard| guard.clone())
+    }
+}
+
+/// Which keys summon the panel on this machine.
+#[tauri::command]
+pub fn summon_shortcut(state: tauri::State<'_, SummonShortcut>) -> Option<String> {
+    state.words()
+}
+
 #[tauri::command]
 pub fn panel_hide(app: AppHandle) {
     hide(&app);

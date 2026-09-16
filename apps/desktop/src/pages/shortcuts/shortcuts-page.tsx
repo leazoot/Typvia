@@ -4,7 +4,9 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+import { summonShortcut } from '@typvia/shared';
 import { useTr, type Tr } from '@typvia/ui';
+import { useEffect, useState } from 'react';
 import { KeyCap } from '../../paper/kit';
 import './shortcuts.css';
 
@@ -15,14 +17,21 @@ interface KeyRow {
   note?: string;
 }
 
-/** Only keys that work today; macOS as symbols, Windows as words. */
-function keyRows(tr: Tr): KeyRow[] {
+/**
+ * Only keys that work today; macOS as symbols, Windows as words. Windows keeps
+ * Win Shift V for its own clipboard history, so the summon key there is
+ * whatever the host managed to register — it says which.
+ */
+function keyRows(tr: Tr, summon: string | null): KeyRow[] {
   return [
     {
       action: tr('Summon Quick Bar', '呼出 Quick Bar'),
       mac: '⌘⇧V',
-      windows: 'Win Shift V',
-      note: tr('in any app', '在任何应用里'),
+      windows: 'Ctrl Alt V',
+      note:
+        summon === null
+          ? tr('this machine granted none', '这台机器没把呼出键给出来')
+          : tr(`in any app · ${summon} here`, `在任何应用里 · 本机是 ${summon}`),
     },
     { action: tr('Insert the picked one', '插入选中项'), mac: '⏎', windows: 'Enter' },
     { action: tr('Copy, do not insert', '只复制不插入'), mac: '⌥⏎', windows: 'Alt Enter' },
@@ -60,6 +69,13 @@ function keyRows(tr: Tr): KeyRow[] {
 
 export function ShortcutsPage() {
   const tr = useTr();
+  // Only the host knows which keys the system handed over.
+  const [summon, setSummon] = useState<string | null>(null);
+  useEffect(() => {
+    summonShortcut()
+      .then(setSummon)
+      .catch(() => setSummon(null));
+  }, []);
 
   return (
     <div className="tpi tvk">
@@ -77,7 +93,7 @@ export function ShortcutsPage() {
             <div role="columnheader">MACOS</div>
             <div role="columnheader">WINDOWS</div>
           </div>
-          {keyRows(tr).map((row) => (
+          {keyRows(tr, summon).map((row) => (
             <div key={row.mac} className="tvk-row" role="row">
               <div role="rowheader">{row.action}</div>
               <div role="cell">

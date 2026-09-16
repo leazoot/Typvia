@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { summonShortcut } from '@typvia/shared';
 import { useTr } from '@typvia/ui';
+import { useEffect, useState } from 'react';
 import { KeyCap } from '../paper/kit';
 import { Mascot } from '../paper/mascot';
 import { BackAction, PlaceTabs } from './title-nav';
@@ -19,6 +21,14 @@ import './window-bar.css';
  */
 export function WindowBar() {
   const tr = useTr();
+  // The host reports what the system actually granted; when it granted
+  // nothing there is no key to name, so the bar simply does not offer one.
+  const [summon, setSummon] = useState<string | null>(null);
+  useEffect(() => {
+    summonShortcut()
+      .then(setSummon)
+      .catch(() => setSummon(null));
+  }, []);
 
   return (
     <header className="tpi tvwin" data-tauri-drag-region="">
@@ -31,10 +41,12 @@ export function WindowBar() {
         <BackAction />
       </span>
       <span className="tvwin-grow" data-tauri-drag-region="" />
-      <span className="tvwin-summon">
-        <span>{tr('Summon', '呼出')}</span>
-        <KeyCap>Win Shift V</KeyCap>
-      </span>
+      {summon !== null && (
+        <span className="tvwin-summon">
+          <span>{tr('Summon', '呼出')}</span>
+          <KeyCap>{summon}</KeyCap>
+        </span>
+      )}
       <div className="tvwin-controls">
         <button
           type="button"

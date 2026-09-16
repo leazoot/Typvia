@@ -31,17 +31,47 @@ use panel::{PANEL_LABEL, PanelState};
 use sync::{SyncHost, SyncScheduler, SyncState};
 use tray::{TRAY_LABEL, TrayState};
 
+/// Keys tried for the global summon, most wanted first, each with the words
+/// the UI shows for it. Windows keeps most Win combinations for the shell and
+/// refuses to hand them out, so the app takes the first one the system grants.
+fn summon_candidates() -> Vec<(Shortcut, &'static str)> {
+    let mut keys = Vec::new();
+    #[cfg(target_os = "macos")]
+    keys.push((
+        Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyV),
+        "⌘⇧V",
+    ));
+    #[cfg(not(target_os = "macos"))]
+    {
+        keys.push((
+            Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyV),
+            "Win Shift V",
+        ));
+        keys.push((
+            Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV),
+            "Ctrl Alt V",
+        ));
+    }
+    keys
+}
+
 /// Builds and runs the Tauri application; exits the process on startup
 /// failure since no UI exists yet to report into.
 pub fn run() {
-    // Global summon shortcut ⌘⇧V for the panel. Registered in setup; the
-    // plugin handler toggles the resident panel window.
-    let summon = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyV);
+    // Which summon keys the system grants is only known at registration time,
+    // so the handler matches against whatever setup managed to take.
+    let granted: std::sync::Arc<std::sync::Mutex<Option<Shortcut>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let pressed = std::sync::Arc::clone(&granted);
     let result = tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
-                    if shortcut == &summon && event.state() == ShortcutState::Pressed {
+                    if event.state() == ShortcutState::Pressed
+                        && pressed
+                            .lock()
+                            .is_ok_and(|current| current.as_ref() == Some(shortcut))
+                    {
                         panel::toggle(app);
                     }
                 })
@@ -127,7 +157,19 @@ pub fn run() {
             if let Some(main) = app.get_webview_window(main_window::MAIN_LABEL) {
                 let _ = main.set_decorations(false);
             }
-            app.global_shortcut().register(summon)?;
+            // A refused shortcut costs the shortcut, never the launch: the
+            // panel still opens from the tray card and the window.
+            let summon = panel::SummonShortcut::default();
+            if let Some((shortcut, words)) = summon_candidates()
+                .into_iter()
+                .find(|(candidate, _)| app.global_shortcut().register(*candidate).is_ok())
+            {
+                if let Ok(mut current) = granted.lock() {
+                    *current = Some(shortcut);
+                }
+                summon.set(words);
+            }
+            app.manage(summon);
             tray::install(app.handle())?;
             Ok(())
         })
@@ -279,6 +321,7 @@ pub fn run() {
             sync::sync_conflict_resolve,
             panel::panel_hide,
             panel::panel_ready,
+            panel::summon_shortcut,
             commands::tray_results,
             commands::tray_insert,
             commands::insertion_pause_status,

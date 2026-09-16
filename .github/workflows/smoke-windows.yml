@@ -1,10 +1,13 @@
 name: Smoke Windows
 
-# Manual only. Launches the desktop app on the runner to capture what a
-# release build cannot report: the window subsystem swallows panics, so a
-# startup failure reaches the user as a silent exit.
+# Launches the desktop app on the runner to capture what a release build
+# cannot report: the window subsystem swallows panics, so a startup failure
+# reaches the user as a silent exit. Manual once this file reaches the default
+# branch; until then it runs on pushes to the branch under test.
 on:
   workflow_dispatch:
+  push:
+    branches: [batch-34]
 
 permissions:
   contents: read

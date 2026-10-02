@@ -90,16 +90,16 @@ dependencies {
     // UniFFI-generated Kotlin requires JNA at runtime; it is taken under the
     // Apache-2.0 option of its Apache-2.0/LGPL-2.1 dual license, which is
     // MPL-2.0 compatible. The @aar variant carries Android libjnidispatch.
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
     testImplementation("junit:junit:4.13.2")
     // Plain jar for host-JVM unit tests (loads the host dylib, not the .so).
-    testImplementation("net.java.dev.jna:jna:5.17.0")
+    testImplementation("net.java.dev.jna:jna:5.19.1")
     // Instrumentation closed loop, test-only: AndroidX Test
     // runner/core/junit drive the host activity, UiAutomator crosses into
     // the IME window (an Espresso view scope cannot reach another process's
     // window). All Apache-2.0; none ship in any product APK.
-    androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.test:core:1.6.1")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test:core:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.4.0")
 }

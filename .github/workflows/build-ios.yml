@@ -58,7 +58,7 @@ jobs:
       # keyboard, share and widget extensions embedded, and no code signature.
       # Re-sign it against an Apple ID to install it.
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typvia-ios-unsigned
           path: apps/mobile/src-tauri/gen/apple/build/arm64/*.ipa
